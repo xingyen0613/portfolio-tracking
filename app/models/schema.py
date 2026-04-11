@@ -81,7 +81,8 @@ INSERT OR IGNORE INTO platforms (name, display_name) VALUES
     ('binance', 'Binance'),
     ('okx', 'OKX'),
     ('yuanta', '元大證券'),
-    ('firsttrade', 'FirstTrade');
+    ('firsttrade', 'FirstTrade'),
+    ('sui_wallet', 'SUI Wallet');
 """
 
 SEED_ACCOUNTS = """

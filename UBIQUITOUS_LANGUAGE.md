@@ -30,6 +30,15 @@
 | **Asset Type** | A minimal classification of an asset: cash, stock, ETF, crypto, stablecoin, wallet_token, unknown | Category, class |
 | **Original Currency** | The currency in which the platform reports price and value — no cross-currency conversion in this layer | Base currency, denomination |
 
+## On-chain / Wallet
+
+| Term | Definition | Aliases to avoid |
+| --- | --- | --- |
+| **Wallet Address** | A blockchain address that holds assets on-chain — one Platform (e.g. SUI) can have multiple Wallet Addresses, each mapped to an Account | Address, wallet, public key |
+| **DeFi Position** | An asset deployed into a DeFi protocol (lending, staking, LP) — distinct from a simple token balance | DeFi balance, protocol asset |
+| **Protocol** | A specific DeFi application on-chain (e.g. Cetus, Navi, Suilend) from which DeFi Positions are fetched | DApp, contract, pool |
+| **Token Balance** | The quantity of a specific coin/token held directly in a Wallet Address, not deployed in any Protocol | Coin balance, native balance |
+
 ## Pipeline Layers (within a Connector)
 
 | Term | Definition | Aliases to avoid |
@@ -41,7 +50,7 @@
 ## Relationships
 
 - A **Batch** contains one or more **Source Runs**, one per enabled **Platform**-**Account** pair
-- A **Source Run** produces exactly one **Raw Payload** (stored as an immutable file)
+- A **Source Run** produces one or more **Raw Payloads** (each stored as an immutable file) — e.g. one for tokens, one per DeFi Protocol
 - A **Raw Payload** is processed by a **Parser** to produce one or more **Normalized Holdings**
 - All **Normalized Holdings** from a single **Source Run** form one **Account Snapshot**
 - All **Account Snapshots** within a **Batch** can be aggregated into a **Portfolio Snapshot**
@@ -67,3 +76,4 @@
 - **"Balance"** is used loosely in API responses to mean either a single asset's quantity or an account's total value. We avoid this term — use **Normalized Holding** for per-asset data and **Account Snapshot** for the aggregate.
 - **"Snapshot"** has two levels: **Account Snapshot** (per-account) and **Portfolio Snapshot** (cross-account aggregate). Always qualify which level is meant.
 - **"Raw data"** is ambiguous — it could mean the file or the DB metadata record. Use **Raw Payload** for the immutable file content, and **raw_payloads table** for the DB metadata that points to it.
+- **"Wallet"** in this system is NOT an Account — a **Wallet Address** is an on-chain address under a Platform. Each Wallet Address is modeled as a separate **Account** in the DB. Don't confuse with exchange "wallet" features (e.g. Binance funding wallet).
