@@ -80,6 +80,21 @@ def run_source_pipeline(connector, batch_id: str):
 
         # Parse holdings
         holdings = connector.parse_holdings(raw_items)
+
+        # Fetch prices for all symbols
+        from app.valuation.pricer import fetch_prices
+        symbols = list({h["platform_symbol"] for h in holdings})
+        prices = fetch_prices(symbols)
+
+        # Enrich holdings with price and value
+        for h in holdings:
+            sym = h["platform_symbol"]
+            p = prices.get(sym)
+            h["price"] = p
+            h["value"] = round(h["quantity"] * p, 8) if p is not None else None
+            if p is not None and not h.get("price_source"):
+                h["price_source"] = "market"
+
         total_value = None
         currency = None
 
