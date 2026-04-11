@@ -8,7 +8,9 @@ import os
 import ccxt
 from dotenv import load_dotenv
 
-load_dotenv()
+from config.settings import ENV_PATH
+
+load_dotenv(ENV_PATH)
 
 STABLECOINS = {"USDT", "USDC", "BUSD", "DAI", "TUSD", "FDUSD", "USDE"}
 FIAT_USD = {"USD"}

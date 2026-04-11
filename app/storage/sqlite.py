@@ -3,11 +3,12 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from app.models.schema import CREATE_TABLES, SEED_ACCOUNTS, SEED_PLATFORMS
-from config.settings import DB_PATH, SQLITE_DIR
+from config.settings import DB_PATH, LOGS_DIR, SQLITE_DIR
 
 
 def init_db() -> None:
     SQLITE_DIR.mkdir(parents=True, exist_ok=True)
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
     with get_conn() as conn:
         conn.executescript(CREATE_TABLES)
         conn.executescript(SEED_PLATFORMS)
