@@ -32,6 +32,7 @@ def _classify(symbol: str) -> str:
 
 class SuiWalletConnector(BaseConnector):
     platform_name = "sui_wallet"
+    use_pricer = True  # pricer fills DeFi positions (price=None); token prices from BlockVision are preserved
 
     def __init__(self, wallet_address: str):
         self.wallet_address = wallet_address
@@ -113,6 +114,10 @@ class SuiWalletConnector(BaseConnector):
             if resource_type == "tokens":
                 coins = result.get("coins", [])
                 for coin in coins:
+                    # Skip unverified or scam tokens
+                    if not coin.get("verified", False) or coin.get("scam", False):
+                        continue
+
                     symbol = coin.get("symbol", "UNKNOWN")
                     decimals = int(coin.get("decimals", 9))
                     raw_balance = int(coin.get("balance", "0"))

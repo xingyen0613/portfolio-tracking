@@ -14,6 +14,7 @@ class RunResult:
 class BaseConnector(ABC):
     platform_name: str
     account_key: str = "account_main"
+    use_pricer: bool = True  # set False to skip market price enrichment
 
     @abstractmethod
     def authenticate(self) -> None:
