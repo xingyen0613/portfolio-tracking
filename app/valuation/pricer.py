@@ -16,6 +16,13 @@ STABLECOINS = {"USDT", "USDC", "BUSD", "DAI", "TUSD", "FDUSD", "USDE"}
 FIAT_USD = {"USD"}
 QUOTE_CURRENCIES = ["USDT", "USDC", "BTC"]  # fallback order for price lookup
 
+# LST / derivative token aliases: treat as equivalent to their underlying asset.
+# These are approximations — actual price may differ slightly due to staking rewards.
+SYMBOL_ALIASES = {
+    "vSUI": "SUI",   # Volo staked SUI
+    "xSUI": "SUI",   # Aftermath staked SUI
+}
+
 
 def _get_binance():
     return ccxt.binance({
@@ -44,8 +51,15 @@ def fetch_prices(symbols: list[str]) -> dict[str, float | None]:
         if s.upper() in STABLECOINS or s.upper() in FIAT_USD:
             prices[s] = 1.0
 
-    # Symbols that need market lookup
-    to_fetch = [s for s in symbols if s not in prices]
+    # Resolve aliases (e.g. vSUI → SUI) — aliased symbols fetch price under canonical name
+    alias_map: dict[str, str] = {}  # orig_symbol → canonical_symbol
+    for s in symbols:
+        if s in SYMBOL_ALIASES:
+            alias_map[s] = SYMBOL_ALIASES[s]
+
+    # Symbols that need market lookup (aliases replaced by canonical, deduped)
+    to_fetch_set = {alias_map.get(s, s) for s in symbols if s not in prices}
+    to_fetch = list(to_fetch_set)
     if not to_fetch:
         return prices
 
@@ -78,6 +92,11 @@ def fetch_prices(symbols: list[str]) -> dict[str, float | None]:
     if still_missing:
         okx_prices = _fetch_from(_get_okx(), still_missing)
         prices.update(okx_prices)
+
+    # Apply alias prices back to original symbols
+    for orig, canonical in alias_map.items():
+        if canonical in prices and orig not in prices:
+            prices[orig] = prices[canonical]
 
     # Fill any remaining symbols as None
     for s in symbols:
