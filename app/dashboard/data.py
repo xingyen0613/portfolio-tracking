@@ -74,6 +74,7 @@ def get_holdings() -> pd.DataFrame:
 def get_snapshot_history() -> pd.DataFrame:
     """
     Return daily account snapshots aggregated by category.
+    For each account+date, only the latest batch's snapshot is used.
     Used for the time series chart.
     """
     sql = """
@@ -86,6 +87,13 @@ def get_snapshot_history() -> pd.DataFrame:
         JOIN accounts a  ON acs.account_id = a.id
         JOIN platforms p ON a.platform_id = p.id
         WHERE acs.total_value IS NOT NULL
+          AND acs.id = (
+              SELECT id FROM account_snapshots
+              WHERE account_id = acs.account_id
+                AND snapshot_date = acs.snapshot_date
+                AND total_value IS NOT NULL
+              ORDER BY created_at DESC LIMIT 1
+          )
         ORDER BY acs.snapshot_date
     """
     with _conn() as conn:
