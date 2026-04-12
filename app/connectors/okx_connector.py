@@ -105,7 +105,8 @@ class OKXConnector(BaseConnector):
             elif resource_type == "savings":
                 for row in payload.get("data", []):
                     symbol = row["ccy"]
-                    qty = float(row.get("amt", 0))
+                    # amt = active balance, pendingAmt = pending redemption (still user's asset)
+                    qty = float(row.get("amt", 0)) + float(row.get("pendingAmt", 0))
                     if qty <= 0:
                         continue
                     # Savings assets are separate from spot; add them in

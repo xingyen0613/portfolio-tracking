@@ -55,12 +55,20 @@ class BinanceConnector(BaseConnector):
                 "fetch_error": str(e),
             })
 
-        # Simple Earn Flexible positions
+        # Simple Earn Flexible positions (paginated)
         try:
-            flexible = self._exchange.sapiGetSimpleEarnFlexiblePosition({})
+            all_rows = []
+            page = 1
+            while True:
+                resp = self._exchange.sapiGetSimpleEarnFlexiblePosition({"current": page, "size": 100})
+                rows = resp.get("rows", [])
+                all_rows.extend(rows)
+                if len(all_rows) >= int(resp.get("total", 0)) or not rows:
+                    break
+                page += 1
             items.append({
                 "resource_type": "earn_flexible",
-                "payload": flexible,
+                "payload": {"rows": all_rows, "total": len(all_rows)},
                 "fetched_at": _now(),
             })
         except Exception as e:
@@ -71,12 +79,20 @@ class BinanceConnector(BaseConnector):
                 "fetch_error": str(e),
             })
 
-        # Simple Earn Locked positions
+        # Simple Earn Locked positions (paginated)
         try:
-            locked = self._exchange.sapiGetSimpleEarnLockedPosition({})
+            all_rows = []
+            page = 1
+            while True:
+                resp = self._exchange.sapiGetSimpleEarnLockedPosition({"current": page, "size": 100})
+                rows = resp.get("rows", [])
+                all_rows.extend(rows)
+                if len(all_rows) >= int(resp.get("total", 0)) or not rows:
+                    break
+                page += 1
             items.append({
                 "resource_type": "earn_locked",
-                "payload": locked,
+                "payload": {"rows": all_rows, "total": len(all_rows)},
                 "fetched_at": _now(),
             })
         except Exception as e:
