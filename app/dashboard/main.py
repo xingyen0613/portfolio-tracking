@@ -15,7 +15,7 @@ import streamlit as st
 
 from app.dashboard.data import get_holdings, get_latest_snapshot_date, get_snapshot_history
 from app.dashboard.metrics import compute_metrics, filter_window
-from config.settings import CATEGORY_LABEL, TWD_PER_USD
+from config.settings import CATEGORY_LABEL, PLATFORM_CATEGORY, TWD_PER_USD
 
 st.set_page_config(
     page_title="Portfolio",
@@ -276,17 +276,32 @@ else:
     with col_window:
         window = st.selectbox("時間窗口", ["1W", "1M", "1Q", "1Y"], index=1)
 
-    # Aggregate daily by category
-    daily = (
-        history_df.groupby(["snapshot_date", "category"])["value_usd"]
-        .sum()
-        .reset_index()
-    )
-    daily_total = daily.groupby("snapshot_date")["value_usd"].sum().reset_index()
-    daily_total["category"] = "total"
+    # Forward-fill per platform first, then aggregate by category (display only, not written to DB)
+    # Step 1: ffill each platform independently over the full date range in the window
+    plat_daily = history_df.groupby(["snapshot_date", "platform"])["value_usd"].sum().reset_index()
+    plat_daily = filter_window(plat_daily, "snapshot_date", window)
 
-    all_daily = pd.concat([daily, daily_total], ignore_index=True)
-    all_daily = filter_window(all_daily, "snapshot_date", window)
+    if not plat_daily.empty:
+        date_range = pd.date_range(plat_daily["snapshot_date"].min(), plat_daily["snapshot_date"].max(), freq="D")
+        platforms = plat_daily["platform"].unique()
+        full_idx = pd.MultiIndex.from_product([date_range, platforms], names=["snapshot_date", "platform"])
+        plat_daily = (
+            plat_daily
+            .set_index(["snapshot_date", "platform"])
+            .reindex(full_idx)
+            .groupby(level="platform")["value_usd"]
+            .ffill()
+            .reset_index()
+        )
+
+        # Step 2: map platform → category, sum by category
+        plat_daily["category"] = plat_daily["platform"].map(PLATFORM_CATEGORY).fillna("unknown")
+        daily = plat_daily.groupby(["snapshot_date", "category"])["value_usd"].sum().reset_index()
+        daily_total = daily.groupby("snapshot_date")["value_usd"].sum().reset_index()
+        daily_total["category"] = "total"
+        all_daily = pd.concat([daily, daily_total], ignore_index=True)
+    else:
+        all_daily = pd.DataFrame(columns=["snapshot_date", "category", "value_usd"])
 
     COLORS = {
         "total": "#636EFA",
