@@ -8,11 +8,11 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/yen/.local/bin/uv</string>
+        <string>/YOUR_HOME/.local/bin/uv</string>
         <string>run</string>
         <string>streamlit</string>
         <string>run</string>
-        <string>/Users/yen/claude/Portfolio-Tracking/app/dashboard/main.py</string>
+        <string>/YOUR_PROJECT_PATH/app/dashboard/main.py</string>
         <string>--server.port</string>
         <string>857</string>
         <string>--server.headless</string>
@@ -22,7 +22,7 @@
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/yen/claude/Portfolio-Tracking</string>
+    <string>/YOUR_PROJECT_PATH</string>
 
     <key>RunAtLoad</key>
     <true/>
@@ -31,9 +31,9 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/yen/claude/Portfolio-Tracking/data/logs/dashboard.log</string>
+    <string>/YOUR_PROJECT_PATH/data/logs/dashboard.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/yen/claude/Portfolio-Tracking/data/logs/dashboard.error.log</string>
+    <string>/YOUR_PROJECT_PATH/data/logs/dashboard.error.log</string>
 </dict>
 </plist>

@@ -8,3 +8,6 @@ __pycache__/
 *.egg-info/
 dist/
 .pytest_cache/
+com.portfolio.dashboard.plist
+thinking.md
+thinking_organized.md
