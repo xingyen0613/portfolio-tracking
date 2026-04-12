@@ -78,26 +78,51 @@ def _resource_label(rt: str) -> str:
     return rt
 
 
-def _display_holding(row):
+def _fmt_qty(qty) -> str:
+    if qty is None or qty != qty:
+        return "—"
+    if qty >= 1000:
+        return f"{qty:,.2f}"
+    if qty >= 1:
+        return f"{qty:.4f}"
+    return f"{qty:.6f}"
+
+
+def _fmt_price(price) -> str:
+    if price is None or price != price:
+        return ""
+    if price >= 1000:
+        return f"@ ${price:,.2f}"
+    if price >= 1:
+        return f"@ ${price:.4f}"
+    return f"@ ${price:.6f}"
+
+
+def _fmt_val(val) -> str:
+    if val is None or val != val:
+        return "—"
+    return f"${val:,.2f} USD"
+
+
+def _display_holding(row, indent=True):
+    val = row["value_usd"]
+    # Skip holdings worth less than $1
+    if val is None or val != val or val < 1:
+        return
+
     sym = row["platform_symbol"]
     qty = row["quantity"]
-    val = row["value_usd"]
     price = row["price"]
 
-    if val is not None and not (val != val):  # not NaN
-        val_str = f"${val:,.2f}"
-    else:
-        val_str = "—"
-
-    if price is not None and not (price != price):
-        price_str = f"@ ${price:,.4g}"
-    else:
-        price_str = ""
-
-    st.markdown(
-        f"&nbsp;&nbsp;&nbsp;&nbsp;`{sym}`&nbsp;&nbsp;{qty:,.4g}&nbsp;&nbsp;{price_str}&nbsp;&nbsp;**{val_str}**",
-        unsafe_allow_html=True,
-    )
+    c1, c2, c3, c4 = st.columns([1, 2, 2, 2])
+    with c1:
+        st.markdown(f"`{sym}`")
+    with c2:
+        st.write(_fmt_qty(qty))
+    with c3:
+        st.write(_fmt_price(price))
+    with c4:
+        st.write(_fmt_val(val))
 
 
 # Active platforms (those with data in this batch)
@@ -149,22 +174,33 @@ for platform in all_platforms:
                             name = row["platform_asset_name"]
                             qty = row["quantity"]
                             val = row["value_usd"]
-                            val_str = f"${val:,.2f}" if (val is not None and val == val) else "—"
-                            st.markdown(
-                                f"&nbsp;&nbsp;&nbsp;&nbsp;`{sym}`&nbsp;&nbsp;{qty:,.4g}&nbsp;&nbsp;**{val_str}**&nbsp;&nbsp;<small>{name}</small>",
-                                unsafe_allow_html=True,
-                            )
+                            c1, c2, c3, c4 = st.columns([1, 2, 2, 2])
+                            with c1:
+                                st.markdown(f"`{sym}`")
+                            with c2:
+                                st.write(_fmt_qty(qty))
+                            with c3:
+                                st.caption(name or "")
+                            with c4:
+                                st.write(_fmt_val(val) if (val and val == val) else "—")
         else:
-            # CEX: group by resource_type
-            for resource_type, rt_df in plat_df.groupby(
-                plat_df["platform_asset_name"].apply(
-                    lambda n: "earn" if n and ("(Savings)" in n or "(Locked)" in n or n.endswith("Earn")) else "spot"
-                )
-            ):
-                rt_label = "理財" if resource_type == "earn" else "現貨"
-                rt_total = rt_df["value_usd"].sum()
-                st.markdown(f"**{rt_label}** — ${rt_total:,.2f} USD")
-                for _, row in rt_df.sort_values("value_usd", ascending=False).iterrows():
+            # CEX: split into 現貨 and 理財, show 現貨 first
+
+            def _is_earn(name: str) -> bool:
+                if not name:
+                    return False
+                return any(kw in name for kw in ("(Savings)", "(Locked)", "(Funding)", "Earn"))
+
+            spot_df = plat_df[~plat_df["platform_asset_name"].apply(_is_earn)]
+            earn_df = plat_df[plat_df["platform_asset_name"].apply(_is_earn)]
+
+            for section_label, section_df in [("現貨", spot_df), ("理財", earn_df)]:
+                section_df = section_df[section_df["value_usd"].fillna(0) >= 1]
+                if section_df.empty:
+                    continue
+                section_total = section_df["value_usd"].sum()
+                st.markdown(f"**{section_label}** — ${section_total:,.2f} USD")
+                for _, row in section_df.sort_values("value_usd", ascending=False).iterrows():
                     _display_holding(row)
 
 st.divider()
