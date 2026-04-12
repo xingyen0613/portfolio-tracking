@@ -103,6 +103,22 @@ class BinanceConnector(BaseConnector):
                 "fetch_error": str(e),
             })
 
+        # Funding account (資金帳戶) — separate from spot wallet
+        try:
+            funding = self._exchange.sapiPostAssetGetFundingAsset({})
+            items.append({
+                "resource_type": "funding",
+                "payload": {"assets": funding},
+                "fetched_at": _now(),
+            })
+        except Exception as e:
+            items.append({
+                "resource_type": "funding",
+                "payload": {"error": str(e)},
+                "fetched_at": _now(),
+                "fetch_error": str(e),
+            })
+
         return items
 
     def parse_holdings(self, raw_items: list[dict]) -> list[dict]:
@@ -169,6 +185,26 @@ class BinanceConnector(BaseConnector):
                         holdings.append({
                             "platform_symbol": symbol,
                             "platform_asset_name": f"{symbol} (Locked)",
+                            "asset_type": _classify(symbol),
+                            "quantity": qty,
+                            "price": None,
+                            "value": None,
+                            "original_currency": "USD",
+                            "price_source": None,
+                        })
+
+            elif resource_type == "funding":
+                for row in payload.get("assets", []):
+                    symbol = row.get("asset", "")
+                    qty = float(row.get("free", 0)) + float(row.get("locked", 0)) + float(row.get("freeze", 0))
+                    if qty <= 0:
+                        continue
+                    key = f"{symbol}_funding"
+                    if key not in seen:
+                        seen.add(key)
+                        holdings.append({
+                            "platform_symbol": symbol,
+                            "platform_asset_name": f"{symbol} (Funding)",
                             "asset_type": _classify(symbol),
                             "quantity": qty,
                             "price": None,
