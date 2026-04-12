@@ -56,9 +56,12 @@ def get_holdings() -> pd.DataFrame:
         JOIN platforms p    ON a.platform_id = p.id
         WHERE sr.status = 'success'
           AND sr.id IN (
-              SELECT id FROM source_runs
-              WHERE account_id = a.id AND status = 'success'
-              ORDER BY started_at DESC LIMIT 1
+              SELECT sr2.id FROM source_runs sr2
+              WHERE sr2.account_id = a.id AND sr2.status = 'success'
+                AND EXISTS (
+                    SELECT 1 FROM normalized_holdings WHERE source_run_id = sr2.id
+                )
+              ORDER BY sr2.started_at DESC LIMIT 1
           )
         ORDER BY p.name, a.account_key, nh.value DESC NULLS LAST
     """
