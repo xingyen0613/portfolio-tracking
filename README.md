@@ -12,6 +12,10 @@
 
 ## 執行
 
+> 所有指令都需要在專案根目錄執行：`cd /Users/yen/claude/Portfolio-Tracking`
+
+### 資料抓取（Batch）
+
 ```bash
 # 所有平台
 uv run python -m app.jobs.run_batch
@@ -19,6 +23,66 @@ uv run python -m app.jobs.run_batch
 # 單一平台
 uv run python -m app.jobs.run_batch --platform sui_wallet
 ```
+
+### Dashboard
+
+```bash
+uv run streamlit run app/dashboard/main.py --server.port 857
+```
+
+瀏覽器開 `http://localhost:857`
+
+每次開頁面都會從 SQLite 讀取最新資料，不需要重跑指令。
+
+---
+
+## 自動化設定
+
+### Cron（每日資料抓取）
+
+使用 `crontab -e` 查看或編輯排程（目前設定為每天 23:00 執行）：
+
+```bash
+crontab -l          # 查看現有排程
+crontab -e          # 編輯排程
+```
+
+範例 crontab 設定：
+
+```
+0 23 * * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python -m app.jobs.run_batch >> data/logs/cron.log 2>&1
+```
+
+### launchd（Dashboard 開機自動啟動）
+
+launchd 是 macOS 原生服務管理器，用來讓 Dashboard 開機後自動在背景跑。與 cron 無關，兩者並行：
+
+| | cron | launchd |
+|---|---|---|
+| 用途 | 定時執行 batch | 開機啟動、常駐 dashboard |
+| 設定方式 | `crontab -e` | `~/Library/LaunchAgents/*.plist` |
+
+**安裝 Dashboard 自動啟動：**
+
+```bash
+cp com.portfolio.dashboard.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.portfolio.dashboard.plist
+```
+
+**確認是否在跑：**
+
+```bash
+launchctl list | grep portfolio
+```
+
+**停止 / 重啟：**
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.portfolio.dashboard.plist   # 停止
+launchctl load   ~/Library/LaunchAgents/com.portfolio.dashboard.plist   # 啟動
+```
+
+Dashboard log：`data/logs/dashboard.log`
 
 ## 定價說明與已知近似值
 

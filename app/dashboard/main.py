@@ -3,6 +3,12 @@ Portfolio Dashboard — Streamlit entry point.
 Run: streamlit run app/dashboard/main.py --server.port 857
 """
 
+import sys
+from pathlib import Path
+
+# Ensure project root is on sys.path when Streamlit runs this file directly
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
