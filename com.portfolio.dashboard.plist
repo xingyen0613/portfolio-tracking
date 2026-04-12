@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.portfolio.dashboard</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/yen/.local/bin/uv</string>
+        <string>run</string>
+        <string>streamlit</string>
+        <string>run</string>
+        <string>/Users/yen/claude/Portfolio-Tracking/app/dashboard/main.py</string>
+        <string>--server.port</string>
+        <string>857</string>
+        <string>--server.headless</string>
+        <string>true</string>
+        <string>--browser.gatherUsageStats</string>
+        <string>false</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/yen/claude/Portfolio-Tracking</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/yen/claude/Portfolio-Tracking/data/logs/dashboard.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/yen/claude/Portfolio-Tracking/data/logs/dashboard.error.log</string>
+</dict>
+</plist>

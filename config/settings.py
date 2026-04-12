@@ -16,3 +16,24 @@ ENABLED_PLATFORMS = ["binance", "okx", "sui_wallet"]
 SUI_DEFI_PROTOCOLS = ["cetus", "navi", "suilend", "typus", "scallop", "walrus"]
 
 PARSER_VERSION = "1.0.0"
+
+# Dashboard settings
+DASHBOARD_PORT = 857
+
+# Platform → asset category mapping
+PLATFORM_CATEGORY = {
+    "binance": "crypto",
+    "okx": "crypto",
+    "sui_wallet": "crypto",
+    "yuanta": "tw_stock",
+    "firsttrade": "us_stock",
+}
+
+CATEGORY_LABEL = {
+    "crypto": "幣圈",
+    "tw_stock": "台股",
+    "us_stock": "美股",
+}
+
+# Exchange rate (TWD per USD) — hardcoded until live FX API is added
+TWD_PER_USD: float = 31.5
