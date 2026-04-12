@@ -27,18 +27,13 @@ def get_latest_snapshot_date() -> str | None:
     return row["d"] if row else None
 
 
-def get_holdings(snapshot_date: str | None = None) -> pd.DataFrame:
+def get_holdings() -> pd.DataFrame:
     """
     Return the latest holdings per account.
-    For each account, picks the most recent successful source_run overall
-    (not limited to a single batch), so Binance/OKX and SUI data are
-    always shown together even if they came from different batches.
+    For each account, picks the most recent successful source_run
+    regardless of date or batch, so all platforms are always shown
+    even if they were last fetched on different days.
     """
-    if snapshot_date is None:
-        snapshot_date = get_latest_snapshot_date()
-    if not snapshot_date:
-        return pd.DataFrame()
-
     sql = """
         SELECT
             p.name        AS platform,
@@ -58,18 +53,16 @@ def get_holdings(snapshot_date: str | None = None) -> pd.DataFrame:
         JOIN source_runs sr ON nh.source_run_id = sr.id
         JOIN accounts a     ON sr.account_id = a.id
         JOIN platforms p    ON a.platform_id = p.id
-        WHERE nh.snapshot_date = ?
-          AND sr.status = 'success'
+        WHERE sr.status = 'success'
           AND sr.id IN (
               SELECT id FROM source_runs
-              WHERE account_id = a.id
-                AND status = 'success'
+              WHERE account_id = a.id AND status = 'success'
               ORDER BY started_at DESC LIMIT 1
           )
         ORDER BY p.name, a.account_key, nh.value DESC NULLS LAST
     """
     with _conn() as conn:
-        df = pd.read_sql_query(sql, conn, params=(snapshot_date,))
+        df = pd.read_sql_query(sql, conn)
 
     df["category"] = df["platform"].map(PLATFORM_CATEGORY).fillna("unknown")
     df["value_usd"] = pd.to_numeric(df["value"], errors="coerce")
