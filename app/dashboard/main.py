@@ -140,7 +140,19 @@ for platform in all_platforms:
     plat_df = df[df["platform"] == platform]
     plat_total = plat_df["value_usd"].sum()
 
-    with st.expander(f"**{display_name}** — ${plat_total:,.0f} USD", expanded=True):
+    # Format fetch timestamp
+    fetched_at_raw = plat_df["fetched_at"].iloc[0] if "fetched_at" in plat_df.columns else None
+    if fetched_at_raw:
+        try:
+            import pandas as pd
+            ts = pd.to_datetime(fetched_at_raw, utc=True).strftime("%m/%d %H:%M UTC")
+            ts_label = f"　`{ts}`"
+        except Exception:
+            ts_label = ""
+    else:
+        ts_label = ""
+
+    with st.expander(f"**{display_name}** — ${plat_total:,.0f} USD{ts_label}", expanded=True):
 
         if platform == "sui_wallet":
             # Group by account (wallet address)

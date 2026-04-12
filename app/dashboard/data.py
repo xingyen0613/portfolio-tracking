@@ -48,7 +48,8 @@ def get_holdings() -> pd.DataFrame:
             nh.price_source,
             nh.original_currency,
             nh.snapshot_date,
-            sr.id         AS source_run_id
+            sr.id         AS source_run_id,
+            sr.started_at AS fetched_at
         FROM normalized_holdings nh
         JOIN source_runs sr ON nh.source_run_id = sr.id
         JOIN accounts a     ON sr.account_id = a.id
