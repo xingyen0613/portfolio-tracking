@@ -157,9 +157,9 @@ for platform in all_platforms:
         if platform == "sui_wallet":
             # Group by account (wallet address)
             for account_key, acct_df in plat_df.groupby("account_key", sort=False):
-                label = acct_df["account_label"].iloc[0] or account_key
+                full_address = acct_df["account_label"].iloc[0] or account_key
                 acct_total = acct_df["value_usd"].sum()
-                with st.expander(f"🔑 `{account_key}` — ${acct_total:,.2f} USD", expanded=False):
+                with st.expander(f"🔑 `{full_address}` — ${acct_total:,.2f} USD", expanded=False):
                     # Tokens (value > $1)
                     tokens_df = acct_df[acct_df["source_run_id"].apply(
                         lambda _: True  # all token rows are already in df
