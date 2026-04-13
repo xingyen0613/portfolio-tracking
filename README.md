@@ -40,18 +40,73 @@ uv run streamlit run app/dashboard/main.py --server.port 857
 
 ### Cron（每日資料抓取）
 
-使用 `crontab -e` 查看或編輯排程（目前設定為每天 23:00 執行）：
+目前設定每天 23:00 自動執行一次資料抓取。
+
+#### 查看目前設定
 
 ```bash
-crontab -l          # 查看現有排程
-crontab -e          # 編輯排程
+crontab -l
 ```
 
-範例 crontab 設定：
+#### 新增 / 修改排程
+
+```bash
+crontab -e
+```
+
+這會在終端機開啟 vi 編輯器，操作如下：
+
+| 動作 | 按鍵 |
+|------|------|
+| 進入編輯模式 | `i` |
+| 退出編輯模式（回到命令模式） | `Esc` |
+| 儲存並退出 | `:wq` 再按 Enter |
+| 不儲存退出 | `:q!` 再按 Enter |
+
+在編輯模式下，貼上（或手動輸入）以下排程設定：
 
 ```
 0 23 * * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python -m app.jobs.run_batch >> data/logs/cron.log 2>&1
 ```
+
+格式說明：`分 時 日 月 星期` — `0 23 * * *` 代表每天 23:00
+
+#### 驗證設定是否生效
+
+儲存後，確認排程是否已寫入：
+
+```bash
+crontab -l
+```
+
+應該可以看到剛才貼上的那行。
+
+#### 確認是否有正常執行
+
+每次 cron 執行後，log 會寫入 `data/logs/cron.log`：
+
+```bash
+# 查看最新幾行 log
+tail -50 data/logs/cron.log
+
+# 持續追蹤 log（等 23:00 跑完後觀察）
+tail -f data/logs/cron.log
+```
+
+成功執行的 log 會像這樣：
+
+```
+[Batch xxxxxxxx] Starting — 2026-04-13T15:00:00+00:00
+Platforms: binance, okx, sui_wallet
+  ✓ [binance/account_main] Success
+  ✓ [okx/account_main] Success
+  ...
+[Batch xxxxxxxx] Done — status: success
+```
+
+如果 log 檔不存在或 23:00 後沒有新記錄，可能原因：
+- 電腦在 23:00 時關機或睡眠（cron 不會補跑）
+- `data/logs/` 目錄不存在 → `mkdir -p data/logs`
 
 ### launchd（Dashboard 開機自動啟動）
 
