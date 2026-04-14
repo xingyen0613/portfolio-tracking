@@ -8,7 +8,7 @@
 |------|---------|-----|
 | Binance | Spot + Earn（Flexible/Locked） | ccxt |
 | OKX | Spot + Savings | ccxt |
-| SUI Wallet | Token 餘額 + DeFi 倉位 | BlockVision v2 |
+| SUI Wallet | Token 餘額 | Sui 公鏈 RPC + Pyth oracle（免費，無需 API key） |
 
 ## 執行
 
@@ -21,6 +21,8 @@
 uv run python -m app.jobs.run_batch
 
 # 單一平台
+uv run python -m app.jobs.run_batch --platform binance
+uv run python -m app.jobs.run_batch --platform okx
 uv run python -m app.jobs.run_batch --platform sui_wallet
 ```
 
@@ -38,9 +40,7 @@ uv run streamlit run app/dashboard/main.py --server.port 857
 
 ## 自動化設定
 
-### Cron（每日資料抓取）
-
-目前設定每天 23:00 自動執行一次資料抓取。
+### Cron（定時資料抓取）
 
 #### 查看目前設定
 
@@ -63,23 +63,31 @@ crontab -e
 | 儲存並退出 | `:wq` 再按 Enter |
 | 不儲存退出 | `:q!` 再按 Enter |
 
-在編輯模式下，貼上（或手動輸入）以下排程設定：
+#### 常用排程範例
+
+Cron 格式：`分 時 日 月 星期`
 
 ```
+# 每天 23:00 執行一次
 0 23 * * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python -m app.jobs.run_batch >> data/logs/cron.log 2>&1
-```
 
-格式說明：`分 時 日 月 星期` — `0 23 * * *` 代表每天 23:00
+# 每小時整點執行
+0 * * * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python -m app.jobs.run_batch >> data/logs/cron.log 2>&1
+
+# 每 6 小時執行（0:00、6:00、12:00、18:00）
+0 0,6,12,18 * * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python -m app.jobs.run_batch >> data/logs/cron.log 2>&1
+
+# 只抓 SUI（較輕量，可以跑更頻繁）
+0 * * * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python -m app.jobs.run_batch --platform sui_wallet >> data/logs/cron.log 2>&1
+```
 
 #### 驗證設定是否生效
 
-儲存後，確認排程是否已寫入：
+儲存後確認排程是否已寫入：
 
 ```bash
 crontab -l
 ```
-
-應該可以看到剛才貼上的那行。
 
 #### 確認是否有正常執行
 
@@ -89,7 +97,7 @@ crontab -l
 # 查看最新幾行 log
 tail -50 data/logs/cron.log
 
-# 持續追蹤 log（等 23:00 跑完後觀察）
+# 持續追蹤 log
 tail -f data/logs/cron.log
 ```
 
@@ -104,9 +112,11 @@ Platforms: binance, okx, sui_wallet
 [Batch xxxxxxxx] Done — status: success
 ```
 
-如果 log 檔不存在或 23:00 後沒有新記錄，可能原因：
-- 電腦在 23:00 時關機或睡眠（cron 不會補跑）
+如果 log 檔不存在或排程後沒有新記錄，可能原因：
+- 電腦在排程時間關機或睡眠（cron 不會補跑）
 - `data/logs/` 目錄不存在 → `mkdir -p data/logs`
+
+---
 
 ### launchd（Dashboard 開機自動啟動）
 
@@ -117,12 +127,38 @@ launchd 是 macOS 原生服務管理器，用來讓 Dashboard 開機後自動在
 | 用途 | 定時執行 batch | 開機啟動、常駐 dashboard |
 | 設定方式 | `crontab -e` | `~/Library/LaunchAgents/*.plist` |
 
-**安裝 Dashboard 自動啟動：**
+#### 初次設定
+
+**Step 1：產生 plist 設定檔**（只需做一次）
 
 ```bash
+cd /Users/yen/claude/Portfolio-Tracking
+
+sed \
+  -e 's|/YOUR_HOME|'"$HOME"'|g' \
+  -e 's|/YOUR_PROJECT_PATH|'"$(pwd)"'|g' \
+  com.portfolio.dashboard.plist.example > com.portfolio.dashboard.plist
+```
+
+確認內容是否正確（路徑應全部是絕對路徑）：
+
+```bash
+cat com.portfolio.dashboard.plist
+```
+
+**Step 2：安裝到 LaunchAgents**
+
+```bash
+cd /Users/yen/claude/Portfolio-Tracking
+
 cp com.portfolio.dashboard.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.portfolio.dashboard.plist
 ```
+
+> ⚠️ `cp` 指令必須在專案根目錄執行，或改用絕對路徑：
+> ```bash
+> cp /Users/yen/claude/Portfolio-Tracking/com.portfolio.dashboard.plist ~/Library/LaunchAgents/
+> ```
 
 **確認是否在跑：**
 
@@ -130,14 +166,26 @@ launchctl load ~/Library/LaunchAgents/com.portfolio.dashboard.plist
 launchctl list | grep portfolio
 ```
 
-**停止 / 重啟：**
+有輸出（PID 不是 `-`）表示正在運行。
+
+#### 停止 / 重啟
 
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.portfolio.dashboard.plist   # 停止
 launchctl load   ~/Library/LaunchAgents/com.portfolio.dashboard.plist   # 啟動
 ```
 
+#### 更新設定後重新載入
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.portfolio.dashboard.plist
+cp /Users/yen/claude/Portfolio-Tracking/com.portfolio.dashboard.plist ~/Library/LaunchAgents/
+launchctl load   ~/Library/LaunchAgents/com.portfolio.dashboard.plist
+```
+
 Dashboard log：`data/logs/dashboard.log`
+
+---
 
 ## 定價說明與已知近似值
 
@@ -150,12 +198,23 @@ Dashboard log：`data/logs/dashboard.log`
 | vSUI | SUI 價格 | Volo 質押 SUI |
 | xSUI | SUI 價格 | Aftermath 質押 SUI |
 
-### SUI Token 驗證規則
+### SUI Token 過濾規則
 
-只有 BlockVision 標記 `verified: true` 且 `scam: false` 的 token 才會被記錄。
-未驗證或被標記為詐騙的 token 一律過濾，不計入資產總值。
+SUI 鏈上 token 透過以下條件過濾垃圾幣：
+
+1. **coin_type 必須在白名單（COIN_FEED_MAP）**：只收錄有對應 Pyth price feed 或已知穩定幣的 coin type
+2. **USD value > $1**：低於門檻的持倉不計入
+
+白名單以 coin_type address（非 symbol 字串）為 key，防止山寨幣偽造 symbol 混入。
+
+### SUI 定價來源
+
+| 類型 | 定價方式 |
+|------|---------|
+| 主流幣（SUI、ETH、BTC、USDT、USDC 等） | Pyth on-chain oracle（via Hermes 公共 API） |
+| 已知穩定幣（BUCK、MUSD 等） | 固定 $1 |
+| 其他 token | 過濾，不計入 |
 
 ### DeFi 倉位
 
-DeFi 倉位（借貸、LP、質押）若 BlockVision 無 USD 報價，由 Binance/OKX 市場價補充。
-無法取得報價的倉位僅記錄數量，value 留空。
+目前版本尚未支援 DeFi 倉位查詢，待後續版本加入。

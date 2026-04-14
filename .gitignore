@@ -1,5 +1,11 @@
 .env
 .env.plaid
+
+# PoC / 測試腳本（整個 scripts/ 資料夾，只保留主流程用的 scripts）
+scripts/
+
+# 僅保留 example 範本檔（不含實際 key 與 raw data）
+!scripts/**/*.example
 .venv/
 data/
 __pycache__/
