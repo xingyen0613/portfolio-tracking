@@ -108,6 +108,46 @@ def get_snapshot_history() -> pd.DataFrame:
     return df
 
 
+def get_crypto_symbol_breakdown() -> pd.DataFrame:
+    """
+    Return per-date per-token breakdown for crypto platforms.
+    Source: normalized_holdings (only available for dates with actual batch runs).
+    Groups by platform_symbol so hover shows individual token percentages.
+    """
+    sql = """
+        SELECT
+            nh.snapshot_date,
+            nh.platform_symbol AS symbol,
+            SUM(nh.value) AS value_usd
+        FROM normalized_holdings nh
+        JOIN source_runs sr ON nh.source_run_id = sr.id
+        JOIN accounts a     ON sr.account_id = a.id
+        JOIN platforms p    ON a.platform_id = p.id
+        WHERE p.name IN ('binance', 'okx', 'mexc', 'bybit', 'sui_wallet')
+          AND nh.value IS NOT NULL
+          AND sr.status = 'success'
+          AND sr.id = (
+              SELECT sr2.id FROM source_runs sr2
+              WHERE sr2.account_id = a.id
+                AND sr2.status = 'success'
+                AND EXISTS (
+                    SELECT 1 FROM normalized_holdings nh2
+                    WHERE nh2.source_run_id = sr2.id
+                      AND nh2.snapshot_date = nh.snapshot_date
+                )
+              ORDER BY sr2.started_at DESC LIMIT 1
+          )
+        GROUP BY nh.snapshot_date, nh.platform_symbol
+        ORDER BY nh.snapshot_date, value_usd DESC
+    """
+    with _conn() as conn:
+        df = pd.read_sql_query(sql, conn)
+    if not df.empty:
+        df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
+        df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
+    return df
+
+
 def get_batch_info(batch_id: str) -> dict:
     """Return metadata for a batch."""
     with _conn() as conn:

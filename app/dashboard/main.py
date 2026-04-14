@@ -9,11 +9,17 @@ from pathlib import Path
 # Ensure project root is on sys.path when Streamlit runs this file directly
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.dashboard.data import get_holdings, get_latest_snapshot_date, get_snapshot_history
+from app.dashboard.data import (
+    get_crypto_symbol_breakdown,
+    get_holdings,
+    get_latest_snapshot_date,
+    get_snapshot_history,
+)
 from app.dashboard.metrics import compute_metrics, filter_window
 from config.settings import CATEGORY_LABEL, PLATFORM_CATEGORY, TWD_PER_USD
 
@@ -59,6 +65,7 @@ PLATFORM_DISPLAY = {
     "mexc": "MEXC",
     "bybit": "Bybit",
     "sui_wallet": "SUI On-chain",
+    "crypto_history": "幣圈（歷史）",
     "yuanta": "元大證券（台股）",
     "firsttrade": "FirstTrade（美股）",
 }
@@ -276,12 +283,23 @@ else:
     with col_mode:
         mode = st.radio("顯示模式", ["絕對數值 (USD)", "報酬率 (%)"], horizontal=True)
     with col_window:
-        window = st.selectbox("時間窗口", ["1W", "1M", "1Q", "1Y"], index=1)
+        window = st.selectbox("時間窗口", ["1W", "1M", "1Q", "1Y", "自訂"], index=1)
+
+    custom_start = custom_end = None
+    if window == "自訂":
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            custom_start = st.date_input(
+                "開始日期",
+                value=(pd.Timestamp.today() - pd.Timedelta(days=180)).date(),
+            )
+        with col_d2:
+            custom_end = st.date_input("結束日期", value=pd.Timestamp.today().date())
 
     # Forward-fill per platform first, then aggregate by category (display only, not written to DB)
-    # Step 1: ffill each platform independently over the full date range in the window
+    # Step 1: ffill each platform independently over the FULL history, then filter to window.
+    # This ensures sparse platforms (tw_stock, us_stock) carry their last known value into the window.
     plat_daily = history_df.groupby(["snapshot_date", "platform"])["value_usd"].sum().reset_index()
-    plat_daily = filter_window(plat_daily, "snapshot_date", window)
 
     if not plat_daily.empty:
         date_range = pd.date_range(plat_daily["snapshot_date"].min(), plat_daily["snapshot_date"].max(), freq="D")
@@ -295,15 +313,26 @@ else:
             .ffill()
             .reset_index()
         )
+        plat_daily = filter_window(plat_daily, "snapshot_date", window, custom_start, custom_end)
 
         # Step 2: map platform → category, sum by category
         plat_daily["category"] = plat_daily["platform"].map(PLATFORM_CATEGORY).fillna("unknown")
+
+        # Keep crypto per-platform slice for hover (before aggregation)
+        crypto_plat_daily = plat_daily[plat_daily["category"] == "crypto"].copy()
+
         daily = plat_daily.groupby(["snapshot_date", "category"])["value_usd"].sum().reset_index()
         daily_total = daily.groupby("snapshot_date")["value_usd"].sum().reset_index()
         daily_total["category"] = "total"
         all_daily = pd.concat([daily, daily_total], ignore_index=True)
     else:
+        crypto_plat_daily = pd.DataFrame()
         all_daily = pd.DataFrame(columns=["snapshot_date", "category", "value_usd"])
+
+    # Token breakdown by individual symbol (independent source: normalized_holdings)
+    crypto_symbol_df = get_crypto_symbol_breakdown()
+    if not crypto_symbol_df.empty:
+        crypto_symbol_df = filter_window(crypto_symbol_df, "snapshot_date", window, custom_start, custom_end)
 
     COLORS = {
         "total": "#636EFA",
@@ -318,10 +347,85 @@ else:
         "us_stock": "美股",
     }
 
+    # ── Line visibility selector ──────────────────────────────────────────────
+    available_cats = [c for c in ["total", "crypto", "tw_stock", "us_stock"]
+                      if not all_daily[all_daily["category"] == c].empty]
+    available_labels = [NAMES[c] for c in available_cats]
+    selected_labels = st.multiselect("顯示線條", available_labels, default=available_labels)
+    selected_cats = [c for c in available_cats if NAMES[c] in selected_labels]
+
+    # Breakdown hover only when 幣圈 is the sole visible line
+    show_crypto_breakdown = (selected_cats == ["crypto"])
+
+    def _crypto_hover_texts(dates) -> list[str]:
+        """Build per-date two-column hover strings for the 幣圈 trace.
+
+        Left column  : platform source percentages (from account_snapshots)
+        Right column : individual token percentages (from normalized_holdings)
+        Both computed independently. crypto_history excluded from source column.
+        Uses HTML <table> for column alignment.
+        """
+        TOP_N = 6
+        SEPARATOR = "<td style='padding:0 6px;color:#888'>｜</td>"
+        texts = []
+        for ts in dates:
+            # ── 來源佔比 ──────────────────────────────────────────────────────
+            plat_rows: list[str] = []
+            if not crypto_plat_daily.empty:
+                day = crypto_plat_daily[
+                    (crypto_plat_daily["snapshot_date"] == ts) &
+                    (crypto_plat_daily["platform"] != "crypto_history")
+                ]
+                total = day["value_usd"].sum()
+                if total > 0:
+                    for _, r in (
+                        day[day["value_usd"] > 0]
+                        .sort_values("value_usd", ascending=False)
+                        .head(TOP_N)
+                        .iterrows()
+                    ):
+                        name = PLATFORM_DISPLAY.get(r["platform"], r["platform"])
+                        plat_rows.append(f"{name}: {r['value_usd']/total*100:.0f}%")
+
+            # ── Token 佔比（by symbol）────────────────────────────────────────
+            token_rows: list[str] = []
+            if not crypto_symbol_df.empty:
+                day_t = crypto_symbol_df[crypto_symbol_df["snapshot_date"] == ts]
+                total_t = day_t["value_usd"].sum()
+                if total_t > 0:
+                    for _, r in (
+                        day_t[day_t["value_usd"] > 0]
+                        .sort_values("value_usd", ascending=False)
+                        .head(TOP_N)
+                        .iterrows()
+                    ):
+                        token_rows.append(f"{r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
+
+            if not plat_rows and not token_rows:
+                texts.append("")
+                continue
+
+            # ── HTML table for aligned two-column layout ──────────────────────
+            n = max(len(plat_rows), len(token_rows))
+            plat_rows += [""] * (n - len(plat_rows))
+            token_rows += [""] * (n - len(token_rows))
+
+            trs = []
+            for left, right in zip(plat_rows, token_rows):
+                trs.append(
+                    f"<tr>"
+                    f"<td style='padding-right:4px'>{left}</td>"
+                    f"{SEPARATOR}"
+                    f"<td style='padding-left:4px'>{right}</td>"
+                    f"</tr>"
+                )
+            texts.append(f"<table style='border-collapse:collapse'>{''.join(trs)}</table>")
+        return texts
+
     use_return = "報酬率" in mode
 
     fig_line = go.Figure()
-    for cat in ["total", "crypto", "tw_stock", "us_stock"]:
+    for cat in selected_cats:
         sub = all_daily[all_daily["category"] == cat].sort_values("snapshot_date")
         if sub.empty:
             continue
@@ -330,13 +434,29 @@ else:
         if use_return and y.iloc[0] > 0:
             y = (y - y.iloc[0]) / y.iloc[0] * 100
 
-        fig_line.add_trace(go.Scatter(
-            x=sub["snapshot_date"],
-            y=y,
-            name=NAMES.get(cat, cat),
-            line=dict(color=COLORS.get(cat, "#888"), width=2),
-            mode="lines",
-        ))
+        if cat == "crypto" and show_crypto_breakdown:
+            hover_texts = _crypto_hover_texts(sub["snapshot_date"])
+            fig_line.add_trace(go.Scatter(
+                x=sub["snapshot_date"],
+                y=y,
+                name=NAMES["crypto"],
+                line=dict(color=COLORS["crypto"], width=2),
+                mode="lines",
+                customdata=hover_texts,
+                hovertemplate=(
+                    "<b>幣圈</b>: %{y:.2f}%<br>%{customdata}<extra></extra>"
+                    if use_return else
+                    "<b>幣圈</b>: $%{y:,.0f} USD<br>%{customdata}<extra></extra>"
+                ),
+            ))
+        else:
+            fig_line.add_trace(go.Scatter(
+                x=sub["snapshot_date"],
+                y=y,
+                name=NAMES.get(cat, cat),
+                line=dict(color=COLORS.get(cat, "#888"), width=2),
+                mode="lines",
+            ))
 
     fig_line.update_layout(
         height=380,

@@ -47,8 +47,23 @@ def compute_metrics(daily_values: pd.Series) -> dict:
     }
 
 
-def filter_window(df: pd.DataFrame, date_col: str, window: str) -> pd.DataFrame:
-    """Filter DataFrame to the selected time window."""
+def filter_window(
+    df: pd.DataFrame,
+    date_col: str,
+    window: str,
+    custom_start=None,
+    custom_end=None,
+) -> pd.DataFrame:
+    """Filter DataFrame to the selected time window.
+
+    Pass custom_start / custom_end (date or Timestamp) when window == '自訂'.
+    """
+    if window == "自訂":
+        if custom_start is not None and custom_end is not None:
+            start = pd.Timestamp(custom_start)
+            end = pd.Timestamp(custom_end)
+            return df[(df[date_col] >= start) & (df[date_col] <= end)]
+        return df  # no valid custom range → return all
     end = df[date_col].max()
     deltas = {"1W": 7, "1M": 30, "1Q": 90, "1Y": 365}
     days = deltas.get(window, 30)
