@@ -1,13 +1,15 @@
 # Portfolio Tracking
 
-個人資產追蹤系統，整合 CEX（Binance、OKX）與 SUI 鏈上錢包資料，每日快照存入 SQLite。
+個人資產追蹤系統，整合 CEX（Binance、OKX、MEXC、Bybit）與 SUI 鏈上錢包資料，每日快照存入 SQLite。
 
 ## 資料來源
 
 | 平台 | 資料類型 | API |
 |------|---------|-----|
-| Binance | Spot + Earn（Flexible/Locked） | ccxt |
+| Binance | Spot + Earn（Flexible/Locked）+ Funding | ccxt |
 | OKX | Spot + Savings | ccxt |
+| MEXC | Spot + Futures（合約帳戶） | ccxt |
+| Bybit | UNIFIED（現貨/衍生品）+ Funding | ccxt |
 | SUI Wallet | Token 餘額 | Sui 公鏈 RPC + Pyth oracle（免費，無需 API key） |
 
 ## 執行
@@ -23,6 +25,8 @@ uv run python -m app.jobs.run_batch
 # 單一平台
 uv run python -m app.jobs.run_batch --platform binance
 uv run python -m app.jobs.run_batch --platform okx
+uv run python -m app.jobs.run_batch --platform mexc
+uv run python -m app.jobs.run_batch --platform bybit
 uv run python -m app.jobs.run_batch --platform sui_wallet
 ```
 
@@ -105,9 +109,11 @@ tail -f data/logs/cron.log
 
 ```
 [Batch xxxxxxxx] Starting — 2026-04-13T15:00:00+00:00
-Platforms: binance, okx, sui_wallet
+Platforms: binance, okx, mexc, bybit, sui_wallet
   ✓ [binance/account_main] Success
   ✓ [okx/account_main] Success
+  ✓ [mexc/account_main] Success
+  ✓ [bybit/account_main] Success
   ...
 [Batch xxxxxxxx] Done — status: success
 ```

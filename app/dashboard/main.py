@@ -56,6 +56,8 @@ st.subheader("資產明細")
 PLATFORM_DISPLAY = {
     "binance": "Binance",
     "okx": "OKX",
+    "mexc": "MEXC",
+    "bybit": "Bybit",
     "sui_wallet": "SUI On-chain",
     "yuanta": "元大證券（台股）",
     "firsttrade": "FirstTrade（美股）",
@@ -127,7 +129,7 @@ def _display_holding(row, indent=True):
 
 # Active platforms (those with data in this batch)
 active_platforms = df["platform"].unique().tolist()
-all_platforms = ["binance", "okx", "sui_wallet", "yuanta", "firsttrade"]
+all_platforms = ["binance", "okx", "mexc", "bybit", "sui_wallet", "yuanta", "firsttrade"]
 
 for platform in all_platforms:
     display_name = PLATFORM_DISPLAY.get(platform, platform)

@@ -32,6 +32,12 @@ def _get_connectors(platform: str) -> list:
     if platform == "okx":
         from app.connectors.okx_connector import OKXConnector
         return [OKXConnector()]
+    if platform == "mexc":
+        from app.connectors.mexc_connector import MexcConnector
+        return [MexcConnector()]
+    if platform == "bybit":
+        from app.connectors.bybit_connector import BybitConnector
+        return [BybitConnector()]
     if platform == "sui_wallet":
         from app.connectors.sui_wallet_connector import SuiWalletConnector
         addresses_raw = os.environ.get("SUI_WALLET_ADDRESSES", "")
@@ -126,7 +132,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     platforms = [args.platform] if args.platform else ENABLED_PLATFORMS
-    implemented = {"binance", "okx", "sui_wallet"}
+    implemented = {"binance", "okx", "mexc", "bybit", "sui_wallet"}
     platforms = [p for p in platforms if p in implemented]
 
     if not platforms:

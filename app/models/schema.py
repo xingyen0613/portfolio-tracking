@@ -80,6 +80,8 @@ SEED_PLATFORMS = """
 INSERT OR IGNORE INTO platforms (name, display_name) VALUES
     ('binance', 'Binance'),
     ('okx', 'OKX'),
+    ('mexc', 'MEXC'),
+    ('bybit', 'Bybit'),
     ('yuanta', '元大證券'),
     ('firsttrade', 'FirstTrade'),
     ('sui_wallet', 'SUI Wallet');
@@ -87,5 +89,5 @@ INSERT OR IGNORE INTO platforms (name, display_name) VALUES
 
 SEED_ACCOUNTS = """
 INSERT OR IGNORE INTO accounts (platform_id, account_key, label)
-SELECT id, 'account_main', 'Main Account' FROM platforms WHERE name IN ('binance', 'okx', 'yuanta', 'firsttrade');
+SELECT id, 'account_main', 'Main Account' FROM platforms WHERE name IN ('binance', 'okx', 'mexc', 'bybit', 'yuanta', 'firsttrade');
 """
