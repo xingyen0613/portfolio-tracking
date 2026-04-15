@@ -74,6 +74,18 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
     note            TEXT,
     created_at      TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS category_snapshots (
+    id              TEXT PRIMARY KEY,   -- UUID
+    snapshot_date   TEXT NOT NULL,      -- YYYY-MM-DD
+    category        TEXT NOT NULL,      -- crypto | tw_stock | us_stock
+    total_value     REAL NOT NULL,
+    currency        TEXT NOT NULL DEFAULT 'USD',
+    source          TEXT NOT NULL,      -- auto | manual
+    batch_id        TEXT REFERENCES batches(id),  -- NULL for manual
+    created_at      TEXT NOT NULL,
+    UNIQUE(snapshot_date, category)
+);
 """
 
 SEED_PLATFORMS = """

@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 from app.storage.sqlite import get_conn, init_db
-from config.settings import ENABLED_PLATFORMS, ENV_PATH
+from config.settings import ENABLED_PLATFORMS, ENV_PATH, PLATFORM_CATEGORY
 
 load_dotenv(ENV_PATH)
 
@@ -59,6 +59,76 @@ def _ensure_sui_accounts(addresses: list[str]) -> None:
                    SELECT id, ?, ? FROM platforms WHERE name = 'sui_wallet'""",
                 (account_key, addr),
             )
+
+
+def _aggregate_categories(batch_id: str) -> None:
+    """After all source runs finish, write category totals to category_snapshots.
+
+    For each date touched by this batch, computes the category total using each
+    platform's LATEST known value on or before that date — not just what this batch
+    captured.  This preserves the "carry-forward" behaviour when not all platforms
+    run on the same day (e.g. OKX monthly vs Binance daily).
+
+    Skips any (date, category) that already has source='manual'.
+    """
+    from collections import defaultdict
+
+    with get_conn() as conn:
+        dates_rows = conn.execute("""
+            SELECT DISTINCT acs.snapshot_date
+            FROM account_snapshots acs
+            WHERE acs.batch_id = ?
+              AND acs.total_value IS NOT NULL
+        """, (batch_id,)).fetchall()
+
+    dates = [row[0] for row in dates_rows]
+    if not dates:
+        return
+
+    now = _now()
+    written = 0
+    with get_conn() as conn:
+        for snapshot_date in dates:
+            # For each platform, get its latest total value on or before snapshot_date
+            platform_values = conn.execute("""
+                SELECT p.name, SUM(acs.total_value) AS total_value
+                FROM account_snapshots acs
+                JOIN accounts a ON acs.account_id = a.id
+                JOIN platforms p ON a.platform_id = p.id
+                WHERE acs.total_value IS NOT NULL
+                  AND acs.snapshot_date = (
+                      SELECT MAX(acs2.snapshot_date)
+                      FROM account_snapshots acs2
+                      JOIN accounts a2 ON acs2.account_id = a2.id
+                      WHERE a2.platform_id = a.platform_id
+                        AND acs2.snapshot_date <= ?
+                        AND acs2.total_value IS NOT NULL
+                  )
+                GROUP BY p.name
+            """, (snapshot_date,)).fetchall()
+
+            grouped: dict[str, float] = defaultdict(float)
+            for pname, total_value in platform_values:
+                cat = PLATFORM_CATEGORY.get(pname)
+                if cat:
+                    grouped[cat] += total_value or 0.0
+
+            for category, total_value in grouped.items():
+                existing = conn.execute(
+                    "SELECT source FROM category_snapshots WHERE snapshot_date=? AND category=?",
+                    (snapshot_date, category),
+                ).fetchone()
+                if existing and existing[0] == "manual":
+                    continue
+                conn.execute(
+                    """INSERT OR REPLACE INTO category_snapshots
+                       (id, snapshot_date, category, total_value, currency, source, batch_id, created_at)
+                       VALUES (?,?,?,?,?,?,?,?)""",
+                    (str(uuid.uuid4()), snapshot_date, category, total_value, "USD", "auto", batch_id, now),
+                )
+                written += 1
+
+    print(f"  [category_snapshots] Wrote {written} entries for batch {batch_id[:8]}")
 
 
 def run_batch(platforms: list[str]) -> None:
@@ -113,6 +183,10 @@ def run_batch(platforms: list[str]) -> None:
         batch_status = "partial"
     else:
         batch_status = "failed"
+
+    # Aggregate account_snapshots → category_snapshots
+    if batch_status in ("success", "partial"):
+        _aggregate_categories(batch_id)
 
     finished_at = _now()
     with get_conn() as conn:

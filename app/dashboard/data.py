@@ -76,33 +76,43 @@ def get_holdings() -> pd.DataFrame:
 
 def get_snapshot_history() -> pd.DataFrame:
     """
-    Return daily account snapshots aggregated by category.
-    For each account+date, only the latest batch's snapshot is used.
+    Return category-level daily totals from category_snapshots (materialized layer).
     Used for the time series chart.
+    """
+    sql = """
+        SELECT snapshot_date, category, total_value AS value_usd, source
+        FROM category_snapshots
+        ORDER BY snapshot_date, category
+    """
+    with _conn() as conn:
+        df = pd.read_sql_query(sql, conn)
+
+    df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
+    df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
+    return df
+
+
+def get_crypto_platform_daily() -> pd.DataFrame:
+    """
+    Return per-date per-platform totals for crypto platforms.
+    Used only for the hover breakdown in the 幣圈 line.
     """
     sql = """
         SELECT
             p.name          AS platform,
             acs.snapshot_date,
-            acs.total_value AS value_usd,
-            acs.currency
+            SUM(acs.total_value) AS value_usd
         FROM account_snapshots acs
         JOIN accounts a  ON acs.account_id = a.id
         JOIN platforms p ON a.platform_id = p.id
         WHERE acs.total_value IS NOT NULL
-          AND acs.id = (
-              SELECT id FROM account_snapshots
-              WHERE account_id = acs.account_id
-                AND snapshot_date = acs.snapshot_date
-                AND total_value IS NOT NULL
-              ORDER BY created_at DESC LIMIT 1
-          )
+          AND p.name IN ('binance', 'okx', 'mexc', 'bybit', 'sui_wallet')
+        GROUP BY p.name, acs.snapshot_date
         ORDER BY acs.snapshot_date
     """
     with _conn() as conn:
         df = pd.read_sql_query(sql, conn)
 
-    df["category"] = df["platform"].map(PLATFORM_CATEGORY).fillna("unknown")
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
     return df

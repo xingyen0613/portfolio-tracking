@@ -15,6 +15,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.dashboard.data import (
+    get_crypto_platform_daily,
     get_crypto_symbol_breakdown,
     get_holdings,
     get_latest_snapshot_date,
@@ -65,7 +66,6 @@ PLATFORM_DISPLAY = {
     "mexc": "MEXC",
     "bybit": "Bybit",
     "sui_wallet": "SUI On-chain",
-    "crypto_history": "幣圈（歷史）",
     "yuanta": "元大證券（台股）",
     "firsttrade": "FirstTrade（美股）",
 }
@@ -296,38 +296,48 @@ else:
         with col_d2:
             custom_end = st.date_input("結束日期", value=pd.Timestamp.today().date())
 
-    # Forward-fill per platform first, then aggregate by category (display only, not written to DB)
-    # Step 1: ffill each platform independently over the FULL history, then filter to window.
-    # This ensures sparse platforms (tw_stock, us_stock) carry their last known value into the window.
-    plat_daily = history_df.groupby(["snapshot_date", "platform"])["value_usd"].sum().reset_index()
+    # category_snapshots is already aggregated; just ffill per-category and filter to window.
+    cat_daily = history_df[["snapshot_date", "category", "value_usd"]].copy()
 
-    if not plat_daily.empty:
-        date_range = pd.date_range(plat_daily["snapshot_date"].min(), plat_daily["snapshot_date"].max(), freq="D")
-        platforms = plat_daily["platform"].unique()
-        full_idx = pd.MultiIndex.from_product([date_range, platforms], names=["snapshot_date", "platform"])
-        plat_daily = (
-            plat_daily
-            .set_index(["snapshot_date", "platform"])
+    if not cat_daily.empty:
+        date_range = pd.date_range(cat_daily["snapshot_date"].min(), cat_daily["snapshot_date"].max(), freq="D")
+        categories = cat_daily["category"].unique()
+        full_idx = pd.MultiIndex.from_product([date_range, categories], names=["snapshot_date", "category"])
+        cat_daily = (
+            cat_daily
+            .set_index(["snapshot_date", "category"])
             .reindex(full_idx)
+            .groupby(level="category")["value_usd"]
+            .ffill()
+            .reset_index()
+        )
+        cat_daily = filter_window(cat_daily, "snapshot_date", window, custom_start, custom_end)
+
+        daily_total = cat_daily.groupby("snapshot_date")["value_usd"].sum().reset_index()
+        daily_total["category"] = "total"
+        all_daily = pd.concat([cat_daily, daily_total], ignore_index=True)
+    else:
+        all_daily = pd.DataFrame(columns=["snapshot_date", "category", "value_usd"])
+
+    # Per-platform daily for hover source breakdown (independent of category_snapshots)
+    crypto_plat_raw = get_crypto_platform_daily()
+    if not crypto_plat_raw.empty:
+        date_range_p = pd.date_range(
+            crypto_plat_raw["snapshot_date"].min(), crypto_plat_raw["snapshot_date"].max(), freq="D"
+        )
+        plats = crypto_plat_raw["platform"].unique()
+        full_idx_p = pd.MultiIndex.from_product([date_range_p, plats], names=["snapshot_date", "platform"])
+        crypto_plat_daily = (
+            crypto_plat_raw
+            .set_index(["snapshot_date", "platform"])
+            .reindex(full_idx_p)
             .groupby(level="platform")["value_usd"]
             .ffill()
             .reset_index()
         )
-        plat_daily = filter_window(plat_daily, "snapshot_date", window, custom_start, custom_end)
-
-        # Step 2: map platform → category, sum by category
-        plat_daily["category"] = plat_daily["platform"].map(PLATFORM_CATEGORY).fillna("unknown")
-
-        # Keep crypto per-platform slice for hover (before aggregation)
-        crypto_plat_daily = plat_daily[plat_daily["category"] == "crypto"].copy()
-
-        daily = plat_daily.groupby(["snapshot_date", "category"])["value_usd"].sum().reset_index()
-        daily_total = daily.groupby("snapshot_date")["value_usd"].sum().reset_index()
-        daily_total["category"] = "total"
-        all_daily = pd.concat([daily, daily_total], ignore_index=True)
+        crypto_plat_daily = filter_window(crypto_plat_daily, "snapshot_date", window, custom_start, custom_end)
     else:
         crypto_plat_daily = pd.DataFrame()
-        all_daily = pd.DataFrame(columns=["snapshot_date", "category", "value_usd"])
 
     # Token breakdown by individual symbol (independent source: normalized_holdings)
     crypto_symbol_df = get_crypto_symbol_breakdown()
@@ -360,10 +370,9 @@ else:
     def _crypto_hover_texts(dates) -> list[str]:
         """Build per-date two-column hover strings for the 幣圈 trace.
 
-        Left column  : platform source percentages (from account_snapshots)
-        Right column : individual token percentages (from normalized_holdings)
-        Both computed independently. crypto_history excluded from source column.
-        Uses HTML <table> for column alignment.
+        Left column  : platform source percentages (from account_snapshots via get_crypto_platform_daily)
+        Right column : individual token percentages (from normalized_holdings via get_crypto_symbol_breakdown)
+        Both computed independently. Uses HTML <table> for column alignment.
         """
         TOP_N = 6
         SEPARATOR = "<td style='padding:0 6px;color:#888'>｜</td>"
@@ -372,10 +381,7 @@ else:
             # ── 來源佔比 ──────────────────────────────────────────────────────
             plat_rows: list[str] = []
             if not crypto_plat_daily.empty:
-                day = crypto_plat_daily[
-                    (crypto_plat_daily["snapshot_date"] == ts) &
-                    (crypto_plat_daily["platform"] != "crypto_history")
-                ]
+                day = crypto_plat_daily[crypto_plat_daily["snapshot_date"] == ts]
                 total = day["value_usd"].sum()
                 if total > 0:
                     for _, r in (

@@ -27,7 +27,6 @@ PLATFORM_CATEGORY = {
     "mexc": "crypto",
     "bybit": "crypto",
     "sui_wallet": "crypto",
-    "crypto_history": "crypto",
     "yuanta": "tw_stock",
     "firsttrade": "us_stock",
 }
