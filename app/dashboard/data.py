@@ -96,6 +96,8 @@ def get_crypto_platform_daily() -> pd.DataFrame:
     """
     Return per-date per-platform totals for crypto platforms.
     Used only for the hover breakdown in the 幣圈 line.
+    Takes the latest account_snapshot per account per date to avoid
+    double-counting when multiple batches ran on the same day.
     """
     sql = """
         SELECT
@@ -107,6 +109,13 @@ def get_crypto_platform_daily() -> pd.DataFrame:
         JOIN platforms p ON a.platform_id = p.id
         WHERE acs.total_value IS NOT NULL
           AND p.name IN ('binance', 'okx', 'mexc', 'bybit', 'sui_wallet')
+          AND acs.id = (
+              SELECT id FROM account_snapshots
+              WHERE account_id = acs.account_id
+                AND snapshot_date = acs.snapshot_date
+                AND total_value IS NOT NULL
+              ORDER BY created_at DESC LIMIT 1
+          )
         GROUP BY p.name, acs.snapshot_date
         ORDER BY acs.snapshot_date
     """

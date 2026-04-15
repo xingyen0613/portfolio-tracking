@@ -368,22 +368,22 @@ else:
     show_crypto_breakdown = (selected_cats == ["crypto"])
 
     def _crypto_hover_texts(dates) -> list[str]:
-        """Build per-date two-column hover strings for the 幣圈 trace.
+        """Build per-date hover strings for the 幣圈 trace.
 
-        Left column  : platform source percentages (from account_snapshots via get_crypto_platform_daily)
-        Right column : individual token percentages (from normalized_holdings via get_crypto_symbol_breakdown)
-        Both computed independently. Uses HTML <table> for column alignment.
+        Shows platform breakdown and top token breakdown separated by a divider.
+        Uses plain <br> to avoid HTML table rendering issues in Plotly/Streamlit.
         """
-        TOP_N = 6
-        SEPARATOR = "<td style='padding:0 6px;color:#888'>｜</td>"
+        TOP_N = 5
         texts = []
         for ts in dates:
+            lines: list[str] = []
+
             # ── 來源佔比 ──────────────────────────────────────────────────────
-            plat_rows: list[str] = []
             if not crypto_plat_daily.empty:
                 day = crypto_plat_daily[crypto_plat_daily["snapshot_date"] == ts]
                 total = day["value_usd"].sum()
                 if total > 0:
+                    lines.append("<b>來源</b>")
                     for _, r in (
                         day[day["value_usd"] > 0]
                         .sort_values("value_usd", ascending=False)
@@ -391,41 +391,25 @@ else:
                         .iterrows()
                     ):
                         name = PLATFORM_DISPLAY.get(r["platform"], r["platform"])
-                        plat_rows.append(f"{name}: {r['value_usd']/total*100:.0f}%")
+                        lines.append(f"  {name}: {r['value_usd']/total*100:.0f}%")
 
             # ── Token 佔比（by symbol）────────────────────────────────────────
-            token_rows: list[str] = []
             if not crypto_symbol_df.empty:
                 day_t = crypto_symbol_df[crypto_symbol_df["snapshot_date"] == ts]
                 total_t = day_t["value_usd"].sum()
                 if total_t > 0:
+                    if lines:
+                        lines.append("─────────────")
+                    lines.append("<b>Token</b>")
                     for _, r in (
                         day_t[day_t["value_usd"] > 0]
                         .sort_values("value_usd", ascending=False)
                         .head(TOP_N)
                         .iterrows()
                     ):
-                        token_rows.append(f"{r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
+                        lines.append(f"  {r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
 
-            if not plat_rows and not token_rows:
-                texts.append("")
-                continue
-
-            # ── HTML table for aligned two-column layout ──────────────────────
-            n = max(len(plat_rows), len(token_rows))
-            plat_rows += [""] * (n - len(plat_rows))
-            token_rows += [""] * (n - len(token_rows))
-
-            trs = []
-            for left, right in zip(plat_rows, token_rows):
-                trs.append(
-                    f"<tr>"
-                    f"<td style='padding-right:4px'>{left}</td>"
-                    f"{SEPARATOR}"
-                    f"<td style='padding-left:4px'>{right}</td>"
-                    f"</tr>"
-                )
-            texts.append(f"<table style='border-collapse:collapse'>{''.join(trs)}</table>")
+            texts.append("<br>".join(lines) if lines else "")
         return texts
 
     use_return = "報酬率" in mode

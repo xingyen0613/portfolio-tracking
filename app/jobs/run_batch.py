@@ -89,7 +89,9 @@ def _aggregate_categories(batch_id: str) -> None:
     written = 0
     with get_conn() as conn:
         for snapshot_date in dates:
-            # For each platform, get its latest total value on or before snapshot_date
+            # For each platform, get its latest total value on or before snapshot_date.
+            # Dedup: per account, take only the latest record on the resolved date
+            # to avoid double-counting when multiple batches ran on the same day.
             platform_values = conn.execute("""
                 SELECT p.name, SUM(acs.total_value) AS total_value
                 FROM account_snapshots acs
@@ -103,6 +105,13 @@ def _aggregate_categories(batch_id: str) -> None:
                       WHERE a2.platform_id = a.platform_id
                         AND acs2.snapshot_date <= ?
                         AND acs2.total_value IS NOT NULL
+                  )
+                  AND acs.id = (
+                      SELECT id FROM account_snapshots
+                      WHERE account_id = acs.account_id
+                        AND snapshot_date = acs.snapshot_date
+                        AND total_value IS NOT NULL
+                      ORDER BY created_at DESC LIMIT 1
                   )
                 GROUP BY p.name
             """, (snapshot_date,)).fetchall()
