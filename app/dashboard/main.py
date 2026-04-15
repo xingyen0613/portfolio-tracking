@@ -18,6 +18,7 @@ from app.dashboard.data import (
     get_crypto_platform_daily,
     get_crypto_symbol_breakdown,
     get_holdings,
+    get_latest_category_totals,
     get_latest_snapshot_date,
     get_snapshot_history,
 )
@@ -42,7 +43,8 @@ snapshot_date = df["snapshot_date"].iloc[0]
 
 # ── Header ────────────────────────────────────────────────────────────────────
 
-total_usd = df["value_usd"].sum()
+cat_totals = get_latest_category_totals()
+total_usd = cat_totals["value_usd"].sum() if not cat_totals.empty else df["value_usd"].sum()
 total_twd = total_usd * TWD_PER_USD
 
 col1, col2, col3 = st.columns([2, 1, 1])
@@ -230,12 +232,11 @@ st.divider()
 
 st.subheader("資產配置")
 
-# Aggregate by category
-cat_df = df.groupby("category")["value_usd"].sum().reset_index()
+# Use category_snapshots latest values so tw_stock/us_stock appear even without connectors
+cat_df = get_latest_category_totals()
 cat_df["label"] = cat_df["category"].map(CATEGORY_LABEL).fillna(cat_df["category"])
-cat_df = cat_df[cat_df["value_usd"] > 0]
 
-# Build hover text: top 5 tokens per category (merged across platforms)
+# Build hover text: top 5 tokens per category (crypto only, from normalized_holdings)
 token_by_cat = (
     df[df["value_usd"] > 0]
     .groupby(["category", "platform_symbol"])["value_usd"]
@@ -246,6 +247,8 @@ token_by_cat = (
 
 def _top5_hover(cat: str) -> str:
     sub = token_by_cat[token_by_cat["category"] == cat].nlargest(5, "value_usd")
+    if sub.empty:
+        return ""
     total = sub["value_usd"].sum()
     lines = []
     for _, r in sub.iterrows():
@@ -279,11 +282,13 @@ history_df = get_snapshot_history()
 if history_df.empty or history_df["snapshot_date"].nunique() < 2:
     st.info("歷史資料不足（需要至少 2 天的快照）。請等待每日 batch 累積資料。")
 else:
-    col_mode, col_window = st.columns([1, 1])
-    with col_mode:
-        mode = st.radio("顯示模式", ["絕對數值 (USD)", "報酬率 (%)"], horizontal=True)
-    with col_window:
-        window = st.selectbox("時間窗口", ["1W", "1M", "1Q", "1Y", "自訂"], index=1)
+    mode = st.radio("顯示模式", ["絕對數值 (USD)", "報酬率 (%)"], horizontal=True)
+    window = st.radio(
+        "時間窗口",
+        ["1W", "1M", "1Q", "1Y", "2Y", "4Y", "自訂"],
+        index=1,
+        horizontal=True,
+    )
 
     custom_start = custom_end = None
     if window == "自訂":

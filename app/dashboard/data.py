@@ -167,6 +167,28 @@ def get_crypto_symbol_breakdown() -> pd.DataFrame:
     return df
 
 
+def get_latest_category_totals() -> pd.DataFrame:
+    """
+    Return the latest total value per category from category_snapshots.
+    Used for the pie chart so all categories (crypto/tw_stock/us_stock) appear
+    even if they don't have normalized_holdings (no connector yet).
+    """
+    sql = """
+        SELECT category, total_value
+        FROM category_snapshots
+        WHERE (category, snapshot_date) IN (
+            SELECT category, MAX(snapshot_date)
+            FROM category_snapshots
+            GROUP BY category
+        )
+          AND total_value > 0
+    """
+    with _conn() as conn:
+        df = pd.read_sql_query(sql, conn)
+    df["value_usd"] = pd.to_numeric(df["total_value"], errors="coerce")
+    return df
+
+
 def get_batch_info(batch_id: str) -> dict:
     """Return metadata for a batch."""
     with _conn() as conn:

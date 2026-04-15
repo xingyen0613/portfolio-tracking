@@ -65,7 +65,7 @@ def filter_window(
             return df[(df[date_col] >= start) & (df[date_col] <= end)]
         return df  # no valid custom range → return all
     end = df[date_col].max()
-    deltas = {"1W": 7, "1M": 30, "1Q": 90, "1Y": 365}
+    deltas = {"1W": 7, "1M": 30, "1Q": 90, "1Y": 365, "2Y": 730, "4Y": 1460}
     days = deltas.get(window, 30)
     start = end - pd.Timedelta(days=days)
     return df[df[date_col] >= start]
