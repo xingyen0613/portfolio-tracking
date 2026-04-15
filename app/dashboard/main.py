@@ -362,33 +362,29 @@ else:
         "us_stock": "美股",
     }
 
-    # ── Line visibility selector ──────────────────────────────────────────────
-    available_cats = [c for c in ["total", "crypto", "tw_stock", "us_stock"]
-                      if not all_daily[all_daily["category"] == c].empty]
-    available_labels = [NAMES[c] for c in available_cats]
-    selected_labels = st.multiselect("顯示線條", available_labels, default=available_labels)
-    selected_cats = [c for c in available_cats if NAMES[c] in selected_labels]
+    selected_cats = [c for c in ["total", "crypto", "tw_stock", "us_stock"]
+                     if not all_daily[all_daily["category"] == c].empty]
 
-    # Breakdown hover only when 幣圈 is the sole visible line
-    show_crypto_breakdown = (selected_cats == ["crypto"])
+    show_crypto_breakdown = st.checkbox("顯示幣圈詳細分解（來源 + Token）", value=False)
 
     def _crypto_hover_texts(dates) -> list[str]:
         """Build per-date hover strings for the 幣圈 trace.
 
-        Shows platform breakdown and top token breakdown separated by a divider.
-        Uses plain <br> to avoid HTML table rendering issues in Plotly/Streamlit.
+        Shows platform breakdown (left) and token breakdown (right) side by side.
+        Uses &nbsp; padding to simulate two columns within Plotly hover HTML.
         """
         TOP_N = 5
         texts = []
         for ts in dates:
-            lines: list[str] = []
+            left_col: list[str] = []
+            right_col: list[str] = []
 
-            # ── 來源佔比 ──────────────────────────────────────────────────────
+            # ── 來源佔比（左欄）──────────────────────────────────────────────
             if not crypto_plat_daily.empty:
                 day = crypto_plat_daily[crypto_plat_daily["snapshot_date"] == ts]
                 total = day["value_usd"].sum()
                 if total > 0:
-                    lines.append("<b>來源</b>")
+                    left_col.append("<b>來源</b>")
                     for _, r in (
                         day[day["value_usd"] > 0]
                         .sort_values("value_usd", ascending=False)
@@ -396,25 +392,39 @@ else:
                         .iterrows()
                     ):
                         name = PLATFORM_DISPLAY.get(r["platform"], r["platform"])
-                        lines.append(f"  {name}: {r['value_usd']/total*100:.0f}%")
+                        left_col.append(f"{name}: {r['value_usd']/total*100:.0f}%")
 
-            # ── Token 佔比（by symbol）────────────────────────────────────────
+            # ── Token 佔比（右欄）────────────────────────────────────────────
             if not crypto_symbol_df.empty:
                 day_t = crypto_symbol_df[crypto_symbol_df["snapshot_date"] == ts]
                 total_t = day_t["value_usd"].sum()
                 if total_t > 0:
-                    if lines:
-                        lines.append("─────────────")
-                    lines.append("<b>Token</b>")
+                    right_col.append("<b>Token</b>")
                     for _, r in (
                         day_t[day_t["value_usd"] > 0]
                         .sort_values("value_usd", ascending=False)
                         .head(TOP_N)
                         .iterrows()
                     ):
-                        lines.append(f"  {r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
+                        right_col.append(f"{r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
 
-            texts.append("<br>".join(lines) if lines else "")
+            if not left_col and not right_col:
+                texts.append("")
+                continue
+
+            # Pad both columns to same length and zip into rows
+            max_rows = max(len(left_col), len(right_col))
+            left_col += [""] * (max_rows - len(left_col))
+            right_col += [""] * (max_rows - len(right_col))
+
+            # Dynamic padding: align to longest item in left column
+            max_left = max((len(l) for l in left_col), default=0)
+            rows = []
+            for l, r in zip(left_col, right_col):
+                nbsp_count = (max_left - len(l) + 3) * 2  # *2: proportional font compensation
+                sep = f"{'&nbsp;' * nbsp_count}│&nbsp;&nbsp;"
+                rows.append(f"{l}{sep}{r}")
+            texts.append("<br>".join(rows))
         return texts
 
     use_return = "報酬率" in mode
@@ -475,7 +485,17 @@ else:
                 st.metric("報酬率", f"{m['total_return']*100:+.2f}%")
                 sharpe_str = f"{m['sharpe']:.2f}" if m["sharpe"] is not None else "—"
                 mdd_str = f"{m['mdd']*100:.2f}%" if m["mdd"] is not None else "—"
-                st.caption(f"Sharpe: {sharpe_str}　MDD: {mdd_str}")
+                sharpe_help = (
+                    "Sharpe Ratio（年化，無風險利率=0）：每單位風險的報酬效率。"
+                    "注意：Sharpe 與總報酬可能方向相反——前段穩定上漲末段急跌時，Sharpe 仍偏高但總報酬為負。"
+                    "ffill 補值會壓低波動度使 Sharpe 偏高。"
+                )
+                st.markdown(
+                    f'<small style="color:gray">Sharpe: {sharpe_str}&nbsp;'
+                    f'<span title="{sharpe_help}" style="cursor:help">ⓘ</span></small><br>'
+                    f'<small style="color:gray">MDD: {mdd_str}</small>',
+                    unsafe_allow_html=True,
+                )
             else:
                 st.metric("報酬率", "—")
                 st.caption("資料不足")
