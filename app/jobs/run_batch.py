@@ -98,6 +98,7 @@ def _aggregate_categories(batch_id: str) -> None:
                 JOIN accounts a ON acs.account_id = a.id
                 JOIN platforms p ON a.platform_id = p.id
                 WHERE acs.total_value IS NOT NULL
+                  AND acs.currency = 'USD'
                   AND acs.snapshot_date = (
                       SELECT MAX(acs2.snapshot_date)
                       FROM account_snapshots acs2
@@ -105,6 +106,7 @@ def _aggregate_categories(batch_id: str) -> None:
                       WHERE a2.platform_id = a.platform_id
                         AND acs2.snapshot_date <= ?
                         AND acs2.total_value IS NOT NULL
+                        AND acs2.currency = 'USD'
                   )
                   AND acs.id = (
                       SELECT id FROM account_snapshots
