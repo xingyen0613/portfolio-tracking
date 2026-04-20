@@ -197,6 +197,25 @@ def get_latest_category_totals() -> pd.DataFrame:
     return df
 
 
+def get_yuanta_latest() -> dict:
+    """Return the latest daily net_asset snapshot for yuanta from account_snapshots."""
+    sql = """
+        SELECT acs.snapshot_date, acs.total_value, acs.currency
+        FROM account_snapshots acs
+        JOIN accounts a  ON acs.account_id = a.id
+        JOIN platforms p ON a.platform_id = p.id
+        WHERE p.name = 'yuanta'
+          AND acs.total_value IS NOT NULL
+        ORDER BY acs.snapshot_date DESC, acs.created_at DESC
+        LIMIT 1
+    """
+    with _conn() as conn:
+        row = conn.execute(sql).fetchone()
+    if not row:
+        return {}
+    return {"snapshot_date": row[0], "total_value": row[1], "currency": row[2]}
+
+
 def get_batch_info(batch_id: str) -> dict:
     """Return metadata for a batch."""
     with _conn() as conn:

@@ -21,6 +21,7 @@ from app.dashboard.data import (
     get_latest_category_totals,
     get_latest_snapshot_date,
     get_snapshot_history,
+    get_yuanta_latest,
 )
 from app.dashboard.metrics import compute_metrics, filter_window
 from config.settings import CATEGORY_LABEL, PLATFORM_CATEGORY, TWD_PER_USD
@@ -140,8 +141,31 @@ def _display_holding(row, indent=True):
 active_platforms = df["platform"].unique().tolist()
 all_platforms = ["binance", "okx", "mexc", "bybit", "sui_wallet", "yuanta", "firsttrade"]
 
+yuanta_snapshot = get_yuanta_latest()
+
 for platform in all_platforms:
     display_name = PLATFORM_DISPLAY.get(platform, platform)
+
+    # 元大：資料來自 account_snapshots，不走 normalized_holdings
+    if platform == "yuanta":
+        if not yuanta_snapshot:
+            with st.expander(f"▷ {display_name} — 尚未連接", expanded=False):
+                st.caption("此平台尚未設定 connector。")
+        else:
+            twd = yuanta_snapshot["total_value"]
+            usd = twd / TWD_PER_USD
+            date_label = yuanta_snapshot["snapshot_date"]
+            with st.expander(
+                f"**{display_name}** — NT${twd:,.0f}　`{date_label}`",
+                expanded=True,
+            ):
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.metric("每日淨資產（TWD）", f"NT${twd:,.0f}")
+                with c2:
+                    st.metric("折合美元（USD）", f"${usd:,.0f}")
+                st.caption("淨資產 = 持股市值 − 融資餘額。個股明細尚未支援，透過月對帳單 PDF 計算。")
+        continue
 
     if platform not in active_platforms:
         with st.expander(f"▷ {display_name} — 尚未連接", expanded=False):
