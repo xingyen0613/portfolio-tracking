@@ -1,16 +1,34 @@
 # Portfolio Tracking
 
-個人資產追蹤系統，整合 CEX（Binance、OKX、MEXC、Bybit）與 SUI 鏈上錢包資料，每日快照存入 SQLite。
+個人資產追蹤系統，整合 CEX（Binance、OKX、MEXC、Bybit）、SUI 鏈上錢包，以及元大證券（台股）資料，每日快照存入 SQLite。
 
 ## 資料來源
 
-| 平台 | 資料類型 | API |
-|------|---------|-----|
-| Binance | Spot + Earn（Flexible/Locked）+ Funding | ccxt |
-| OKX | Spot + Savings | ccxt |
-| MEXC | Spot + Futures（合約帳戶） | ccxt |
-| Bybit | UNIFIED（現貨/衍生品）+ Funding | ccxt |
-| SUI Wallet | Token 餘額 | Sui 公鏈 RPC + Pyth oracle（免費，無需 API key） |
+| 平台 | 資料類型 | 方式 | 幣別 |
+|------|---------|------|------|
+| Binance | Spot + Earn（Flexible/Locked）+ Funding | ccxt API | USD |
+| OKX | Spot + Savings | ccxt API | USD |
+| MEXC | Spot + Futures（合約帳戶） | ccxt API | USD |
+| Bybit | UNIFIED（現貨/衍生品）+ Funding | ccxt API | USD |
+| SUI Wallet | Token 餘額 | Sui 公鏈 RPC + Pyth oracle | USD |
+| 元大證券 | 台股每日淨資產（持股市值 - 融資餘額） | 月對帳單 PDF 解析 | TWD |
+
+## 元大台股 Pipeline
+
+元大每月電子對帳單 PDF → 解析 → 日重建 → 收盤價抓取 → 每日淨資產 → 寫入主系統 DB
+
+```
+Gmail 下載 PDF          scripts/yuanta_gmail_poc.py --fetch --all
+PDF 解析                scripts/yuanta_pdf_parse_poc.py --batch
+日持股重建              scripts/yuanta_daily_reconstruct_poc.py --batch
+收盤價抓取（Yahoo）     scripts/yuanta_price_fetch_poc.py --batch
+每日淨資產計算          scripts/yuanta_net_asset_poc.py --batch
+寫入主系統 DB           scripts/yuanta_insert_poc.py --batch
+```
+
+- 收盤價只有交易日有值，非交易日 net_asset 存 `null`（不 forward-fill，留給前端處理）
+- 幣別：TWD（不換算 USD，category_snapshots tw_stock 亦以 TWD 儲存）
+- 股票代號自動解析：遇到 PDF 無代號的持股（如質押擔保品），自動查 TWSE/TPEX 官方清單，結果 cache 於 `data/derived/yuanta_poc/name_to_symbol_cache.json`
 
 ## 執行
 
@@ -72,7 +90,7 @@ crontab -e
 Cron 格式：`分 時 日 月 星期`
 
 ```
-# 每天 23:00 執行一次
+# 每天 23:00 執行一次（幣圈）
 0 23 * * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python -m app.jobs.run_batch >> data/logs/cron.log 2>&1
 
 # 每小時整點執行
@@ -83,6 +101,9 @@ Cron 格式：`分 時 日 月 星期`
 
 # 只抓 SUI（較輕量，可以跑更頻繁）
 0 * * * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python -m app.jobs.run_batch --platform sui_wallet >> data/logs/cron.log 2>&1
+
+# 元大台股（每月 5 號 09:00，自動判斷是否有新對帳單）
+0 9 5 * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python scripts/yuanta_run_pipeline.py >> data/logs/yuanta.log 2>&1
 ```
 
 #### 驗證設定是否生效

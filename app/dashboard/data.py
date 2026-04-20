@@ -80,7 +80,7 @@ def get_snapshot_history() -> pd.DataFrame:
     Used for the time series chart.
     """
     sql = """
-        SELECT snapshot_date, category, total_value AS value_usd, source
+        SELECT snapshot_date, category, total_value, currency, source
         FROM category_snapshots
         ORDER BY snapshot_date, category
     """
@@ -88,7 +88,11 @@ def get_snapshot_history() -> pd.DataFrame:
         df = pd.read_sql_query(sql, conn)
 
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
-    df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
+    df["total_value"] = pd.to_numeric(df["total_value"], errors="coerce")
+    df["value_usd"] = df.apply(
+        lambda r: r["total_value"] / TWD_PER_USD if r["currency"] == "TWD" else r["total_value"],
+        axis=1,
+    )
     return df
 
 
@@ -174,7 +178,7 @@ def get_latest_category_totals() -> pd.DataFrame:
     even if they don't have normalized_holdings (no connector yet).
     """
     sql = """
-        SELECT category, total_value
+        SELECT category, total_value, currency
         FROM category_snapshots
         WHERE (category, snapshot_date) IN (
             SELECT category, MAX(snapshot_date)
@@ -185,7 +189,11 @@ def get_latest_category_totals() -> pd.DataFrame:
     """
     with _conn() as conn:
         df = pd.read_sql_query(sql, conn)
-    df["value_usd"] = pd.to_numeric(df["total_value"], errors="coerce")
+    df["total_value"] = pd.to_numeric(df["total_value"], errors="coerce")
+    df["value_usd"] = df.apply(
+        lambda r: r["total_value"] / TWD_PER_USD if r["currency"] == "TWD" else r["total_value"],
+        axis=1,
+    )
     return df
 
 

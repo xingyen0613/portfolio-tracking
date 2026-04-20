@@ -1,11 +1,10 @@
 .env
 .env.plaid
+.secrets/
 
-# PoC / 測試腳本（整個 scripts/ 資料夾，只保留主流程用的 scripts）
-scripts/
-
-# 僅保留 example 範本檔（不含實際 key 與 raw data）
-!scripts/**/*.example
+# 測試腳本預設忽略，只追蹤 yuanta pipeline scripts
+scripts/*
+!scripts/yuanta_*.py
 .venv/
 data/
 __pycache__/
