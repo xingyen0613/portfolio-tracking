@@ -3,6 +3,7 @@ Data access layer for the Streamlit dashboard.
 Reads from SQLite and returns aggregated DataFrames.
 """
 
+import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -195,6 +196,91 @@ def get_latest_category_totals() -> pd.DataFrame:
         axis=1,
     )
     return df
+
+
+def get_yuanta_holdings_detail() -> dict:
+    """
+    Return latest detailed holdings for yuanta from JSON files.
+    Combines parsed.json (owned/pledged classification) with
+    daily_net_asset.json (latest trading day values).
+    Returns empty dict if no data available.
+    """
+    project_root = Path(DB_PATH).parent.parent.parent
+    derived_dir = project_root / "data" / "derived" / "yuanta_poc"
+    raw_dir = project_root / "data" / "raw" / "yuanta_poc"
+
+    # Find latest month with daily_net_asset.json
+    months = sorted(
+        [p.parent.name for p in derived_dir.glob("*/daily_net_asset.json")],
+        reverse=True,
+    )
+    if not months:
+        return {}
+
+    latest_month = months[0]
+
+    # Latest non-null entry from daily_net_asset.json
+    with open(derived_dir / latest_month / "daily_net_asset.json", encoding="utf-8") as f:
+        na_data = json.load(f)
+    latest_entry = next(
+        (e for e in reversed(na_data["daily"]) if e.get("net_asset") is not None),
+        None,
+    )
+    if not latest_entry:
+        return {}
+
+    holdings_value = {k: float(v) for k, v in (latest_entry.get("holdings_value") or {}).items()}
+
+    # Name→symbol cache (for pledged holdings that have no symbol in PDF)
+    cache_path = derived_dir / "name_to_symbol_cache.json"
+    name_to_sym: dict[str, str] = {}
+    if cache_path.exists():
+        with open(cache_path, encoding="utf-8") as f:
+            name_to_sym = json.load(f)
+
+    # parsed.json — owned vs pledged distinction (end-of-month snapshot)
+    owned: list[dict] = []
+    pledged: list[dict] = []
+    parsed_path = raw_dir / latest_month / "parsed.json"
+    if parsed_path.exists():
+        with open(parsed_path, encoding="utf-8") as f:
+            parsed = json.load(f)
+
+        for h in parsed.get("holdings_owned", []):
+            sym = h.get("symbol")
+            owned.append({
+                "symbol": sym or "—",
+                "name": h.get("name", ""),
+                "shares": int(h.get("shares_collateral_free") or 0),
+                "value_twd": holdings_value.get(sym) if sym else None,
+            })
+
+        for h in parsed.get("holdings_pledged", []):
+            name = h.get("name", "")
+            sym = h.get("symbol") or name_to_sym.get(name)
+            pledged.append({
+                "symbol": sym or "—",
+                "name": name,
+                "shares_balance": int(h.get("shares_balance") or 0),
+                "shares_used": int(h.get("shares_used") or 0),
+                "shares_remaining": int(h.get("shares_remaining") or 0),
+                "value_twd": holdings_value.get(sym) if sym else None,
+            })
+
+    owned.sort(key=lambda x: x["value_twd"] or 0, reverse=True)
+    pledged.sort(key=lambda x: x["value_twd"] or 0, reverse=True)
+
+    summary = parsed.get("summary", {}) if parsed_path.exists() else {}
+    return {
+        "date": latest_entry["date"],
+        "month": latest_month,
+        "market_value": float(latest_entry.get("market_value") or 0),
+        "margin_balance": float(latest_entry.get("margin_balance") or 0),
+        "net_asset": float(latest_entry.get("net_asset") or 0),
+        "margin_maintenance_pct": summary.get("margin_maintenance_pct"),
+        "owned": owned,
+        "pledged": pledged,
+    }
 
 
 def get_yuanta_latest() -> dict:

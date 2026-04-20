@@ -21,7 +21,7 @@ from app.dashboard.data import (
     get_latest_category_totals,
     get_latest_snapshot_date,
     get_snapshot_history,
-    get_yuanta_latest,
+    get_yuanta_holdings_detail,
 )
 from app.dashboard.metrics import compute_metrics, filter_window
 from config.settings import CATEGORY_LABEL, PLATFORM_CATEGORY, TWD_PER_USD
@@ -141,30 +141,73 @@ def _display_holding(row, indent=True):
 active_platforms = df["platform"].unique().tolist()
 all_platforms = ["binance", "okx", "mexc", "bybit", "sui_wallet", "yuanta", "firsttrade"]
 
-yuanta_snapshot = get_yuanta_latest()
+yuanta_detail = get_yuanta_holdings_detail()
 
 for platform in all_platforms:
     display_name = PLATFORM_DISPLAY.get(platform, platform)
 
-    # 元大：資料來自 account_snapshots，不走 normalized_holdings
+    # 元大：資料來自 JSON 檔案，不走 normalized_holdings
     if platform == "yuanta":
-        if not yuanta_snapshot:
+        if not yuanta_detail:
             with st.expander(f"▷ {display_name} — 尚未連接", expanded=False):
                 st.caption("此平台尚未設定 connector。")
         else:
-            twd = yuanta_snapshot["total_value"]
-            usd = twd / TWD_PER_USD
-            date_label = yuanta_snapshot["snapshot_date"]
+            net = yuanta_detail["net_asset"]
+            usd = net / TWD_PER_USD
+            date_label = yuanta_detail["date"]
             with st.expander(
-                f"**{display_name}** — NT${twd:,.0f}　`{date_label}`",
+                f"**{display_name}** — NT${net:,.0f}　`{date_label}`",
                 expanded=True,
             ):
-                c1, c2 = st.columns(2)
+                # ── Summary ──────────────────────────────────────────────
+                c1, c2, c3 = st.columns(3)
                 with c1:
-                    st.metric("每日淨資產（TWD）", f"NT${twd:,.0f}")
+                    st.metric("持股市值", f"NT${yuanta_detail['market_value']:,.0f}")
                 with c2:
-                    st.metric("折合美元（USD）", f"${usd:,.0f}")
-                st.caption("淨資產 = 持股市值 − 融資餘額。個股明細尚未支援，透過月對帳單 PDF 計算。")
+                    margin = yuanta_detail["margin_balance"]
+                    st.metric("融資餘額", f"NT${margin:,.0f}")
+                with c3:
+                    st.metric("淨資產", f"NT${net:,.0f}　≈ ${usd:,.0f} USD")
+
+                # ── 自有持股 ──────────────────────────────────────────────
+                owned = yuanta_detail["owned"]
+                if owned:
+                    st.markdown("**自有持股**")
+                    hdr = st.columns([1, 2, 2, 2])
+                    for col, label in zip(hdr, ["代碼", "名稱", "股數", "市值（TWD）"]):
+                        col.caption(label)
+                    for h in owned:
+                        c1, c2, c3, c4 = st.columns([1, 2, 2, 2])
+                        with c1: st.markdown(f"`{h['symbol']}`")
+                        with c2: st.write(h["name"])
+                        with c3: st.write(f"{h['shares']:,} 股")
+                        with c4: st.write(f"NT${h['value_twd']:,.0f}" if h["value_twd"] else "—")
+
+                # ── 抵押品部位 ────────────────────────────────────────────
+                pledged = yuanta_detail["pledged"]
+                if pledged:
+                    st.markdown("**抵押品部位**")
+                    hdr = st.columns([1, 2, 2, 2, 2])
+                    for col, label in zip(hdr, ["代碼", "名稱", "庫存股", "擔保使用", "剩餘可用"]):
+                        col.caption(label)
+                    for h in pledged:
+                        c1, c2, c3, c4, c5 = st.columns([1, 2, 2, 2, 2])
+                        with c1: st.markdown(f"`{h['symbol']}`")
+                        with c2: st.write(h["name"])
+                        with c3: st.write(f"{h['shares_balance']:,} 股")
+                        with c4: st.write(f"{h['shares_used']:,} 股")
+                        with c5: st.write(f"{h['shares_remaining']:,} 股")
+
+                # ── 借貸部位 ──────────────────────────────────────────────
+                if margin > 0:
+                    st.markdown("**借貸部位（融資）**")
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.metric("融資餘額", f"NT${margin:,.0f}")
+                    pct = yuanta_detail.get("margin_maintenance_pct")
+                    if pct:
+                        with c2:
+                            st.metric("維持率", f"{pct}%")
         continue
 
     if platform not in active_platforms:
