@@ -172,6 +172,137 @@ def get_crypto_symbol_breakdown() -> pd.DataFrame:
     return df
 
 
+def get_us_stock_platform_daily() -> pd.DataFrame:
+    """Per-date per-platform totals for us_stock (ibkr + firsttrade). Used for hover breakdown."""
+    sql = """
+        SELECT
+            p.name          AS platform,
+            acs.snapshot_date,
+            SUM(acs.total_value) AS value_usd
+        FROM account_snapshots acs
+        JOIN accounts a  ON acs.account_id = a.id
+        JOIN platforms p ON a.platform_id = p.id
+        WHERE acs.total_value IS NOT NULL
+          AND p.name IN ('ibkr', 'firsttrade')
+          AND acs.currency = 'USD'
+          AND acs.id = (
+              SELECT id FROM account_snapshots
+              WHERE account_id = acs.account_id
+                AND snapshot_date = acs.snapshot_date
+                AND total_value IS NOT NULL
+              ORDER BY created_at DESC LIMIT 1
+          )
+        GROUP BY p.name, acs.snapshot_date
+        ORDER BY acs.snapshot_date
+    """
+    with _conn() as conn:
+        df = pd.read_sql_query(sql, conn)
+    df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
+    df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
+    return df
+
+
+def get_us_stock_symbol_breakdown() -> pd.DataFrame:
+    """Per-date per-stock breakdown for us_stock platforms. Only available on batch-run dates."""
+    sql = """
+        SELECT
+            nh.snapshot_date,
+            nh.platform_symbol AS symbol,
+            SUM(nh.value) AS value_usd
+        FROM normalized_holdings nh
+        JOIN source_runs sr ON nh.source_run_id = sr.id
+        JOIN accounts a     ON sr.account_id = a.id
+        JOIN platforms p    ON a.platform_id = p.id
+        WHERE p.name IN ('ibkr', 'firsttrade')
+          AND nh.asset_type = 'stock'
+          AND nh.value IS NOT NULL
+          AND sr.status = 'success'
+          AND sr.id = (
+              SELECT sr2.id FROM source_runs sr2
+              WHERE sr2.account_id = a.id
+                AND sr2.status = 'success'
+                AND EXISTS (
+                    SELECT 1 FROM normalized_holdings nh2
+                    WHERE nh2.source_run_id = sr2.id
+                      AND nh2.snapshot_date = nh.snapshot_date
+                )
+              ORDER BY sr2.started_at DESC LIMIT 1
+          )
+        GROUP BY nh.snapshot_date, nh.platform_symbol
+        ORDER BY nh.snapshot_date, value_usd DESC
+    """
+    with _conn() as conn:
+        df = pd.read_sql_query(sql, conn)
+    if not df.empty:
+        df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
+        df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
+    return df
+
+
+def get_tw_stock_symbol_breakdown() -> pd.DataFrame:
+    """
+    Return per-date per-stock breakdown for tw_stock (yuanta).
+    Source: daily_net_asset.json holdings_value (TWD per symbol).
+    Only includes trading days where holdings_value is non-empty.
+    """
+    project_root = Path(DB_PATH).parent.parent.parent
+    derived_dir = project_root / "data" / "derived" / "yuanta_poc"
+
+    rows = []
+    for na_file in sorted(derived_dir.glob("*/daily_net_asset.json")):
+        with open(na_file, encoding="utf-8") as f:
+            data = json.load(f)
+        for entry in data.get("daily", []):
+            hv = entry.get("holdings_value")
+            if not hv:
+                continue
+            date_str = entry["date"]
+            for symbol, value_str in hv.items():
+                rows.append({
+                    "snapshot_date": date_str,
+                    "symbol": symbol,
+                    "value_usd": float(value_str) / TWD_PER_USD,
+                })
+
+    if not rows:
+        return pd.DataFrame(columns=["snapshot_date", "symbol", "value_usd"])
+
+    df = pd.DataFrame(rows)
+    df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
+    df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
+    return df.sort_values(["snapshot_date", "value_usd"], ascending=[True, False])
+
+
+def get_tw_stock_platform_daily() -> pd.DataFrame:
+    """Per-date per-platform totals for tw_stock (yuanta, extensible). Used for hover breakdown."""
+    sql = """
+        SELECT
+            p.name          AS platform,
+            acs.snapshot_date,
+            SUM(acs.total_value) / :rate AS value_usd
+        FROM account_snapshots acs
+        JOIN accounts a  ON acs.account_id = a.id
+        JOIN platforms p ON a.platform_id = p.id
+        WHERE acs.total_value IS NOT NULL
+          AND p.name IN ('yuanta')
+          AND acs.currency = 'TWD'
+          AND acs.id = (
+              SELECT id FROM account_snapshots
+              WHERE account_id = acs.account_id
+                AND snapshot_date = acs.snapshot_date
+                AND total_value IS NOT NULL
+              ORDER BY created_at DESC LIMIT 1
+          )
+        GROUP BY p.name, acs.snapshot_date
+        ORDER BY acs.snapshot_date
+    """
+    with _conn() as conn:
+        df = pd.read_sql_query(sql, conn, params={"rate": TWD_PER_USD})
+    df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
+    df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
+    return df
+
+
 def get_latest_category_totals() -> pd.DataFrame:
     """
     Return the latest total value per category from category_snapshots.

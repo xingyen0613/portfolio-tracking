@@ -21,6 +21,10 @@ from app.dashboard.data import (
     get_latest_category_totals,
     get_latest_snapshot_date,
     get_snapshot_history,
+    get_tw_stock_platform_daily,
+    get_tw_stock_symbol_breakdown,
+    get_us_stock_platform_daily,
+    get_us_stock_symbol_breakdown,
     get_yuanta_holdings_detail,
 )
 from app.dashboard.metrics import compute_metrics, filter_window
@@ -445,6 +449,58 @@ else:
     if not crypto_symbol_df.empty:
         crypto_symbol_df = filter_window(crypto_symbol_df, "snapshot_date", window, custom_start, custom_end)
 
+    # Per-platform daily for us_stock hover breakdown
+    us_plat_raw = get_us_stock_platform_daily()
+    if not us_plat_raw.empty:
+        date_range_us = pd.date_range(
+            us_plat_raw["snapshot_date"].min(), us_plat_raw["snapshot_date"].max(), freq="D"
+        )
+        us_plats = us_plat_raw["platform"].unique()
+        full_idx_us = pd.MultiIndex.from_product(
+            [date_range_us, us_plats], names=["snapshot_date", "platform"]
+        )
+        us_plat_daily = (
+            us_plat_raw
+            .set_index(["snapshot_date", "platform"])
+            .reindex(full_idx_us)
+            .groupby(level="platform")["value_usd"]
+            .ffill()
+            .reset_index()
+        )
+        us_plat_daily = filter_window(us_plat_daily, "snapshot_date", window, custom_start, custom_end)
+    else:
+        us_plat_daily = pd.DataFrame()
+
+    us_symbol_df = get_us_stock_symbol_breakdown()
+    if not us_symbol_df.empty:
+        us_symbol_df = filter_window(us_symbol_df, "snapshot_date", window, custom_start, custom_end)
+
+    # Per-platform daily for tw_stock hover breakdown
+    tw_plat_raw = get_tw_stock_platform_daily()
+    if not tw_plat_raw.empty:
+        date_range_tw = pd.date_range(
+            tw_plat_raw["snapshot_date"].min(), tw_plat_raw["snapshot_date"].max(), freq="D"
+        )
+        tw_plats = tw_plat_raw["platform"].unique()
+        full_idx_tw = pd.MultiIndex.from_product(
+            [date_range_tw, tw_plats], names=["snapshot_date", "platform"]
+        )
+        tw_plat_daily = (
+            tw_plat_raw
+            .set_index(["snapshot_date", "platform"])
+            .reindex(full_idx_tw)
+            .groupby(level="platform")["value_usd"]
+            .ffill()
+            .reset_index()
+        )
+        tw_plat_daily = filter_window(tw_plat_daily, "snapshot_date", window, custom_start, custom_end)
+    else:
+        tw_plat_daily = pd.DataFrame()
+
+    tw_symbol_df = get_tw_stock_symbol_breakdown()
+    if not tw_symbol_df.empty:
+        tw_symbol_df = filter_window(tw_symbol_df, "snapshot_date", window, custom_start, custom_end)
+
     COLORS = {
         "total": "#636EFA",
         "crypto": "#F7C244",
@@ -461,7 +517,13 @@ else:
     selected_cats = [c for c in ["total", "crypto", "tw_stock", "us_stock"]
                      if not all_daily[all_daily["category"] == c].empty]
 
-    show_crypto_breakdown = st.checkbox("顯示幣圈詳細分解（來源 + Token）", value=False)
+    breakdown_cols = st.columns(3)
+    with breakdown_cols[0]:
+        show_crypto_breakdown = st.checkbox("顯示幣圈詳細分解（來源 + Token）", value=False)
+    with breakdown_cols[1]:
+        show_us_stock_breakdown = st.checkbox("顯示美股詳細分解（來源 + 個股）", value=False)
+    with breakdown_cols[2]:
+        show_tw_stock_breakdown = st.checkbox("顯示台股詳細分解（來源）", value=False)
 
     def _crypto_hover_texts(dates) -> list[str]:
         """Build per-date hover strings for the 幣圈 trace.
@@ -523,6 +585,108 @@ else:
             texts.append("<br>".join(rows))
         return texts
 
+    def _us_stock_hover_texts(dates) -> list[str]:
+        """Build per-date hover strings for the 美股 trace (platform left, stock right)."""
+        TOP_N = 5
+        texts = []
+        for ts in dates:
+            left_col: list[str] = []
+            right_col: list[str] = []
+
+            if not us_plat_daily.empty:
+                day = us_plat_daily[us_plat_daily["snapshot_date"] == ts]
+                total = day["value_usd"].sum()
+                if total > 0:
+                    left_col.append("<b>來源</b>")
+                    for _, r in (
+                        day[day["value_usd"] > 0]
+                        .sort_values("value_usd", ascending=False)
+                        .head(TOP_N)
+                        .iterrows()
+                    ):
+                        name = PLATFORM_DISPLAY.get(r["platform"], r["platform"])
+                        left_col.append(f"{name}: {r['value_usd']/total*100:.0f}%")
+
+            if not us_symbol_df.empty:
+                day_t = us_symbol_df[us_symbol_df["snapshot_date"] == ts]
+                total_t = day_t["value_usd"].sum()
+                if total_t > 0:
+                    right_col.append("<b>個股</b>")
+                    for _, r in (
+                        day_t[day_t["value_usd"] > 0]
+                        .sort_values("value_usd", ascending=False)
+                        .head(TOP_N)
+                        .iterrows()
+                    ):
+                        right_col.append(f"{r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
+
+            if not left_col and not right_col:
+                texts.append("")
+                continue
+
+            max_rows = max(len(left_col), len(right_col))
+            left_col += [""] * (max_rows - len(left_col))
+            right_col += [""] * (max_rows - len(right_col))
+            max_left = max((len(l) for l in left_col), default=0)
+            rows = []
+            for l, r in zip(left_col, right_col):
+                nbsp_count = (max_left - len(l) + 3) * 2
+                sep = f"{'&nbsp;' * nbsp_count}│&nbsp;&nbsp;"
+                rows.append(f"{l}{sep}{r}")
+            texts.append("<br>".join(rows))
+        return texts
+
+    def _tw_stock_hover_texts(dates) -> list[str]:
+        """Build per-date hover strings for the 台股 trace (platform left, stock right)."""
+        TOP_N = 5
+        texts = []
+        for ts in dates:
+            left_col: list[str] = []
+            right_col: list[str] = []
+
+            if not tw_plat_daily.empty:
+                day = tw_plat_daily[tw_plat_daily["snapshot_date"] == ts]
+                total = day["value_usd"].sum()
+                if total > 0:
+                    left_col.append("<b>來源</b>")
+                    for _, r in (
+                        day[day["value_usd"] > 0]
+                        .sort_values("value_usd", ascending=False)
+                        .head(TOP_N)
+                        .iterrows()
+                    ):
+                        name = PLATFORM_DISPLAY.get(r["platform"], r["platform"])
+                        left_col.append(f"{name}: {r['value_usd']/total*100:.0f}%")
+
+            if not tw_symbol_df.empty:
+                day_t = tw_symbol_df[tw_symbol_df["snapshot_date"] == ts]
+                total_t = day_t["value_usd"].sum()
+                if total_t > 0:
+                    right_col.append("<b>個股</b>")
+                    for _, r in (
+                        day_t[day_t["value_usd"] > 0]
+                        .sort_values("value_usd", ascending=False)
+                        .head(TOP_N)
+                        .iterrows()
+                    ):
+                        right_col.append(f"{r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
+
+            if not left_col and not right_col:
+                texts.append("")
+                continue
+
+            max_rows = max(len(left_col), len(right_col))
+            left_col += [""] * (max_rows - len(left_col))
+            right_col += [""] * (max_rows - len(right_col))
+            max_left = max((len(l) for l in left_col), default=0)
+            rows = []
+            for l, r in zip(left_col, right_col):
+                nbsp_count = (max_left - len(l) + 3) * 2
+                sep = f"{'&nbsp;' * nbsp_count}│&nbsp;&nbsp;"
+                rows.append(f"{l}{sep}{r}")
+            texts.append("<br>".join(rows))
+        return texts
+
     use_return = "報酬率" in mode
 
     fig_line = go.Figure()
@@ -548,6 +712,36 @@ else:
                     "<b>幣圈</b>: %{y:.2f}%<br>%{customdata}<extra></extra>"
                     if use_return else
                     "<b>幣圈</b>: $%{y:,.0f} USD<br>%{customdata}<extra></extra>"
+                ),
+            ))
+        elif cat == "us_stock" and show_us_stock_breakdown:
+            hover_texts = _us_stock_hover_texts(sub["snapshot_date"])
+            fig_line.add_trace(go.Scatter(
+                x=sub["snapshot_date"],
+                y=y,
+                name=NAMES["us_stock"],
+                line=dict(color=COLORS["us_stock"], width=2),
+                mode="lines",
+                customdata=hover_texts,
+                hovertemplate=(
+                    "<b>美股</b>: %{y:.2f}%<br>%{customdata}<extra></extra>"
+                    if use_return else
+                    "<b>美股</b>: $%{y:,.0f} USD<br>%{customdata}<extra></extra>"
+                ),
+            ))
+        elif cat == "tw_stock" and show_tw_stock_breakdown:
+            hover_texts = _tw_stock_hover_texts(sub["snapshot_date"])
+            fig_line.add_trace(go.Scatter(
+                x=sub["snapshot_date"],
+                y=y,
+                name=NAMES["tw_stock"],
+                line=dict(color=COLORS["tw_stock"], width=2),
+                mode="lines",
+                customdata=hover_texts,
+                hovertemplate=(
+                    "<b>台股</b>: %{y:.2f}%<br>%{customdata}<extra></extra>"
+                    if use_return else
+                    "<b>台股</b>: $%{y:,.0f} USD<br>%{customdata}<extra></extra>"
                 ),
             ))
         else:
