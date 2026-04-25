@@ -4,14 +4,11 @@ import os
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from pathlib import Path
 
 import requests
-from dotenv import load_dotenv
 
 from app.connectors.base import BaseConnector
 
-_ROOT = Path(__file__).parent.parent.parent
 _BASE_URL = "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService"
 _HEADERS = {"User-Agent": "Python/3"}
 
@@ -25,7 +22,6 @@ class IBKRConnector(BaseConnector):
     use_pricer = False  # IBKR provides mark prices directly
 
     def authenticate(self) -> None:
-        load_dotenv(_ROOT / ".env.ibkr")  # fallback if vars not in main .env
         self.token = os.getenv("IBKR_FLEX_TOKEN")
         self.query_id = os.getenv("IBKR_FLEX_QUERY_ID")
         if not self.token or not self.query_id:
