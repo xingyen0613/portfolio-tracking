@@ -10,7 +10,7 @@ DB_PATH = SQLITE_DIR / "portfolio.db"
 ENV_PATH = ROOT_DIR / ".env"
 
 # Enabled platforms (in execution order)
-ENABLED_PLATFORMS = ["binance", "okx", "mexc", "bybit", "sui_wallet"]
+ENABLED_PLATFORMS = ["binance", "okx", "mexc", "bybit", "sui_wallet", "ibkr"]
 
 # SUI DeFi protocols — 預留供後續版本使用，目前 connector 尚未支援
 # SUI_DEFI_PROTOCOLS = ["cetus", "navi", "suilend", "typus", "scallop", "walrus"]
@@ -29,6 +29,7 @@ PLATFORM_CATEGORY = {
     "sui_wallet": "crypto",
     "yuanta": "tw_stock",
     "firsttrade": "us_stock",
+    "ibkr": "us_stock",
 }
 
 CATEGORY_LABEL = {

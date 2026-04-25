@@ -71,6 +71,7 @@ PLATFORM_DISPLAY = {
     "sui_wallet": "SUI On-chain",
     "yuanta": "元大證券（台股）",
     "firsttrade": "FirstTrade（美股）",
+    "ibkr": "IBKR（美股）",
 }
 
 RESOURCE_DISPLAY = {
@@ -139,7 +140,7 @@ def _display_holding(row, indent=True):
 
 # Active platforms (those with data in this batch)
 active_platforms = df["platform"].unique().tolist()
-all_platforms = ["binance", "okx", "mexc", "bybit", "sui_wallet", "yuanta", "firsttrade"]
+all_platforms = ["binance", "okx", "mexc", "bybit", "sui_wallet", "yuanta", "ibkr", "firsttrade"]
 
 yuanta_detail = get_yuanta_holdings_detail()
 
@@ -273,6 +274,34 @@ for platform in all_platforms:
                                 st.caption(name or "")
                             with c4:
                                 st.write(_fmt_val(val) if (val and val == val) else "—")
+        elif platform == "ibkr":
+            # IBKR: stocks + cash (cash may be negative for margin)
+            stock_df = plat_df[plat_df["asset_type"] == "stock"].sort_values("value_usd", ascending=False)
+            cash_df = plat_df[plat_df["asset_type"] == "cash"]
+
+            if not stock_df.empty:
+                st.markdown("**持股**")
+                hdr = st.columns([1, 3, 2, 2, 2])
+                for col, label in zip(hdr, ["代碼", "名稱", "股數", "價格", "市值（USD）"]):
+                    col.caption(label)
+                for _, row in stock_df.iterrows():
+                    c1, c2, c3, c4, c5 = st.columns([1, 3, 2, 2, 2])
+                    with c1: st.markdown(f"`{row['platform_symbol']}`")
+                    with c2: st.write(row["platform_asset_name"] or "")
+                    with c3: st.write(f"{row['quantity']:,.4f}".rstrip("0").rstrip(".") + " 股")
+                    with c4: st.write(f"${row['price']:,.2f}")
+                    with c5: st.write(f"${row['value_usd']:,.2f}")
+
+            if not cash_df.empty:
+                st.markdown("**現金**")
+                for _, row in cash_df.iterrows():
+                    cash_val = row["value_usd"]
+                    color = "red" if cash_val < 0 else "green"
+                    st.markdown(
+                        f"`USD` — <span style='color:{color}'>${cash_val:,.2f}</span>",
+                        unsafe_allow_html=True,
+                    )
+
         else:
             # CEX: split into 現貨 and 理財, show 現貨 first
 

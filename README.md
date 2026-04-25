@@ -1,6 +1,10 @@
 # Portfolio Tracking
 
-個人資產追蹤系統，整合 CEX（Binance、OKX、MEXC、Bybit）、SUI 鏈上錢包，以及元大證券（台股）資料，每日快照存入 SQLite。
+個人資產追蹤系統，整合 CEX（Binance、OKX、MEXC、Bybit）、SUI 鏈上錢包、IBKR 美股、Firsttrade 美股，以及元大證券（台股）資料，每日快照存入 SQLite。
+
+## 文件
+
+- [資料處理 Pipeline 說明](docs/data-pipeline.md) — 各平台從原始資料到 DB 的完整流程與儲存斷點
 
 ## 資料來源
 
@@ -11,7 +15,21 @@
 | MEXC | Spot + Futures（合約帳戶） | ccxt API | USD |
 | Bybit | UNIFIED（現貨/衍生品）+ Funding | ccxt API | USD |
 | SUI Wallet | Token 餘額 | Sui 公鏈 RPC + Pyth oracle | USD |
+| IBKR | 美股持倉 + 現金（含負值保證金） | Flex Web Service API | USD |
+| Firsttrade | 美股持倉 | 手動輸入（connector 待實作） | USD |
 | 元大證券 | 台股每日淨資產（持股市值 - 融資餘額） | 月對帳單 PDF 解析 | TWD |
+
+## IBKR 美股 Pipeline
+
+IBKR 透過 Flex Web Service 每日自動抓取，與其他 CEX 平台一起走 `run_batch`：
+
+- 持倉：OpenPosition（SUMMARY level）→ `normalized_holdings` asset_type=`stock`
+- 現金：EquitySummaryByReportDateInBase.cash → asset_type=`cash`（保證金為負值）
+- 設定：`IBKR_FLEX_TOKEN` 與 `IBKR_FLEX_QUERY_ID` 填入 `.env`
+
+## Firsttrade 美股 Pipeline
+
+Firsttrade 目前無 connector，持倉以手動方式寫入：直接 INSERT 進 `normalized_holdings` + `account_snapshots`，再呼叫 `_aggregate_categories()` 更新 `category_snapshots`。
 
 ## 元大台股 Pipeline
 
@@ -46,6 +64,7 @@ uv run python -m app.jobs.run_batch --platform okx
 uv run python -m app.jobs.run_batch --platform mexc
 uv run python -m app.jobs.run_batch --platform bybit
 uv run python -m app.jobs.run_batch --platform sui_wallet
+uv run python -m app.jobs.run_batch --platform ibkr
 ```
 
 ### Dashboard
