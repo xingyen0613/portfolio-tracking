@@ -45,6 +45,9 @@ def _get_connectors(platform: str) -> list:
         if not addresses:
             raise ValueError("SUI_WALLET_ADDRESSES not set in .env")
         return [SuiWalletConnector(addr) for addr in addresses]
+    if platform == "ibkr":
+        from app.connectors.ibkr_connector import IBKRConnector
+        return [IBKRConnector()]
     raise ValueError(f"Unknown platform: {platform}")
 
 
@@ -217,7 +220,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     platforms = [args.platform] if args.platform else ENABLED_PLATFORMS
-    implemented = {"binance", "okx", "mexc", "bybit", "sui_wallet"}
+    implemented = {"binance", "okx", "mexc", "bybit", "sui_wallet", "ibkr"}
     platforms = [p for p in platforms if p in implemented]
 
     if not platforms:
