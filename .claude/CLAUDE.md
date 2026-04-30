@@ -8,6 +8,15 @@
 
 需要知道某個環境變數的 key 名稱時，讀 `.env.example` 即可。
 
+## 資料保護規則
+
+以下資料屬於不可變的歷史紀錄，**禁止在未獲明確授權的情況下修改或刪除**：
+- SQLite 中的 `normalized_holdings`、`account_snapshots`、`category_snapshots` 表的現有資料
+- `data/raw/` 和 `data/derived/` 下的所有歷史快照 JSON 檔案
+- `source_runs`、`batches` 等 audit trail 表的記錄
+
+例外：用戶明確說「幫我修改/刪除這筆資料」時才可執行。
+
 ## 文件
 
 - [資料處理 Pipeline 說明](../docs/data-pipeline.md) — 各平台斷點設計、儲存位置、定價來源
