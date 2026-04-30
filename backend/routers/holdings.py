@@ -160,7 +160,8 @@ def get_all_holdings() -> dict[str, Any]:
             "sections":  sections,
         })
 
-    # ── Sort by category order → total_usd ───────────────────────────────────
+    # ── 過濾掉已歸零平台，排序 ────────────────────────────────────────────────
+    platforms = [p for p in platforms if p["total_usd"] != 0]
     platforms.sort(key=lambda p: (
         CATEGORY_ORDER.get(p["category"], 9),
         -p["total_usd"],
