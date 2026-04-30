@@ -109,8 +109,11 @@ function MiniChart({ histData }: { histData: HistoryData | undefined }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
+const WINDOWS = ['1W', '1M', '3M', '6M', '1Y', '2Y', 'YTD', 'all']
+
 export default function AllocationTab() {
   const [drill, setDrill] = useState<string | null>(null)
+  const [win, setWin]     = useState('YTD')
 
   const { data: allocData } = useQuery<AllocData>({
     queryKey: ['portfolio/allocation'],
@@ -124,13 +127,13 @@ export default function AllocationTab() {
   })
 
   const { data: metricsData } = useQuery<MetricsMap>({
-    queryKey: ['portfolio/metrics'],
-    queryFn: () => api.get('/api/portfolio/metrics?window=YTD').then(r => r.data),
+    queryKey: ['portfolio/metrics', win],
+    queryFn: () => api.get(`/api/portfolio/metrics?window=${win}`).then(r => r.data),
   })
 
   const { data: histData } = useQuery<HistoryData>({
-    queryKey: ['portfolio/history', '3M'],
-    queryFn: () => api.get('/api/portfolio/history?window=3M').then(r => r.data),
+    queryKey: ['portfolio/history/all'],
+    queryFn: () => api.get('/api/portfolio/history?window=all').then(r => r.data),
   })
 
   // Donut slices
@@ -209,7 +212,7 @@ export default function AllocationTab() {
           background: 'var(--surf)', border: '1px solid var(--bdr)', borderRadius: 8, padding: 14,
         }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 12 }}>
-            近期走勢（3M）
+            資產走勢（全部）
           </div>
           <MiniChart histData={histData} />
           {histData && (
@@ -229,8 +232,23 @@ export default function AllocationTab() {
       </div>
 
       {/* Metrics grid */}
-      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg3)', textTransform: 'uppercase', letterSpacing: '.6px' }}>
-        績效指標（YTD）
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg3)', textTransform: 'uppercase', letterSpacing: '.6px' }}>
+          績效指標
+        </div>
+        <div style={{ display: 'flex', gap: 2 }}>
+          {WINDOWS.map(w => (
+            <div key={w} onClick={() => setWin(w)} style={{
+              padding: '3px 6px', fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+              color: win === w ? 'var(--blue)' : 'var(--fg3)',
+              background: win === w ? 'var(--surf2)' : 'transparent',
+              border: win === w ? '1px solid var(--bdr)' : '1px solid transparent',
+              borderRadius: 4, cursor: 'pointer', userSelect: 'none',
+            }}>
+              {w === 'all' ? 'ALL' : w}
+            </div>
+          ))}
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {metricKeys.map(key => {
