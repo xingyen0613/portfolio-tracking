@@ -534,23 +534,17 @@ else:
     show_tw_stock_breakdown = show_breakdown
 
     def _crypto_hover_texts(dates) -> list[str]:
-        """Build per-date hover strings for the 幣圈 trace.
-
-        Shows platform breakdown (left) and token breakdown (right) side by side.
-        Uses &nbsp; padding to simulate two columns within Plotly hover HTML.
-        """
+        """Build per-date hover strings for the 幣圈 trace (stacked sections)."""
         TOP_N = 5
         texts = []
         for ts in dates:
-            left_col: list[str] = []
-            right_col: list[str] = []
+            lines: list[str] = []
 
-            # ── 來源佔比（左欄）──────────────────────────────────────────────
             if not crypto_plat_daily.empty:
                 day = crypto_plat_daily[crypto_plat_daily["snapshot_date"] == ts]
                 total = day["value_usd"].sum()
                 if total > 0:
-                    left_col.append("<b>來源</b>")
+                    lines.append("<b>來源</b>")
                     for _, r in (
                         day[day["value_usd"] > 0]
                         .sort_values("value_usd", ascending=False)
@@ -558,54 +552,38 @@ else:
                         .iterrows()
                     ):
                         name = PLATFORM_DISPLAY.get(r["platform"], r["platform"])
-                        left_col.append(f"{name}: {r['value_usd']/total*100:.0f}%")
+                        lines.append(f"{name}: {r['value_usd']/total*100:.0f}%")
 
-            # ── Token 佔比（右欄）────────────────────────────────────────────
             if not crypto_symbol_df.empty:
                 day_t = crypto_symbol_df[crypto_symbol_df["snapshot_date"] == ts]
                 total_t = day_t["value_usd"].sum()
                 if total_t > 0:
-                    right_col.append("<b>Token</b>")
+                    if lines:
+                        lines.append("─────────────")
+                    lines.append("<b>Token</b>")
                     for _, r in (
                         day_t[day_t["value_usd"] > 0]
                         .sort_values("value_usd", ascending=False)
                         .head(TOP_N)
                         .iterrows()
                     ):
-                        right_col.append(f"{r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
+                        lines.append(f"{r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
 
-            if not left_col and not right_col:
-                texts.append("")
-                continue
-
-            # Pad both columns to same length and zip into rows
-            max_rows = max(len(left_col), len(right_col))
-            left_col += [""] * (max_rows - len(left_col))
-            right_col += [""] * (max_rows - len(right_col))
-
-            # Dynamic padding: align to longest item in left column
-            max_left = max((len(l) for l in left_col), default=0)
-            rows = []
-            for l, r in zip(left_col, right_col):
-                nbsp_count = (max_left - len(l) + 3) * 2  # *2: proportional font compensation
-                sep = f"{'&nbsp;' * nbsp_count}│&nbsp;&nbsp;"
-                rows.append(f"{l}{sep}{r}")
-            texts.append("<br>".join(rows))
+            texts.append("<br>".join(lines) if lines else "")
         return texts
 
     def _us_stock_hover_texts(dates) -> list[str]:
-        """Build per-date hover strings for the 美股 trace (platform left, stock right)."""
+        """Build per-date hover strings for the 美股 trace (stacked sections)."""
         TOP_N = 5
         texts = []
         for ts in dates:
-            left_col: list[str] = []
-            right_col: list[str] = []
+            lines: list[str] = []
 
             if not us_plat_daily.empty:
                 day = us_plat_daily[us_plat_daily["snapshot_date"] == ts]
                 total = day["value_usd"].sum()
                 if total > 0:
-                    left_col.append("<b>來源</b>")
+                    lines.append("<b>來源</b>")
                     for _, r in (
                         day[day["value_usd"] > 0]
                         .sort_values("value_usd", ascending=False)
@@ -613,50 +591,38 @@ else:
                         .iterrows()
                     ):
                         name = PLATFORM_DISPLAY.get(r["platform"], r["platform"])
-                        left_col.append(f"{name}: {r['value_usd']/total*100:.0f}%")
+                        lines.append(f"{name}: {r['value_usd']/total*100:.0f}%")
 
             if not us_symbol_df.empty:
                 day_t = us_symbol_df[us_symbol_df["snapshot_date"] == ts]
                 total_t = day_t["value_usd"].sum()
                 if total_t > 0:
-                    right_col.append("<b>個股</b>")
+                    if lines:
+                        lines.append("─────────────")
+                    lines.append("<b>個股</b>")
                     for _, r in (
                         day_t[day_t["value_usd"] > 0]
                         .sort_values("value_usd", ascending=False)
                         .head(TOP_N)
                         .iterrows()
                     ):
-                        right_col.append(f"{r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
+                        lines.append(f"{r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
 
-            if not left_col and not right_col:
-                texts.append("")
-                continue
-
-            max_rows = max(len(left_col), len(right_col))
-            left_col += [""] * (max_rows - len(left_col))
-            right_col += [""] * (max_rows - len(right_col))
-            max_left = max((len(l) for l in left_col), default=0)
-            rows = []
-            for l, r in zip(left_col, right_col):
-                nbsp_count = (max_left - len(l) + 3) * 2
-                sep = f"{'&nbsp;' * nbsp_count}│&nbsp;&nbsp;"
-                rows.append(f"{l}{sep}{r}")
-            texts.append("<br>".join(rows))
+            texts.append("<br>".join(lines) if lines else "")
         return texts
 
     def _tw_stock_hover_texts(dates) -> list[str]:
-        """Build per-date hover strings for the 台股 trace (platform left, stock right)."""
+        """Build per-date hover strings for the 台股 trace (stacked sections)."""
         TOP_N = 5
         texts = []
         for ts in dates:
-            left_col: list[str] = []
-            right_col: list[str] = []
+            lines: list[str] = []
 
             if not tw_plat_daily.empty:
                 day = tw_plat_daily[tw_plat_daily["snapshot_date"] == ts]
                 total = day["value_usd"].sum()
                 if total > 0:
-                    left_col.append("<b>來源</b>")
+                    lines.append("<b>來源</b>")
                     for _, r in (
                         day[day["value_usd"] > 0]
                         .sort_values("value_usd", ascending=False)
@@ -664,35 +630,24 @@ else:
                         .iterrows()
                     ):
                         name = PLATFORM_DISPLAY.get(r["platform"], r["platform"])
-                        left_col.append(f"{name}: {r['value_usd']/total*100:.0f}%")
+                        lines.append(f"{name}: {r['value_usd']/total*100:.0f}%")
 
             if not tw_symbol_df.empty:
                 day_t = tw_symbol_df[tw_symbol_df["snapshot_date"] == ts]
                 total_t = day_t["value_usd"].sum()
                 if total_t > 0:
-                    right_col.append("<b>個股</b>")
+                    if lines:
+                        lines.append("─────────────")
+                    lines.append("<b>個股</b>")
                     for _, r in (
                         day_t[day_t["value_usd"] > 0]
                         .sort_values("value_usd", ascending=False)
                         .head(TOP_N)
                         .iterrows()
                     ):
-                        right_col.append(f"{r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
+                        lines.append(f"{r['symbol']}: {r['value_usd']/total_t*100:.0f}%")
 
-            if not left_col and not right_col:
-                texts.append("")
-                continue
-
-            max_rows = max(len(left_col), len(right_col))
-            left_col += [""] * (max_rows - len(left_col))
-            right_col += [""] * (max_rows - len(right_col))
-            max_left = max((len(l) for l in left_col), default=0)
-            rows = []
-            for l, r in zip(left_col, right_col):
-                nbsp_count = (max_left - len(l) + 3) * 2
-                sep = f"{'&nbsp;' * nbsp_count}│&nbsp;&nbsp;"
-                rows.append(f"{l}{sep}{r}")
-            texts.append("<br>".join(rows))
+            texts.append("<br>".join(lines) if lines else "")
         return texts
 
     use_return = "報酬率" in mode
