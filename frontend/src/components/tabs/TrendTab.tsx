@@ -1,32 +1,58 @@
 import { useEffect, useRef, useState } from 'react'
-import { createChart, ColorType, LineSeries, type IChartApi, type ISeriesApi } from 'lightweight-charts'
+import {
+  createChart, ColorType, LineSeries, LineStyle,
+  type IChartApi, type ISeriesApi,
+} from 'lightweight-charts'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
 
-const COLORS = {
-  total: '#58a6ff',
-  crypto: '#d29922',
-  us_stock: '#f85149',
-  tw_stock: '#3fb950',
-} as const
+// ── Portfolio constants ──────────────────────────────────────────────────────
 
-const LABELS = {
-  total: '總資產',
-  crypto: '幣圈',
-  us_stock: '美股',
-  tw_stock: '台股',
-} as const
+const P_COLORS = { total: '#58a6ff', crypto: '#d29922', us_stock: '#f85149', tw_stock: '#3fb950' } as const
+const P_LABELS = { total: '總資產', crypto: '幣圈', us_stock: '美股', tw_stock: '台股' } as const
+type PKey = keyof typeof P_COLORS
+const P_KEYS: PKey[] = ['total', 'crypto', 'us_stock', 'tw_stock']
 
-type Key = keyof typeof COLORS
-const KEYS: Key[] = ['total', 'crypto', 'us_stock', 'tw_stock']
+// ── Benchmark constants ──────────────────────────────────────────────────────
+
+const B_TICKERS = ['^GSPC', '0050.TW', 'BTC-USD'] as const
+type BTicker = typeof B_TICKERS[number]
+
+const B_COLORS: Record<BTicker, string> = {
+  '^GSPC':   '#a371f7',
+  '0050.TW': '#39d353',
+  'BTC-USD': '#f0883e',
+}
+const B_LABELS: Record<BTicker, string> = {
+  '^GSPC':   'S&P 500',
+  '0050.TW': '0050',
+  'BTC-USD': 'BTC',
+}
+
+// ── Time windows ─────────────────────────────────────────────────────────────
+
 const WINDOWS = ['1W', '1M', '3M', '6M', '1Y', '2Y']
+
+function windowStartDate(win: string): string {
+  const days: Record<string, number> = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '2Y': 730 }
+  const d = new Date()
+  d.setDate(d.getDate() - (days[win] ?? 90))
+  return d.toISOString().split('T')[0]
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface HistoryData {
   dates: string[]
-  series: Record<Key, number[]>
-  latest: Record<Key, number>
-  metrics: Record<Key, { total_return: number | null; sharpe: number | null; mdd: number | null }>
+  series: Record<PKey, number[]>
+  latest: Record<PKey, number>
+  metrics: Record<PKey, { total_return: number | null; sharpe: number | null; mdd: number | null }>
 }
+
+interface BenchmarkSeries { ticker: string; label: string; color: string; dates: string[]; closes: number[] }
+interface BenchmarkData { benchmarks: BenchmarkSeries[] }
+
+// ── Formatters ────────────────────────────────────────────────────────────────
 
 function fmtUsd(v: number) {
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
@@ -36,30 +62,41 @@ function fmtUsd(v: number) {
 
 function fmtPct(v: number | null) {
   if (v == null) return '—'
-  const sign = v >= 0 ? '+' : ''
-  return `${sign}${(v * 100).toFixed(2)}%`
+  return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function TrendTab() {
-  const [mode, setMode] = useState<'USD' | 'return'>('USD')
-  const [window, setWindow] = useState('3M')
-  const [visible, setVisible] = useState<Record<Key, boolean>>({
-    total: true, crypto: true, us_stock: true, tw_stock: true,
+  const [mode, setMode]       = useState<'USD' | 'return'>('USD')
+  const [win, setWin]         = useState('3M')
+  const [pVis, setPVis]       = useState<Record<PKey, boolean>>(
+    () => Object.fromEntries(P_KEYS.map(k => [k, true])) as Record<PKey, boolean>
+  )
+  const [bVis, setBVis]       = useState<Record<BTicker, boolean>>(
+    () => Object.fromEntries(B_TICKERS.map(t => [t, true])) as Record<BTicker, boolean>
+  )
+
+  const containerRef   = useRef<HTMLDivElement>(null)
+  const chartRef       = useRef<IChartApi | null>(null)
+  const pSeriesMap     = useRef<Partial<Record<PKey, ISeriesApi<'Line'>>>>({})
+  const bSeriesMap     = useRef<Partial<Record<BTicker, ISeriesApi<'Line'>>>>({})
+
+  // ── Data queries ────────────────────────────────────────────────────────────
+
+  const { data: portData, isLoading } = useQuery<HistoryData>({
+    queryKey: ['portfolio/history', win],
+    queryFn: () => api.get(`/api/portfolio/history?window=${win}`).then(r => r.data),
   })
 
-  const containerRef = useRef<HTMLDivElement>(null)
-  const chartRef = useRef<IChartApi | null>(null)
-  const seriesMap = useRef<Partial<Record<Key, ISeriesApi<'Line'>>>>({})
-
-  const { data, isLoading } = useQuery<HistoryData>({
-    queryKey: ['portfolio/history', window],
-    queryFn: async () => {
-      const res = await api.get(`/api/portfolio/history?window=${window}`)
-      return res.data
-    },
+  const { data: benchData } = useQuery<BenchmarkData>({
+    queryKey: ['benchmarks', win],
+    queryFn: () =>
+      api.get(`/api/benchmarks?tickers=%5EGSPC,0050.TW,BTC-USD&start=${windowStartDate(win)}`).then(r => r.data),
   })
 
-  // Init chart (once)
+  // ── Chart init (once) ───────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -70,30 +107,35 @@ export default function TrendTab() {
         fontFamily: 'JetBrains Mono, monospace',
         fontSize: 10,
       },
-      grid: {
-        vertLines: { color: '#21262d' },
-        horzLines: { color: '#21262d' },
-      },
-      crosshair: {
+      grid:     { vertLines: { color: '#21262d' }, horzLines: { color: '#21262d' } },
+      crosshair:{
         vertLine: { color: '#30363d', labelBackgroundColor: '#1c2128' },
         horzLine: { color: '#30363d', labelBackgroundColor: '#1c2128' },
       },
       rightPriceScale: { borderColor: '#30363d' },
-      timeScale: { borderColor: '#30363d', timeVisible: false },
-      handleScroll: { mouseWheel: true, pressedMouseMove: true },
-      handleScale: { mouseWheel: true, pinch: true },
-      width: containerRef.current.clientWidth,
-      height: 260,
+      timeScale:       { borderColor: '#30363d', timeVisible: false },
+      handleScroll:    { mouseWheel: true, pressedMouseMove: true },
+      handleScale:     { mouseWheel: true, pinch: true },
+      width:  containerRef.current.clientWidth,
+      height: 280,
     })
 
-    KEYS.forEach(key => {
-      const series = chart.addSeries(LineSeries, {
-        color: COLORS[key],
-        lineWidth: 2,
-        lastValueVisible: false,
-        priceLineVisible: false,
+    // Portfolio lines (solid)
+    P_KEYS.forEach(key => {
+      pSeriesMap.current[key] = chart.addSeries(LineSeries, {
+        color: P_COLORS[key], lineWidth: 2,
+        lastValueVisible: false, priceLineVisible: false,
       })
-      seriesMap.current[key] = series
+    })
+
+    // Benchmark lines (dashed, thinner)
+    B_TICKERS.forEach(ticker => {
+      bSeriesMap.current[ticker] = chart.addSeries(LineSeries, {
+        color: B_COLORS[ticker], lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        lastValueVisible: false, priceLineVisible: false,
+        visible: false,
+      })
     })
 
     chartRef.current = chart
@@ -107,112 +149,141 @@ export default function TrendTab() {
       ro.disconnect()
       chart.remove()
       chartRef.current = null
-      seriesMap.current = {}
+      pSeriesMap.current = {}
+      bSeriesMap.current = {}
     }
   }, [])
 
-  // Update series data when data or mode changes
-  useEffect(() => {
-    if (!data) return
+  // ── Update portfolio series ─────────────────────────────────────────────────
 
-    KEYS.forEach(key => {
-      const series = seriesMap.current[key]
+  useEffect(() => {
+    if (!portData) return
+
+    P_KEYS.forEach(key => {
+      const series = pSeriesMap.current[key]
       if (!series) return
 
-      const raw = data.series[key] ?? []
-      const dates = data.dates
+      const raw   = portData.series[key] ?? []
+      const dates = portData.dates
+      const base  = raw[0] || 1
 
-      let values: number[]
-      if (mode === 'return' && raw.length > 0) {
-        const base = raw[0] || 1
-        values = raw.map(v => ((v - base) / base) * 100)
-      } else {
-        values = raw
-      }
+      const values = mode === 'return'
+        ? raw.map(v => ((v - base) / base) * 100)
+        : raw
 
-      const chartData = dates
-        .map((d, i) => ({ time: d as `${number}-${number}-${number}`, value: values[i] ?? 0 }))
-        .filter(p => isFinite(p.value))
-
-      series.setData(chartData)
-      series.applyOptions({ visible: visible[key] })
+      series.setData(
+        dates
+          .map((d, i) => ({ time: d as `${number}-${number}-${number}`, value: values[i] ?? 0 }))
+          .filter(p => isFinite(p.value))
+      )
+      series.applyOptions({ visible: pVis[key] })
     })
 
     chartRef.current?.timeScale().fitContent()
-  }, [data, mode, visible])
+  }, [portData, mode, pVis])
 
-  const toggleKey = (key: Key) => {
-    setVisible(prev => ({ ...prev, [key]: !prev[key] }))
-  }
+  // ── Update benchmark series ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!benchData) return
+
+    benchData.benchmarks.forEach(b => {
+      const ticker = b.ticker as BTicker
+      const series = bSeriesMap.current[ticker]
+      if (!series) return
+
+      if (mode !== 'return') {
+        series.applyOptions({ visible: false })
+        return
+      }
+
+      const base = b.closes[0] || 1
+      series.setData(
+        b.dates
+          .map((d, i) => ({ time: d as `${number}-${number}-${number}`, value: ((b.closes[i] - base) / base) * 100 }))
+          .filter(p => isFinite(p.value))
+      )
+      series.applyOptions({ visible: bVis[ticker] })
+    })
+
+    chartRef.current?.timeScale().fitContent()
+  }, [benchData, mode, bVis])
+
+  // ── Chip helpers ─────────────────────────────────────────────────────────────
+
+  const chip = (label: string, color: string, active: boolean, dashed: boolean, onClick: () => void) => (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 5,
+        padding: '4px 8px', borderRadius: 5, cursor: 'pointer',
+        border: `1px solid ${active ? 'var(--bdr)' : 'transparent'}`,
+        background: active ? 'var(--surf2)' : 'transparent',
+        color: active ? 'var(--fg1)' : 'var(--fg2)',
+        fontSize: 11, userSelect: 'none', opacity: active ? 1 : 0.35,
+        transition: 'opacity 120ms',
+      }}
+    >
+      {dashed
+        ? <div style={{ width: 14, height: 0, borderBottom: `2px dashed ${color}` }} />
+        : <div style={{ width: 14, height: 2, background: color, borderRadius: 1 }} />
+      }
+      {label}
+    </div>
+  )
 
   return (
     <>
       {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {/* Mode toggle */}
         <div style={{
           display: 'flex', background: 'var(--surf3)', border: '1px solid var(--bdr)',
           borderRadius: 6, overflow: 'hidden',
         }}>
           {(['USD', 'return'] as const).map(m => (
-            <div
-              key={m}
-              onClick={() => setMode(m)}
-              style={{
-                padding: '5px 10px', fontSize: 11, fontWeight: 500, cursor: 'pointer',
-                color: mode === m ? 'var(--fg1)' : 'var(--fg2)',
-                background: mode === m ? 'var(--surf2)' : 'transparent',
-                userSelect: 'none',
-              }}
-            >
+            <div key={m} onClick={() => setMode(m)} style={{
+              padding: '5px 10px', fontSize: 11, fontWeight: 500, cursor: 'pointer',
+              color: mode === m ? 'var(--fg1)' : 'var(--fg2)',
+              background: mode === m ? 'var(--surf2)' : 'transparent', userSelect: 'none',
+            }}>
               {m === 'USD' ? 'USD' : '報酬率 %'}
             </div>
           ))}
         </div>
 
-        {/* Time window */}
         <div style={{ display: 'flex', gap: 2 }}>
           {WINDOWS.map(w => (
-            <div
-              key={w}
-              onClick={() => setWindow(w)}
-              style={{
-                padding: '5px 7px', fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
-                color: window === w ? 'var(--blue)' : 'var(--fg2)',
-                background: window === w ? 'var(--surf2)' : 'transparent',
-                border: window === w ? '1px solid var(--bdr)' : '1px solid transparent',
-                borderRadius: 4, cursor: 'pointer', userSelect: 'none',
-              }}
-            >
+            <div key={w} onClick={() => setWin(w)} style={{
+              padding: '5px 7px', fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
+              color: win === w ? 'var(--blue)' : 'var(--fg2)',
+              background: win === w ? 'var(--surf2)' : 'transparent',
+              border: win === w ? '1px solid var(--bdr)' : '1px solid transparent',
+              borderRadius: 4, cursor: 'pointer', userSelect: 'none',
+            }}>
               {w}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Legend chips */}
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        {KEYS.map(key => (
-          <div
-            key={key}
-            onClick={() => toggleKey(key)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '4px 8px', borderRadius: 5, cursor: 'pointer',
-              border: `1px solid ${visible[key] ? 'var(--bdr)' : 'transparent'}`,
-              background: visible[key] ? 'var(--surf2)' : 'transparent',
-              color: visible[key] ? 'var(--fg1)' : 'var(--fg2)',
-              fontSize: 11, userSelect: 'none', opacity: visible[key] ? 1 : 0.35,
-              transition: 'opacity 120ms',
-            }}
-          >
-            <div style={{ width: 14, height: 2, background: COLORS[key], borderRadius: 1 }} />
-            {LABELS[key]}
-          </div>
+      {/* Legend — portfolio chips + optional benchmark chips */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+        {P_KEYS.map(key => chip(P_LABELS[key], P_COLORS[key], pVis[key], false, () =>
+          setPVis(prev => ({ ...prev, [key]: !prev[key] }))
         ))}
+
+        {mode === 'return' && (
+          <>
+            <div style={{ width: 1, height: 16, background: 'var(--bdr)', margin: '0 4px' }} />
+            <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.5px' }}>BENCHMARK</span>
+            {B_TICKERS.map(t => chip(B_LABELS[t], B_COLORS[t], bVis[t], true, () =>
+              setBVis(prev => ({ ...prev, [t]: !prev[t] }))
+            ))}
+          </>
+        )}
       </div>
 
-      {/* Chart container */}
+      {/* Chart */}
       <div style={{ position: 'relative' }}>
         <div ref={containerRef} style={{ borderRadius: 6, overflow: 'hidden' }} />
         {isLoading && (
@@ -228,37 +299,28 @@ export default function TrendTab() {
 
       {/* Stat row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-        {KEYS.map(key => {
-          const latest = data?.latest[key]
-          const m = data?.metrics[key]
-          const ret = m?.total_return ?? null
-          const isUp = ret != null ? ret >= 0 : null
+        {P_KEYS.map(key => {
+          const latest = portData?.latest[key]
+          const ret    = portData?.metrics[key]?.total_return ?? null
           return (
-            <div
-              key={key}
-              style={{
-                background: 'var(--surf)', border: '1px solid var(--bdr)',
-                borderTop: `2px solid ${COLORS[key]}`,
-                borderRadius: 8, padding: '10px 12px',
-              }}
-            >
+            <div key={key} style={{
+              background: 'var(--surf)', border: '1px solid var(--bdr)',
+              borderTop: `2px solid ${P_COLORS[key]}`, borderRadius: 8, padding: '10px 12px',
+            }}>
               <div style={{
                 fontSize: 10, color: 'var(--fg2)', textTransform: 'uppercase',
                 letterSpacing: '.5px', marginBottom: 5,
                 display: 'flex', alignItems: 'center', gap: 5,
               }}>
-                <div style={{ width: 5, height: 5, borderRadius: '50%', background: COLORS[key] }} />
-                {LABELS[key]}
+                <div style={{ width: 5, height: 5, borderRadius: '50%', background: P_COLORS[key] }} />
+                {P_LABELS[key]}
               </div>
-              <div style={{
-                fontFamily: 'JetBrains Mono, monospace', fontSize: 15, fontWeight: 500,
-                color: 'var(--fg1)',
-              }}>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 15, fontWeight: 500 }}>
                 {latest != null ? fmtUsd(latest) : '—'}
               </div>
               <div style={{
                 fontFamily: 'JetBrains Mono, monospace', fontSize: 11, marginTop: 3,
-                color: isUp === null ? 'var(--fg2)' : isUp ? 'var(--green)' : 'var(--red)',
+                color: ret == null ? 'var(--fg2)' : ret >= 0 ? 'var(--green)' : 'var(--red)',
               }}>
                 {fmtPct(ret)}
               </div>
