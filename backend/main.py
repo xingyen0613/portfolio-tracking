@@ -1,9 +1,19 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.utils.fx import ensure_updated
 from backend.routers import portfolio, benchmarks, holdings
 
-app = FastAPI(title="Portfolio Tracking API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    ensure_updated()
+    yield
+
+
+app = FastAPI(title="Portfolio Tracking API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

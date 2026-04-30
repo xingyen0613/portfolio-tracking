@@ -13,7 +13,8 @@ from app.dashboard.data import (
     get_tw_stock_symbol_breakdown,
 )
 from app.dashboard.metrics import compute_metrics
-from config.settings import CATEGORY_LABEL, TWD_PER_USD
+from app.utils.fx import get_latest_fx_rate
+from config.settings import CATEGORY_LABEL
 
 router = APIRouter()
 
@@ -141,5 +142,5 @@ def portfolio_meta() -> dict[str, Any]:
     last_updated = get_latest_snapshot_date()
     return {
         "last_updated": last_updated,
-        "usd_twd_rate": TWD_PER_USD,
+        "usd_twd_rate": get_latest_fx_rate(),
     }

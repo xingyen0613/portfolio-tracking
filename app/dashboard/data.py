@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from app.utils.fx import get_fx_rates_series, get_latest_fx_rate, lookup_rate
 from config.settings import DB_PATH, PLATFORM_CATEGORY, TWD_PER_USD
 
 
@@ -71,7 +72,7 @@ def get_holdings() -> pd.DataFrame:
 
     df["category"] = df["platform"].map(PLATFORM_CATEGORY).fillna("unknown")
     df["value_usd"] = pd.to_numeric(df["value"], errors="coerce")
-    df["value_twd"] = df["value_usd"] * TWD_PER_USD
+    df["value_twd"] = df["value_usd"] * get_latest_fx_rate()
     return df
 
 
@@ -90,8 +91,12 @@ def get_snapshot_history() -> pd.DataFrame:
 
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     df["total_value"] = pd.to_numeric(df["total_value"], errors="coerce")
+
+    rates = get_fx_rates_series()
     df["value_usd"] = df.apply(
-        lambda r: r["total_value"] / TWD_PER_USD if r["currency"] == "TWD" else r["total_value"],
+        lambda r: r["total_value"] / lookup_rate(r["snapshot_date"], rates)
+        if r["currency"] == "TWD"
+        else r["total_value"],
         axis=1,
     )
     return df
@@ -248,6 +253,7 @@ def get_tw_stock_symbol_breakdown() -> pd.DataFrame:
     project_root = Path(DB_PATH).parent.parent.parent
     derived_dir = project_root / "data" / "derived" / "yuanta_poc"
 
+    rates = get_fx_rates_series()
     rows = []
     for na_file in sorted(derived_dir.glob("*/daily_net_asset.json")):
         with open(na_file, encoding="utf-8") as f:
@@ -257,11 +263,12 @@ def get_tw_stock_symbol_breakdown() -> pd.DataFrame:
             if not hv:
                 continue
             date_str = entry["date"]
+            rate = lookup_rate(date_str, rates)
             for symbol, value_str in hv.items():
                 rows.append({
                     "snapshot_date": date_str,
                     "symbol": symbol,
-                    "value_usd": float(value_str) / TWD_PER_USD,
+                    "value_usd": float(value_str) / rate,
                 })
 
     if not rows:
@@ -279,7 +286,7 @@ def get_tw_stock_platform_daily() -> pd.DataFrame:
         SELECT
             p.name          AS platform,
             acs.snapshot_date,
-            SUM(acs.total_value) / :rate AS value_usd
+            SUM(acs.total_value) AS total_twd
         FROM account_snapshots acs
         JOIN accounts a  ON acs.account_id = a.id
         JOIN platforms p ON a.platform_id = p.id
@@ -297,9 +304,14 @@ def get_tw_stock_platform_daily() -> pd.DataFrame:
         ORDER BY acs.snapshot_date
     """
     with _conn() as conn:
-        df = pd.read_sql_query(sql, conn, params={"rate": TWD_PER_USD})
+        df = pd.read_sql_query(sql, conn)
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
-    df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
+    df["total_twd"] = pd.to_numeric(df["total_twd"], errors="coerce")
+
+    rates = get_fx_rates_series()
+    df["value_usd"] = df.apply(
+        lambda r: r["total_twd"] / lookup_rate(r["snapshot_date"], rates), axis=1
+    )
     return df
 
 
@@ -355,8 +367,9 @@ def get_latest_category_totals() -> pd.DataFrame:
     with _conn() as conn:
         df = pd.read_sql_query(sql, conn)
     df["total_value"] = pd.to_numeric(df["total_value"], errors="coerce")
+    latest_rate = get_latest_fx_rate()
     df["value_usd"] = df.apply(
-        lambda r: r["total_value"] / TWD_PER_USD if r["currency"] == "TWD" else r["total_value"],
+        lambda r: r["total_value"] / latest_rate if r["currency"] == "TWD" else r["total_value"],
         axis=1,
     )
     return df

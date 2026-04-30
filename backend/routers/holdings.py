@@ -7,7 +7,8 @@ from app.dashboard.data import (
     get_latest_category_totals,
     get_yuanta_holdings_detail,
 )
-from config.settings import CATEGORY_LABEL, TWD_PER_USD
+from app.utils.fx import get_latest_fx_rate
+from config.settings import CATEGORY_LABEL
 
 router = APIRouter()
 
@@ -116,8 +117,9 @@ def get_all_holdings() -> dict[str, Any]:
     # ── Yuanta from JSON ──────────────────────────────────────────────────────
     yuanta_detail = get_yuanta_holdings_detail()
     if yuanta_detail and not any(p["name"] == "yuanta" for p in platforms):
+        fx = get_latest_fx_rate()
         net_asset_twd  = float(yuanta_detail.get("net_asset") or 0)
-        net_asset_usd  = round(net_asset_twd / TWD_PER_USD, 2)
+        net_asset_usd  = round(net_asset_twd / fx, 2)
 
         owned_rows = [
             {
@@ -125,7 +127,7 @@ def get_all_holdings() -> dict[str, Any]:
                 "name":      h.get("name", ""),
                 "quantity":  f"{h['shares']:,} 股",
                 "price":     "—",
-                "value_usd": round((h["value_twd"] or 0) / TWD_PER_USD, 2),
+                "value_usd": round((h["value_twd"] or 0) / fx, 2),
             }
             for h in yuanta_detail.get("owned", []) if h.get("shares", 0) > 0
         ]
@@ -142,13 +144,13 @@ def get_all_holdings() -> dict[str, Any]:
         if margin_twd != 0:
             sections.append({
                 "label":     "融資餘額",
-                "total_usd": round(-margin_twd / TWD_PER_USD, 2),
+                "total_usd": round(-margin_twd / fx, 2),
                 "rows": [{
                     "symbol":    "借貸",
                     "name":      "融資借款",
                     "quantity":  "—",
                     "price":     "—",
-                    "value_usd": round(-margin_twd / TWD_PER_USD, 2),
+                    "value_usd": round(-margin_twd / fx, 2),
                 }],
             })
 

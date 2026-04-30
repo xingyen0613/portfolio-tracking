@@ -52,7 +52,7 @@ export default function Shell() {
             LIVE
           </span>
           <span style={{ color: 'var(--fg3)' }}>
-            1 USD = {meta?.usd_twd_rate?.toFixed(1) ?? '31.5'} TWD
+            1 USD = {meta?.usd_twd_rate?.toFixed(2) ?? '--'} TWD
           </span>
         </div>
       </div>
