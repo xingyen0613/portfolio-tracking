@@ -31,14 +31,7 @@ const B_LABELS: Record<BTicker, string> = {
 
 // ── Time windows ─────────────────────────────────────────────────────────────
 
-const WINDOWS = ['1W', '1M', '3M', '6M', '1Y', '2Y']
-
-function windowStartDate(win: string): string {
-  const days: Record<string, number> = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '2Y': 730 }
-  const d = new Date()
-  d.setDate(d.getDate() - (days[win] ?? 90))
-  return d.toISOString().split('T')[0]
-}
+const WINDOWS = ['1W', '1M', '3M', '6M', '1Y', '2Y', 'all']
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -49,15 +42,21 @@ interface HistoryData {
   metrics: Record<PKey, { total_return: number | null; sharpe: number | null; mdd: number | null }>
 }
 
+interface MetricsData {
+  [key: string]: { total_return: number | null; sharpe: number | null; mdd: number | null }
+}
+
 interface BenchmarkSeries { ticker: string; label: string; color: string; dates: string[]; closes: number[] }
 interface BenchmarkData { benchmarks: BenchmarkSeries[] }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
 function fmtUsd(v: number) {
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}k`
-  return `$${v.toFixed(0)}`
+  const abs = Math.abs(v)
+  const sign = v < 0 ? '-' : ''
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}k`
+  return `${sign}$${abs.toFixed(0)}`
 }
 
 function fmtPct(v: number | null) {
@@ -68,34 +67,40 @@ function fmtPct(v: number | null) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function TrendTab() {
-  const [mode, setMode]       = useState<'USD' | 'return'>('USD')
-  const [win, setWin]         = useState('3M')
-  const [pVis, setPVis]       = useState<Record<PKey, boolean>>(
+  const [mode, setMode] = useState<'USD' | 'return'>('USD')
+  const [win, setWin]   = useState('3M')
+  const [pVis, setPVis] = useState<Record<PKey, boolean>>(
     () => Object.fromEntries(P_KEYS.map(k => [k, true])) as Record<PKey, boolean>
   )
-  const [bVis, setBVis]       = useState<Record<BTicker, boolean>>(
+  const [bVis, setBVis] = useState<Record<BTicker, boolean>>(
     () => Object.fromEntries(B_TICKERS.map(t => [t, true])) as Record<BTicker, boolean>
   )
 
-  const containerRef   = useRef<HTMLDivElement>(null)
-  const chartRef       = useRef<IChartApi | null>(null)
-  const pSeriesMap     = useRef<Partial<Record<PKey, ISeriesApi<'Line'>>>>({})
-  const bSeriesMap     = useRef<Partial<Record<BTicker, ISeriesApi<'Line'>>>>({})
+  const containerRef = useRef<HTMLDivElement>(null)
+  const chartRef     = useRef<IChartApi | null>(null)
+  const pSeriesMap   = useRef<Partial<Record<PKey, ISeriesApi<'Line'>>>>({})
+  const bSeriesMap   = useRef<Partial<Record<BTicker, ISeriesApi<'Line'>>>>({})
 
-  // ── Data queries ────────────────────────────────────────────────────────────
+  // ── Data queries ─────────────────────────────────────────────────────────────
+  // 圖表永遠顯示全部資料，win 只控制下方 stat cards 的收益計算區間
 
   const { data: portData, isLoading } = useQuery<HistoryData>({
-    queryKey: ['portfolio/history', win],
-    queryFn: () => api.get(`/api/portfolio/history?window=${win}`).then(r => r.data),
+    queryKey: ['portfolio/history/all'],
+    queryFn: () => api.get('/api/portfolio/history?window=all').then(r => r.data),
+  })
+
+  const { data: metricsData } = useQuery<MetricsData>({
+    queryKey: ['portfolio/metrics', win],
+    queryFn: () => api.get(`/api/portfolio/metrics?window=${win}`).then(r => r.data),
   })
 
   const { data: benchData } = useQuery<BenchmarkData>({
-    queryKey: ['benchmarks', win],
+    queryKey: ['benchmarks/all'],
     queryFn: () =>
-      api.get(`/api/benchmarks?tickers=%5EGSPC,0050.TW,BTC-USD&start=${windowStartDate(win)}`).then(r => r.data),
+      api.get('/api/benchmarks?tickers=%5EGSPC,0050.TW,BTC-USD&start=2015-01-01').then(r => r.data),
   })
 
-  // ── Chart init (once) ───────────────────────────────────────────────────────
+  // ── Chart init (once) ────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -117,10 +122,9 @@ export default function TrendTab() {
       handleScroll:    { mouseWheel: true, pressedMouseMove: true },
       handleScale:     { mouseWheel: true, pinch: true },
       width:  containerRef.current.clientWidth,
-      height: 280,
+      height: 320,
     })
 
-    // Portfolio lines (solid)
     P_KEYS.forEach(key => {
       pSeriesMap.current[key] = chart.addSeries(LineSeries, {
         color: P_COLORS[key], lineWidth: 2,
@@ -128,7 +132,6 @@ export default function TrendTab() {
       })
     })
 
-    // Benchmark lines (dashed, thinner)
     B_TICKERS.forEach(ticker => {
       bSeriesMap.current[ticker] = chart.addSeries(LineSeries, {
         color: B_COLORS[ticker], lineWidth: 1,
@@ -154,7 +157,7 @@ export default function TrendTab() {
     }
   }, [])
 
-  // ── Update portfolio series ─────────────────────────────────────────────────
+  // ── Update portfolio series ───────────────────────────────────────────────────
 
   useEffect(() => {
     if (!portData) return
@@ -163,16 +166,14 @@ export default function TrendTab() {
       const series = pSeriesMap.current[key]
       if (!series) return
 
-      const raw   = portData.series[key] ?? []
-      const dates = portData.dates
-      const base  = raw[0] || 1
-
+      const raw  = portData.series[key] ?? []
+      const base = raw[0] || 1
       const values = mode === 'return'
         ? raw.map(v => ((v - base) / base) * 100)
         : raw
 
       series.setData(
-        dates
+        portData.dates
           .map((d, i) => ({ time: d as `${number}-${number}-${number}`, value: values[i] ?? 0 }))
           .filter(p => isFinite(p.value))
       )
@@ -182,7 +183,7 @@ export default function TrendTab() {
     chartRef.current?.timeScale().fitContent()
   }, [portData, mode, pVis])
 
-  // ── Update benchmark series ─────────────────────────────────────────────────
+  // ── Update benchmark series ───────────────────────────────────────────────────
 
   useEffect(() => {
     if (!benchData) return
@@ -209,7 +210,7 @@ export default function TrendTab() {
     chartRef.current?.timeScale().fitContent()
   }, [benchData, mode, bVis])
 
-  // ── Chip helpers ─────────────────────────────────────────────────────────────
+  // ── Chip helper ───────────────────────────────────────────────────────────────
 
   const chip = (label: string, color: string, active: boolean, dashed: boolean, onClick: () => void) => (
     <div
@@ -232,9 +233,11 @@ export default function TrendTab() {
     </div>
   )
 
+  const winLabel = win === 'all' ? '全部' : win
+
   return (
     <>
-      {/* Controls */}
+      {/* Controls: mode toggle + legend chips */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <div style={{
           display: 'flex', background: 'var(--surf3)', border: '1px solid var(--bdr)',
@@ -251,23 +254,6 @@ export default function TrendTab() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 2 }}>
-          {WINDOWS.map(w => (
-            <div key={w} onClick={() => setWin(w)} style={{
-              padding: '5px 7px', fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
-              color: win === w ? 'var(--blue)' : 'var(--fg2)',
-              background: win === w ? 'var(--surf2)' : 'transparent',
-              border: win === w ? '1px solid var(--bdr)' : '1px solid transparent',
-              borderRadius: 4, cursor: 'pointer', userSelect: 'none',
-            }}>
-              {w}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Legend — portfolio chips + optional benchmark chips */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
         {P_KEYS.map(key => chip(P_LABELS[key], P_COLORS[key], pVis[key], false, () =>
           setPVis(prev => ({ ...prev, [key]: !prev[key] }))
         ))}
@@ -297,11 +283,29 @@ export default function TrendTab() {
         )}
       </div>
 
-      {/* Stat row */}
+      {/* Window selector — controls stat card metrics below */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.4px' }}>收益計算區間</span>
+        <div style={{ display: 'flex', gap: 2 }}>
+          {WINDOWS.map(w => (
+            <div key={w} onClick={() => setWin(w)} style={{
+              padding: '4px 7px', fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
+              color: win === w ? 'var(--blue)' : 'var(--fg2)',
+              background: win === w ? 'var(--surf2)' : 'transparent',
+              border: win === w ? '1px solid var(--bdr)' : '1px solid transparent',
+              borderRadius: 4, cursor: 'pointer', userSelect: 'none',
+            }}>
+              {w === 'all' ? 'ALL' : w}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Stat cards — latest value + return for selected window */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
         {P_KEYS.map(key => {
           const latest = portData?.latest[key]
-          const ret    = portData?.metrics[key]?.total_return ?? null
+          const ret    = metricsData?.[key]?.total_return ?? null
           return (
             <div key={key} style={{
               background: 'var(--surf)', border: '1px solid var(--bdr)',
@@ -323,6 +327,7 @@ export default function TrendTab() {
                 color: ret == null ? 'var(--fg2)' : ret >= 0 ? 'var(--green)' : 'var(--red)',
               }}>
                 {fmtPct(ret)}
+                <span style={{ color: 'var(--fg3)', marginLeft: 4 }}>{winLabel}</span>
               </div>
             </div>
           )

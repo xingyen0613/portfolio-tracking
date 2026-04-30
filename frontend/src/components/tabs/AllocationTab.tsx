@@ -80,7 +80,7 @@ function MiniChart({ histData }: { histData: HistoryData | undefined }) {
       timeScale: { borderColor: '#30363d', timeVisible: false },
       handleScroll: { mouseWheel: true, pressedMouseMove: true },
       handleScale:  { mouseWheel: true, pinch: true },
-      width: ref.current.clientWidth, height: 108,
+      width: ref.current.clientWidth, height: 180,
     })
     seriesRef.current = c.addSeries(LineSeries, {
       color: P_COLORS.total, lineWidth: 2, lastValueVisible: false, priceLineVisible: false,
