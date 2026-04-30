@@ -80,7 +80,7 @@ export default function Shell() {
 
       {/* Content */}
       <div style={{
-        flex: 1, overflowY: 'auto', padding: '16px 18px',
+        flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 18px',
         display: 'flex', flexDirection: 'column', gap: 12,
       }}>
         {content[activeTab]}
