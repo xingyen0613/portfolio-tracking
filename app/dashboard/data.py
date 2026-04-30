@@ -303,6 +303,39 @@ def get_tw_stock_platform_daily() -> pd.DataFrame:
     return df
 
 
+def get_platform_latest_account_snapshot() -> dict[str, dict]:
+    """
+    Return the latest account_snapshot per platform (by snapshot_date, then created_at).
+    Used to detect platforms that have been zeroed out more recently than their last holdings.
+    Returns {platform_name: {snapshot_date, total_value, currency}}.
+    """
+    sql = """
+        SELECT p.name AS platform, acs.snapshot_date, acs.total_value, acs.currency
+        FROM account_snapshots acs
+        JOIN accounts a  ON acs.account_id = a.id
+        JOIN platforms p ON a.platform_id = p.id
+        WHERE acs.id = (
+            SELECT id FROM account_snapshots
+            WHERE account_id = acs.account_id
+            ORDER BY snapshot_date DESC, created_at DESC
+            LIMIT 1
+        )
+    """
+    with _conn() as conn:
+        rows = conn.execute(sql).fetchall()
+    result: dict[str, dict] = {}
+    for row in rows:
+        platform = row["platform"]
+        existing = result.get(platform)
+        if existing is None or row["snapshot_date"] > existing["snapshot_date"]:
+            result[platform] = {
+                "snapshot_date": row["snapshot_date"],
+                "total_value": row["total_value"],
+                "currency": row["currency"],
+            }
+    return result
+
+
 def get_latest_category_totals() -> pd.DataFrame:
     """
     Return the latest total value per category from category_snapshots.

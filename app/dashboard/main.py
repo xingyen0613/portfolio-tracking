@@ -20,6 +20,7 @@ from app.dashboard.data import (
     get_holdings,
     get_latest_category_totals,
     get_latest_snapshot_date,
+    get_platform_latest_account_snapshot,
     get_snapshot_history,
     get_tw_stock_platform_daily,
     get_tw_stock_symbol_breakdown,
@@ -147,9 +148,19 @@ active_platforms = df["platform"].unique().tolist()
 all_platforms = ["binance", "okx", "mexc", "bybit", "sui_wallet", "yuanta", "ibkr", "firsttrade"]
 
 yuanta_detail = get_yuanta_holdings_detail()
+platform_account_snapshots = get_platform_latest_account_snapshot()
 
 for platform in all_platforms:
     display_name = PLATFORM_DISPLAY.get(platform, platform)
+
+    # 若平台最新 account_snapshot 為 $0 且比 normalized_holdings 更新，顯示空持倉
+    latest_snap = platform_account_snapshots.get(platform)
+    if latest_snap and latest_snap["total_value"] == 0:
+        holdings_latest = df[df["platform"] == platform]["snapshot_date"].max() if platform in df["platform"].values else None
+        if holdings_latest is None or latest_snap["snapshot_date"] > str(holdings_latest):
+            with st.expander(f"**{display_name}** — $0 USD　`{latest_snap['snapshot_date']}`", expanded=True):
+                st.caption("目前無持倉。")
+            continue
 
     # 元大：資料來自 JSON 檔案，不走 normalized_holdings
     if platform == "yuanta":
@@ -517,13 +528,10 @@ else:
     selected_cats = [c for c in ["total", "crypto", "tw_stock", "us_stock"]
                      if not all_daily[all_daily["category"] == c].empty]
 
-    breakdown_cols = st.columns(3)
-    with breakdown_cols[0]:
-        show_crypto_breakdown = st.checkbox("顯示幣圈詳細分解（來源 + Token）", value=False)
-    with breakdown_cols[1]:
-        show_us_stock_breakdown = st.checkbox("顯示美股詳細分解（來源 + 個股）", value=False)
-    with breakdown_cols[2]:
-        show_tw_stock_breakdown = st.checkbox("顯示台股詳細分解（來源）", value=False)
+    show_breakdown = st.checkbox("顯示詳細分解（來源 + 個股/Token）", value=False)
+    show_crypto_breakdown = show_breakdown
+    show_us_stock_breakdown = show_breakdown
+    show_tw_stock_breakdown = show_breakdown
 
     def _crypto_hover_texts(dates) -> list[str]:
         """Build per-date hover strings for the 幣圈 trace.
