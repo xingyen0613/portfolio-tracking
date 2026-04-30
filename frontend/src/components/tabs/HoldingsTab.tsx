@@ -30,28 +30,68 @@ function fmtUsd(v: number) {
 function Chevron({ open }: { open: boolean }) {
   return (
     <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5}
-      style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 150ms', flexShrink: 0, color: 'var(--fg3)' }}>
+      style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 200ms ease', flexShrink: 0, color: 'var(--fg3)' }}>
       <path d="M5 3l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  )
+}
+
+// ── Holding row (own hover state, avoids imperative DOM mutation) ─────────────
+
+function HoldingRowView({ row }: { row: HoldingRow }) {
+  const [hovered, setHovered] = useState(false)
+  const bg = hovered ? 'var(--surf2)' : undefined
+
+  return (
+    <tr onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      <td style={{ padding: '8px 14px', fontSize: 12, borderBottom: '1px solid var(--bdr2)', background: bg }}>
+        <span style={{
+          display: 'inline-block', background: 'var(--surf3)', border: '1px solid var(--bdr)',
+          borderRadius: 4, padding: '2px 5px', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 500,
+        }}>
+          {row.symbol}
+        </span>
+      </td>
+      {[row.quantity, row.price].map((v, j) => (
+        <td key={j} style={{
+          padding: '8px 14px', fontSize: 12, textAlign: 'right',
+          fontFamily: 'JetBrains Mono, monospace', borderBottom: '1px solid var(--bdr2)',
+          color: 'var(--fg2)', background: bg,
+        }}>
+          {v}
+        </td>
+      ))}
+      <td style={{
+        padding: '8px 14px', fontSize: 12, textAlign: 'right',
+        fontFamily: 'JetBrains Mono, monospace', borderBottom: '1px solid var(--bdr2)',
+        color: row.value_usd < 0 ? 'var(--red)' : 'var(--fg1)', background: bg,
+      }}>
+        {fmtUsd(row.value_usd)}
+      </td>
+    </tr>
   )
 }
 
 // ── Platform card ─────────────────────────────────────────────────────────────
 
 function PlatformCard({ p }: { p: Platform }) {
-  const [open, setOpen] = useState(p.total_usd > 10_000)
+  const [open, setOpen]       = useState(p.total_usd > 10_000)
+  const [hovered, setHovered] = useState(false)
 
   return (
     <div style={{ background: 'var(--surf)', border: '1px solid var(--bdr)', borderRadius: 8, overflow: 'hidden' }}>
+
       {/* Header */}
       <div
         onClick={() => setOpen(o => !o)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', cursor: 'pointer',
           borderBottom: open ? '1px solid var(--bdr2)' : 'none',
+          background: hovered ? 'var(--surf2)' : 'transparent',
+          transition: 'background 120ms',
         }}
-        onMouseEnter={e => (e.currentTarget.style.background = 'var(--surf2)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
       >
         <div style={{
           width: 26, height: 26, borderRadius: 5, display: 'flex', alignItems: 'center',
@@ -70,8 +110,12 @@ function PlatformCard({ p }: { p: Platform }) {
         <Chevron open={open} />
       </div>
 
-      {/* Sections */}
-      {open && (
+      {/* Collapsible content — maxHeight transition avoids layout jump */}
+      <div style={{
+        maxHeight: open ? '2000px' : '0',
+        overflow: 'hidden',
+        transition: open ? 'max-height 350ms ease' : 'max-height 200ms ease',
+      }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
@@ -89,7 +133,6 @@ function PlatformCard({ p }: { p: Platform }) {
           <tbody>
             {p.sections.map(sec => (
               <>
-                {/* Section divider */}
                 <tr key={`sec-${sec.label}`}>
                   <td colSpan={4} style={{ padding: 0 }}>
                     <div style={{
@@ -104,44 +147,13 @@ function PlatformCard({ p }: { p: Platform }) {
                     </div>
                   </td>
                 </tr>
-
-                {/* Holdings rows */}
-                {sec.rows.map((row, i) => (
-                  <tr key={i}
-                    onMouseEnter={e => { Array.from(e.currentTarget.cells).forEach(c => (c.style.background = 'var(--surf2)')) }}
-                    onMouseLeave={e => { Array.from(e.currentTarget.cells).forEach(c => (c.style.background = '')) }}
-                  >
-                    <td style={{ padding: '8px 14px', fontSize: 12, borderBottom: '1px solid var(--bdr2)' }}>
-                      <span style={{
-                        display: 'inline-block', background: 'var(--surf3)', border: '1px solid var(--bdr)',
-                        borderRadius: 4, padding: '2px 5px', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 500,
-                      }}>
-                        {row.symbol}
-                      </span>
-                    </td>
-                    {[row.quantity, row.price].map((v, j) => (
-                      <td key={j} style={{
-                        padding: '8px 14px', fontSize: 12, textAlign: 'right',
-                        fontFamily: 'JetBrains Mono, monospace', borderBottom: '1px solid var(--bdr2)',
-                        color: 'var(--fg2)',
-                      }}>
-                        {v}
-                      </td>
-                    ))}
-                    <td style={{
-                      padding: '8px 14px', fontSize: 12, textAlign: 'right',
-                      fontFamily: 'JetBrains Mono, monospace', borderBottom: '1px solid var(--bdr2)',
-                      color: row.value_usd < 0 ? 'var(--red)' : 'var(--fg1)',
-                    }}>
-                      {fmtUsd(row.value_usd)}
-                    </td>
-                  </tr>
-                ))}
+                {sec.rows.map((row, i) => <HoldingRowView key={i} row={row} />)}
               </>
             ))}
           </tbody>
         </table>
-      )}
+      </div>
+
     </div>
   )
 }
@@ -162,7 +174,7 @@ export default function HoldingsTab() {
     )
   }
 
-  const summary  = data?.summary
+  const summary   = data?.summary
   const platforms = data?.platforms ?? []
 
   const statCards = [
