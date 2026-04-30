@@ -78,12 +78,11 @@ export default function Shell() {
         ))}
       </div>
 
-      {/* Content */}
-      <div style={{
-        flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 18px',
-        display: 'flex', flexDirection: 'column', gap: 12,
-      }}>
-        {content[activeTab]}
+      {/* Content — outer div scrolls, inner div lays out naturally */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {content[activeTab]}
+        </div>
       </div>
     </div>
   )
