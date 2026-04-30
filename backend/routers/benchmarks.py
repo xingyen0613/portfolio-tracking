@@ -1,12 +1,11 @@
 import sqlite3
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Query
 
-router = APIRouter()
+from config.settings import DB_PATH
 
-DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "sqlite" / "portfolio.db"
+router = APIRouter()
 
 AVAILABLE_TICKERS = {"^GSPC", "0050.TW", "BTC-USD"}
 
