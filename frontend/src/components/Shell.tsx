@@ -1,12 +1,22 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '../api/client'
 import HoldingsTab from './tabs/HoldingsTab'
 import AllocationTab from './tabs/AllocationTab'
 import TrendTab from './tabs/TrendTab'
+
+interface MetaData { last_updated: string | null; usd_twd_rate: number }
 
 const TABS = ['持倉明細', '資產配置', '資產走勢'] as const
 
 export default function Shell() {
   const [activeTab, setActiveTab] = useState<number>(2)
+
+  const { data: meta } = useQuery<MetaData>({
+    queryKey: ['portfolio/meta'],
+    queryFn: () => api.get('/api/portfolio/meta').then(r => r.data),
+    staleTime: 5 * 60 * 1000,
+  })
 
   const content = [<HoldingsTab />, <AllocationTab />, <TrendTab />]
 
@@ -29,6 +39,11 @@ export default function Shell() {
           marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14,
           fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'var(--fg2)',
         }}>
+          {meta?.last_updated && (
+            <span style={{ color: 'var(--fg3)' }}>
+              更新：{meta.last_updated}
+            </span>
+          )}
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{
               width: 5, height: 5, borderRadius: '50%', background: 'var(--green)',
@@ -36,7 +51,9 @@ export default function Shell() {
             }} />
             LIVE
           </span>
-          <span style={{ color: 'var(--fg3)' }}>1 USD = 31.5 TWD</span>
+          <span style={{ color: 'var(--fg3)' }}>
+            1 USD = {meta?.usd_twd_rate?.toFixed(1) ?? '31.5'} TWD
+          </span>
         </div>
       </div>
 
