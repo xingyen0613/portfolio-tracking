@@ -6,6 +6,7 @@
 # 測試腳本預設忽略，只追蹤 yuanta pipeline scripts
 scripts/*
 !scripts/yuanta_*.py
+!scripts/fetch_benchmarks.py
 .venv/
 data/
 __pycache__/
