@@ -67,7 +67,39 @@ uv run python -m app.jobs.run_batch --platform sui_wallet
 uv run python -m app.jobs.run_batch --platform ibkr
 ```
 
-### Dashboard
+### Dashboard（React + FastAPI）
+
+目前主要 Dashboard 為 React 前端 + FastAPI 後端。
+
+**Step 1：啟動後端 API**
+
+```bash
+uv run uvicorn backend.main:app --port 8000 --reload
+```
+
+**Step 2：啟動前端開發伺服器**
+
+```bash
+cd frontend && npm run dev -- --port 5173
+```
+
+瀏覽器開 `http://localhost:5173`
+
+每次開頁面都會從 SQLite 讀取最新資料，不需要重跑指令。
+
+> 首次執行需先安裝前端依賴：`cd frontend && npm install`
+
+#### Benchmark 資料（初次或補資料時執行）
+
+```bash
+uv run python scripts/fetch_benchmarks.py
+```
+
+抓取 S&P 500 / 元大台灣50 / BTC 歷史收盤價，存入 `benchmark_prices` 表。支援增量更新（只抓缺失日期）。
+
+---
+
+### Dashboard（Streamlit，舊版，暫時保留）
 
 ```bash
 uv run streamlit run app/dashboard/main.py --server.port 857
@@ -75,7 +107,7 @@ uv run streamlit run app/dashboard/main.py --server.port 857
 
 瀏覽器開 `http://localhost:857`
 
-每次開頁面都會從 SQLite 讀取最新資料，不需要重跑指令。
+> ⚠️ 舊版 Streamlit Dashboard 目前仍可用，但後續維護以 React 版為主。是否永久移除待評估。
 
 ---
 
