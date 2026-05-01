@@ -64,6 +64,21 @@ function fmtPct(v: number | null) {
   return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`
 }
 
+// converts Lightweight Charts Time (string | number | BusinessDay) → 'YYYY-MM-DD'
+function lwcTimeToStr(t: unknown): string {
+  if (typeof t === 'string') return t
+  if (typeof t === 'number') return new Date(t * 1000).toISOString().slice(0, 10)
+  const bd = t as { year: number; month: number; day: number }
+  return `${bd.year}-${String(bd.month).padStart(2, '0')}-${String(bd.day).padStart(2, '0')}`
+}
+
+const PCT_FORMAT = {
+  type: 'custom' as const,
+  formatter: (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`,
+  minMove: 0.01,
+}
+const USD_FORMAT = { type: 'price' as const, precision: 0, minMove: 1 }
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function TrendTab() {
@@ -80,6 +95,11 @@ export default function TrendTab() {
   const chartRef     = useRef<IChartApi | null>(null)
   const pSeriesMap   = useRef<Partial<Record<PKey, ISeriesApi<'Line'>>>>({})
   const bSeriesMap   = useRef<Partial<Record<BTicker, ISeriesApi<'Line'>>>>({})
+
+  // raw data refs for dynamic % baseline recalculation
+  const rawPortRef  = useRef<Partial<Record<PKey, number[]>>>({})
+  const rawBenchRef = useRef<Partial<Record<BTicker, { dates: string[]; closes: number[] }>>>({})
+  const isRecalc    = useRef(false)
 
   // ── Data queries ─────────────────────────────────────────────────────────────
   // 圖表永遠顯示全部資料，win 只控制下方 stat cards 的收益計算區間
@@ -167,6 +187,8 @@ export default function TrendTab() {
       if (!series) return
 
       const raw  = portData.series[key] ?? []
+      rawPortRef.current[key] = raw
+
       const base = raw[0] || 1
       const values = mode === 'return'
         ? raw.map(v => ((v - base) / base) * 100)
@@ -177,7 +199,10 @@ export default function TrendTab() {
           .map((d, i) => ({ time: d as `${number}-${number}-${number}`, value: values[i] ?? 0 }))
           .filter(p => isFinite(p.value))
       )
-      series.applyOptions({ visible: pVis[key] })
+      series.applyOptions({
+        visible: pVis[key],
+        priceFormat: mode === 'return' ? PCT_FORMAT : USD_FORMAT,
+      })
     })
 
     chartRef.current?.timeScale().fitContent()
@@ -193,6 +218,8 @@ export default function TrendTab() {
       const series = bSeriesMap.current[ticker]
       if (!series) return
 
+      rawBenchRef.current[ticker] = { dates: b.dates, closes: b.closes }
+
       if (mode !== 'return') {
         series.applyOptions({ visible: false })
         return
@@ -204,11 +231,61 @@ export default function TrendTab() {
           .map((d, i) => ({ time: d as `${number}-${number}-${number}`, value: ((b.closes[i] - base) / base) * 100 }))
           .filter(p => isFinite(p.value))
       )
-      series.applyOptions({ visible: bVis[ticker] })
+      series.applyOptions({
+        visible: bVis[ticker],
+        priceFormat: PCT_FORMAT,
+      })
     })
 
     chartRef.current?.timeScale().fitContent()
   }, [benchData, mode, bVis])
+
+  // ── Dynamic % baseline: recalculate on visible range change ──────────────────
+
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart || mode !== 'return') return
+
+    const handler = () => {
+      if (isRecalc.current || !portData) return
+      const range = chart.timeScale().getVisibleRange()
+      if (!range) return
+
+      isRecalc.current = true
+      const fromDate = lwcTimeToStr(range.from)
+
+      P_KEYS.forEach(key => {
+        const series = pSeriesMap.current[key]
+        const raw    = rawPortRef.current[key]
+        if (!series || !raw) return
+        const baseIdx = Math.max(0, portData.dates.findIndex(d => d >= fromDate))
+        const base    = raw[baseIdx] || 1
+        series.setData(
+          portData.dates
+            .map((d, i) => ({ time: d as `${number}-${number}-${number}`, value: ((raw[i] - base) / base) * 100 }))
+            .filter(p => isFinite(p.value))
+        )
+      })
+
+      B_TICKERS.forEach(ticker => {
+        const series = bSeriesMap.current[ticker]
+        const rb     = rawBenchRef.current[ticker]
+        if (!series || !rb || !bVis[ticker]) return
+        const baseIdx = Math.max(0, rb.dates.findIndex(d => d >= fromDate))
+        const base    = rb.closes[baseIdx] || 1
+        series.setData(
+          rb.dates
+            .map((d, i) => ({ time: d as `${number}-${number}-${number}`, value: ((rb.closes[i] - base) / base) * 100 }))
+            .filter(p => isFinite(p.value))
+        )
+      })
+
+      isRecalc.current = false
+    }
+
+    chart.timeScale().subscribeVisibleTimeRangeChange(handler)
+    return () => chart.timeScale().unsubscribeVisibleTimeRangeChange(handler)
+  }, [mode, portData, bVis])
 
   // ── Chip helper ───────────────────────────────────────────────────────────────
 
@@ -258,15 +335,12 @@ export default function TrendTab() {
           setPVis(prev => ({ ...prev, [key]: !prev[key] }))
         ))}
 
-        {mode === 'return' && (
-          <>
-            <div style={{ width: 1, height: 16, background: 'var(--bdr)', margin: '0 4px' }} />
-            <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.5px' }}>BENCHMARK</span>
-            {B_TICKERS.map(t => chip(B_LABELS[t], B_COLORS[t], bVis[t], true, () =>
-              setBVis(prev => ({ ...prev, [t]: !prev[t] }))
-            ))}
-          </>
-        )}
+        <div style={{ width: 1, height: 16, background: 'var(--bdr)', margin: '0 4px' }} />
+        <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.5px' }}>BENCHMARK</span>
+        {B_TICKERS.map(t => chip(B_LABELS[t], B_COLORS[t], bVis[t], true, () => {
+          if (mode !== 'return') setMode('return')
+          setBVis(prev => ({ ...prev, [t]: !prev[t] }))
+        }))}
       </div>
 
       {/* Chart */}
