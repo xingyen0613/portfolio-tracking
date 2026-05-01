@@ -113,6 +113,62 @@ def portfolio_allocation_drilldown(category: str) -> dict[str, Any]:
     return {"category": category, "label": label, "items": items}
 
 
+# ── /api/portfolio/snapshot ───────────────────────────────────────────────────
+
+# Cache breakdown DataFrames for the lifetime of the server process.
+# These are historical snapshots — they only grow when a new batch run completes,
+# which requires a server restart anyway.
+_breakdown_cache: dict[str, "pd.DataFrame"] = {}
+
+def _get_breakdown(category: str) -> "pd.DataFrame":
+    if category not in _breakdown_cache:
+        fetcher = {
+            "crypto":   get_crypto_symbol_breakdown,
+            "us_stock": get_us_stock_symbol_breakdown,
+            "tw_stock": get_tw_stock_symbol_breakdown,
+        }[category]
+        _breakdown_cache[category] = fetcher()
+    return _breakdown_cache[category]
+
+
+@router.get("/snapshot")
+def portfolio_snapshot(date: str = Query(...)) -> dict[str, Any]:
+    """Symbol-level breakdown for each category on or before `date`."""
+    try:
+        target = pd.Timestamp(date)
+    except Exception:
+        return {"date": date, "categories": {}}
+
+    result: dict[str, Any] = {}
+    for category in ("crypto", "us_stock", "tw_stock"):
+        df = _get_breakdown(category)
+        if df.empty:
+            result[category] = {"actual_date": None, "items": []}
+            continue
+
+        avail = df[df["snapshot_date"] <= target]["snapshot_date"]
+        if avail.empty:
+            result[category] = {"actual_date": None, "items": []}
+            continue
+
+        actual = avail.max()
+        day_df = df[df["snapshot_date"] == actual].sort_values("value_usd", ascending=False)
+        total  = float(day_df["value_usd"].sum())
+        items  = [
+            {
+                "symbol": str(row["symbol"]),
+                "pct":    round(float(row["value_usd"]) / total * 100, 1) if total > 0 else 0.0,
+            }
+            for _, row in day_df.iterrows()
+        ]
+        result[category] = {
+            "actual_date": actual.strftime("%Y-%m-%d"),
+            "items":       items,
+        }
+
+    return {"date": date, "categories": result}
+
+
 # ── /api/portfolio/metrics ────────────────────────────────────────────────────
 
 @router.get("/metrics")
