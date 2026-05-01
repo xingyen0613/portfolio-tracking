@@ -338,8 +338,12 @@ export default function TrendTab() {
         <div style={{ width: 1, height: 16, background: 'var(--bdr)', margin: '0 4px' }} />
         <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.5px' }}>BENCHMARK</span>
         {B_TICKERS.map(t => chip(B_LABELS[t], B_COLORS[t], bVis[t], true, () => {
-          if (mode !== 'return') setMode('return')
-          setBVis(prev => ({ ...prev, [t]: !prev[t] }))
+          if (mode !== 'return') {
+            setMode('return')
+            setBVis(prev => ({ ...prev, [t]: true }))
+          } else {
+            setBVis(prev => ({ ...prev, [t]: !prev[t] }))
+          }
         }))}
       </div>
 
