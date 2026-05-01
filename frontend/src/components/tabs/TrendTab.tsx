@@ -49,9 +49,11 @@ interface MetricsData {
 interface BenchmarkSeries { ticker: string; label: string; color: string; dates: string[]; closes: number[] }
 interface BenchmarkData { benchmarks: BenchmarkSeries[] }
 
-interface SnapshotItem     { symbol: string; value_usd: number; pct: number }
+interface SnapshotItem     { symbol: string; pct: number }
 interface SnapshotCategory { actual_date: string | null; items: SnapshotItem[] }
 interface SnapshotData     { date: string; categories: Record<string, SnapshotCategory> }
+
+const CAT_KEYS: PKey[] = ['us_stock', 'crypto', 'tw_stock']
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -82,6 +84,89 @@ const PCT_FORMAT = {
   minMove: 0.01,
 }
 const USD_FORMAT = { type: 'price' as const, precision: 0, minMove: 1 }
+
+// ── Tooltip renderer ──────────────────────────────────────────────────────────
+
+function renderTooltip({
+  tooltip, portData, containerRef, snap, snapshotFetching,
+}: {
+  tooltip:          { x: number; y: number; idx: number }
+  portData:         HistoryData
+  containerRef:     React.RefObject<HTMLDivElement | null>
+  snap:             SnapshotData | null
+  snapshotFetching: boolean
+}) {
+  const containerW = containerRef.current?.clientWidth ?? 600
+  const flipLeft   = tooltip.x > containerW * 0.65
+  const hovDate    = portData.dates[tooltip.idx]
+
+  return (
+    <div style={{
+      position: 'absolute',
+      left: flipLeft ? Math.max(0, tooltip.x - 224) : tooltip.x + 14,
+      top:  Math.max(4, tooltip.y - 10),
+      background: '#1c2128',
+      border: '1px solid #30363d',
+      borderRadius: 7,
+      padding: '9px 12px',
+      fontSize: 11,
+      fontFamily: 'JetBrains Mono, monospace',
+      pointerEvents: 'none',
+      zIndex: 10,
+      width: 210,
+    }}>
+      <div style={{ color: 'var(--fg3)', fontSize: 10, marginBottom: 7 }}>{hovDate}</div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: P_COLORS.total, flexShrink: 0 }} />
+        <span style={{ color: 'var(--fg2)', flex: 1 }}>總資產</span>
+        <span style={{ color: 'var(--fg1)' }}>{fmtUsd(portData.series.total?.[tooltip.idx] ?? 0)}</span>
+      </div>
+
+      <div style={{ borderTop: '1px solid #30363d', marginBottom: 8 }} />
+
+      {snapshotFetching && !snap && (
+        <div style={{ color: 'var(--fg3)', fontSize: 10, marginBottom: 6 }}>載入明細...</div>
+      )}
+
+      {CAT_KEYS.map(key => {
+        const catVal = portData.series[key]?.[tooltip.idx]
+        if (!catVal) return null
+        const catSnap  = snap?.categories[key]
+        const topItems = catSnap?.items.slice(0, 4) ?? []
+        const rest     = (catSnap?.items.length ?? 0) - topItems.length
+        const isStale  = catSnap?.actual_date && catSnap.actual_date !== hovDate
+
+        return (
+          <div key={key} style={{ marginBottom: 7 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: P_COLORS[key], flexShrink: 0 }} />
+              <span style={{ color: 'var(--fg2)', flex: 1 }}>{P_LABELS[key]}</span>
+              <span style={{ color: 'var(--fg1)' }}>{fmtUsd(catVal)}</span>
+            </div>
+            {snap && topItems.length === 0 && (
+              <div style={{ paddingLeft: 13, color: 'var(--fg3)', fontSize: 10 }}>無明細資料</div>
+            )}
+            {topItems.map(item => (
+              <div key={item.symbol} style={{ display: 'flex', gap: 6, paddingLeft: 13, marginBottom: 1 }}>
+                <span style={{ color: 'var(--fg3)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.symbol}</span>
+                <span style={{ color: 'var(--fg2)' }}>{item.pct.toFixed(1)}%</span>
+              </div>
+            ))}
+            {rest > 0 && (
+              <div style={{ paddingLeft: 13, color: 'var(--fg3)', fontSize: 10 }}>+{rest} 更多</div>
+            )}
+            {isStale && (
+              <div style={{ paddingLeft: 13, color: 'var(--fg3)', fontSize: 9, marginTop: 1 }}>
+                資料：{catSnap!.actual_date}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -134,8 +219,9 @@ export default function TrendTab() {
   // debounce: fetch snapshot data 350ms after crosshair stops on a date
   const tooltipIdx = tooltip?.idx ?? -1
   useEffect(() => {
-    if (tooltipIdx === -1 || !portData) { setSnapshotDate(null); return }
-    const date = portData.dates[tooltipIdx]
+    if (tooltipIdx === -1) { setSnapshotDate(null); return }
+    const date = portDataRef.current?.dates[tooltipIdx]
+    if (!date) { setSnapshotDate(null); return }
     const t = setTimeout(() => setSnapshotDate(date), 350)
     return () => clearTimeout(t)
   }, [tooltipIdx])
@@ -398,85 +484,11 @@ export default function TrendTab() {
             載入中...
           </div>
         )}
-        {tooltip && portData && (() => {
-          const containerW = containerRef.current?.clientWidth ?? 600
-          const flipLeft   = tooltip.x > containerW * 0.65
-          const hovDate    = portData.dates[tooltip.idx]
-          const snap       = snapshotData?.date === hovDate ? snapshotData : null
-          const CAT_KEYS   = ['us_stock', 'crypto', 'tw_stock'] as PKey[]
-
-          return (
-            <div style={{
-              position: 'absolute',
-              left: flipLeft ? tooltip.x - 224 : tooltip.x + 14,
-              top:  Math.max(4, tooltip.y - 10),
-              background: '#1c2128',
-              border: '1px solid #30363d',
-              borderRadius: 7,
-              padding: '9px 12px',
-              fontSize: 11,
-              fontFamily: 'JetBrains Mono, monospace',
-              pointerEvents: 'none',
-              zIndex: 10,
-              width: 210,
-            }}>
-              {/* Date */}
-              <div style={{ color: 'var(--fg3)', fontSize: 10, marginBottom: 7 }}>{hovDate}</div>
-
-              {/* Total */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: P_COLORS.total, flexShrink: 0 }} />
-                <span style={{ color: 'var(--fg2)', flex: 1 }}>總資產</span>
-                <span style={{ color: 'var(--fg1)' }}>{fmtUsd(portData.series.total?.[tooltip.idx] ?? 0)}</span>
-              </div>
-
-              <div style={{ borderTop: '1px solid #30363d', marginBottom: 8 }} />
-
-              {/* Per-category breakdown */}
-              {CAT_KEYS.map(key => {
-                const catVal = portData.series[key]?.[tooltip.idx]
-                if (!catVal) return null
-                const catSnap  = snap?.categories[key]
-                const topItems = catSnap?.items.slice(0, 4) ?? []
-                const rest     = (catSnap?.items.length ?? 0) - topItems.length
-                const isStale  = catSnap?.actual_date && catSnap.actual_date !== hovDate
-
-                return (
-                  <div key={key} style={{ marginBottom: 7 }}>
-                    {/* Category header */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: P_COLORS[key], flexShrink: 0 }} />
-                      <span style={{ color: 'var(--fg2)', flex: 1 }}>{P_LABELS[key]}</span>
-                      <span style={{ color: 'var(--fg1)' }}>{fmtUsd(catVal)}</span>
-                    </div>
-
-                    {/* Symbol rows */}
-                    {snapshotFetching && !snap && (
-                      <div style={{ paddingLeft: 13, color: 'var(--fg3)', fontSize: 10 }}>載入中...</div>
-                    )}
-                    {snap && topItems.length === 0 && (
-                      <div style={{ paddingLeft: 13, color: 'var(--fg3)', fontSize: 10 }}>無明細資料</div>
-                    )}
-                    {topItems.map(item => (
-                      <div key={item.symbol} style={{ display: 'flex', gap: 6, paddingLeft: 13, marginBottom: 1 }}>
-                        <span style={{ color: 'var(--fg3)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.symbol}</span>
-                        <span style={{ color: 'var(--fg2)' }}>{item.pct.toFixed(1)}%</span>
-                      </div>
-                    ))}
-                    {rest > 0 && (
-                      <div style={{ paddingLeft: 13, color: 'var(--fg3)', fontSize: 10 }}>+{rest} 更多</div>
-                    )}
-                    {isStale && (
-                      <div style={{ paddingLeft: 13, color: 'var(--fg3)', fontSize: 9, marginTop: 1 }}>
-                        資料：{catSnap!.actual_date}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })()}
+        {tooltip && portData && renderTooltip({
+          tooltip, portData, containerRef,
+          snap: snapshotData?.date === portData.dates[tooltip.idx] ? snapshotData : null,
+          snapshotFetching,
+        })}
       </div>
 
       {/* Window selector — controls stat card metrics below */}
