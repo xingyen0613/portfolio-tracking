@@ -48,6 +48,18 @@ def _get_connectors(platform: str) -> list:
     if platform == "ibkr":
         from app.connectors.ibkr_connector import IBKRConnector
         return [IBKRConnector()]
+    if platform == "evm_wallet":
+        from app.connectors.evm_wallet_connector import EVMWalletConnector
+        api_key = os.environ.get("ETHERSCAN_API_KEY", "")
+        if not api_key:
+            raise ValueError("ETHERSCAN_API_KEY not set in .env")
+        addresses_raw = os.environ.get("EVM_WALLET_ADDRESSES", "")
+        addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
+        if not addresses:
+            raise ValueError("EVM_WALLET_ADDRESSES not set in .env")
+        chains_raw = os.environ.get("EVM_CHAINS", "ethereum")
+        chains = [c.strip() for c in chains_raw.split(",") if c.strip()]
+        return [EVMWalletConnector(addr, chain, api_key) for addr in addresses for chain in chains]
     raise ValueError(f"Unknown platform: {platform}")
 
 
@@ -62,6 +74,25 @@ def _ensure_sui_accounts(addresses: list[str]) -> None:
                    SELECT id, ?, ? FROM platforms WHERE name = 'sui_wallet'""",
                 (account_key, addr),
             )
+
+
+def _ensure_evm_accounts(addresses: list[str], chains: list[str]) -> None:
+    """Ensure one account record per (address, chain) exists under evm_wallet platform."""
+    from app.connectors.evm_wallet_connector import CHAIN_CONFIG
+    from app.storage.sqlite import get_conn
+    for addr in addresses:
+        addr_lower = addr.lower()
+        for chain in chains:
+            cfg = CHAIN_CONFIG.get(chain, {})
+            short = cfg.get("short", chain)
+            account_key = f"{addr_lower[:10]}_{short}"
+            label = f"{addr} ({chain})"
+            with get_conn() as conn:
+                conn.execute(
+                    """INSERT OR IGNORE INTO accounts (platform_id, account_key, label)
+                       SELECT id, ?, ? FROM platforms WHERE name = 'evm_wallet'""",
+                    (account_key, label),
+                )
 
 
 def _aggregate_categories(batch_id: str) -> None:
@@ -148,12 +179,19 @@ def _aggregate_categories(batch_id: str) -> None:
 def run_batch(platforms: list[str]) -> None:
     init_db()
 
-    # Ensure SUI wallet accounts exist if needed
+    # Ensure wallet accounts exist in DB if needed
     if "sui_wallet" in platforms:
         addresses_raw = os.environ.get("SUI_WALLET_ADDRESSES", "")
         addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
         if addresses:
             _ensure_sui_accounts(addresses)
+    if "evm_wallet" in platforms:
+        addresses_raw = os.environ.get("EVM_WALLET_ADDRESSES", "")
+        addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
+        chains_raw = os.environ.get("EVM_CHAINS", "ethereum")
+        chains = [c.strip() for c in chains_raw.split(",") if c.strip()]
+        if addresses:
+            _ensure_evm_accounts(addresses, chains)
 
     batch_id = str(uuid.uuid4())
     started_at = _now()
@@ -220,7 +258,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     platforms = [args.platform] if args.platform else ENABLED_PLATFORMS
-    implemented = {"binance", "okx", "mexc", "bybit", "sui_wallet", "ibkr"}
+    implemented = {"binance", "okx", "mexc", "bybit", "sui_wallet", "ibkr", "evm_wallet"}
     platforms = [p for p in platforms if p in implemented]
 
     if not platforms:

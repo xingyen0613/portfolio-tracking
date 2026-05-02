@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
 
@@ -6,7 +6,8 @@ import { api } from '../../api/client'
 
 interface HoldingRow  { symbol: string; name: string; quantity: string; price: string; value_usd: number }
 interface Section     { label: string; total_usd: number; rows: HoldingRow[] }
-interface Platform    { name: string; display: string; abbr: string; color: string; fg: string; category: string; total_usd: number; sections: Section[] }
+interface Account     { account_key: string; address: string; chain: string | null; label: string; total_usd: number; sections: Section[] }
+interface Platform    { name: string; display: string; abbr: string; color: string; fg: string; category: string; total_usd: number; sections: Section[]; accounts?: Account[] }
 interface Summary     { total_usd: number; crypto_usd?: number; us_stock_usd?: number; tw_stock_usd?: number }
 interface HoldingsData{ summary: Summary; platforms: Platform[] }
 
@@ -23,6 +24,46 @@ function fmtUsd(v: number) {
   if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`
   if (abs >= 1_000)     return `${sign}$${(abs / 1_000).toFixed(1)}k`
   return `${sign}$${abs.toFixed(0)}`
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function fmtAddr(addr: string): string {
+  if (addr.length <= 14) return addr
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
+}
+
+// ── Address badge row (for wallet platforms) ──────────────────────────────────
+
+function AddressBadge({ account, totalUsd }: { account: Account; totalUsd: number }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+      background: 'var(--bg)', borderBottom: '1px solid var(--bdr2)',
+    }}>
+      <code style={{
+        fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
+        color: 'var(--fg2)', letterSpacing: '.3px',
+      }}>
+        {fmtAddr(account.address)}
+      </code>
+      {account.chain && (
+        <span style={{
+          fontSize: 10, fontWeight: 600, padding: '1px 5px',
+          borderRadius: 3, background: 'var(--surf3)', color: 'var(--fg3)',
+          textTransform: 'uppercase', letterSpacing: '.4px',
+        }}>
+          {account.chain}
+        </span>
+      )}
+      <span style={{
+        marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace',
+        fontSize: 11, color: 'var(--fg3)',
+      }}>
+        {fmtUsd(totalUsd)}
+      </span>
+    </div>
+  )
 }
 
 // ── Chevron icon ──────────────────────────────────────────────────────────────
@@ -112,46 +153,94 @@ function PlatformCard({ p }: { p: Platform }) {
 
       {/* Collapsible content — maxHeight transition avoids layout jump */}
       <div style={{
-        maxHeight: open ? '2000px' : '0',
+        maxHeight: open ? '4000px' : '0',
         overflow: 'hidden',
-        transition: open ? 'max-height 350ms ease' : 'max-height 200ms ease',
+        transition: open ? 'max-height 500ms ease' : 'max-height 200ms ease',
       }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              {['代碼', '數量', '單價', '市值'].map((h, i) => (
-                <th key={h} style={{
-                  padding: '7px 14px', fontSize: 10, color: 'var(--fg3)', fontWeight: 500,
-                  textAlign: i === 0 ? 'left' : 'right',
-                  borderBottom: '1px solid var(--bdr2)', letterSpacing: '.4px',
-                }}>
-                  {h}
-                </th>
+        {p.accounts && p.accounts.length > 0 ? (
+          // Wallet platform: group by address/chain
+          p.accounts.map(acct => (
+            <div key={acct.account_key}>
+              <AddressBadge account={acct} totalUsd={acct.total_usd} />
+              {acct.sections.length > 0 && (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['代碼', '數量', '單價', '市值'].map((h, i) => (
+                        <th key={h} style={{
+                          padding: '7px 14px', fontSize: 10, color: 'var(--fg3)', fontWeight: 500,
+                          textAlign: i === 0 ? 'left' : 'right',
+                          borderBottom: '1px solid var(--bdr2)', letterSpacing: '.4px',
+                        }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {acct.sections.map(sec => (
+                      <Fragment key={sec.label}>
+                        <tr>
+                          <td colSpan={4} style={{ padding: 0 }}>
+                            <div style={{
+                              padding: '5px 14px', fontSize: 10, fontWeight: 600, color: 'var(--fg3)',
+                              background: 'var(--surf2)', textTransform: 'uppercase', letterSpacing: '.5px',
+                              display: 'flex', alignItems: 'center', gap: 8,
+                            }}>
+                              {sec.label}
+                              <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', color: 'var(--fg2)' }}>
+                                {fmtUsd(sec.total_usd)}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                        {sec.rows.map((row, i) => <HoldingRowView key={i} row={row} />)}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ))
+        ) : (
+          // Regular platform: flat sections
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['代碼', '數量', '單價', '市值'].map((h, i) => (
+                  <th key={h} style={{
+                    padding: '7px 14px', fontSize: 10, color: 'var(--fg3)', fontWeight: 500,
+                    textAlign: i === 0 ? 'left' : 'right',
+                    borderBottom: '1px solid var(--bdr2)', letterSpacing: '.4px',
+                  }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {p.sections.map(sec => (
+                <Fragment key={sec.label}>
+                  <tr>
+                    <td colSpan={4} style={{ padding: 0 }}>
+                      <div style={{
+                        padding: '5px 14px', fontSize: 10, fontWeight: 600, color: 'var(--fg3)',
+                        background: 'var(--bg)', textTransform: 'uppercase', letterSpacing: '.5px',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                      }}>
+                        {sec.label}
+                        <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', color: 'var(--fg2)' }}>
+                          {fmtUsd(sec.total_usd)}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                  {sec.rows.map((row, i) => <HoldingRowView key={i} row={row} />)}
+                </Fragment>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {p.sections.map(sec => (
-              <>
-                <tr key={`sec-${sec.label}`}>
-                  <td colSpan={4} style={{ padding: 0 }}>
-                    <div style={{
-                      padding: '5px 14px', fontSize: 10, fontWeight: 600, color: 'var(--fg3)',
-                      background: 'var(--bg)', textTransform: 'uppercase', letterSpacing: '.5px',
-                      display: 'flex', alignItems: 'center', gap: 8,
-                    }}>
-                      {sec.label}
-                      <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', color: 'var(--fg2)' }}>
-                        {fmtUsd(sec.total_usd)}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-                {sec.rows.map((row, i) => <HoldingRowView key={i} row={row} />)}
-              </>
-            ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        )}
       </div>
 
     </div>

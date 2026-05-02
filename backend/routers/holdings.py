@@ -27,12 +27,16 @@ PLATFORM_META: dict[str, dict] = {
     "mexc":       {"display": "MEXC",              "abbr": "MX",  "color": "#0C94E4", "fg": "#fff"},
     "bybit":      {"display": "Bybit",             "abbr": "BY",  "color": "#F7A600", "fg": "#000"},
     "sui_wallet": {"display": "SUI Wallet",        "abbr": "SUI", "color": "#6fbcf0", "fg": "#000"},
+    "evm_wallet": {"display": "EVM Wallet",        "abbr": "EVM", "color": "#627eea", "fg": "#fff"},
     "ibkr":       {"display": "IBKR（美股）",       "abbr": "IB",  "color": "#c0392b", "fg": "#fff"},
     "firsttrade": {"display": "Firsttrade（美股）", "abbr": "FT",  "color": "#2c8af8", "fg": "#fff"},
     "yuanta":     {"display": "元大證券（台股）",   "abbr": "元",  "color": "#27ae60", "fg": "#fff"},
 }
 
 CATEGORY_ORDER = {"crypto": 0, "us_stock": 1, "tw_stock": 2}
+
+# Platforms where holdings should be grouped by wallet address
+WALLET_PLATFORMS = {"sui_wallet", "evm_wallet"}
 
 
 def _fmt_qty(q: float, decimals: int = 4) -> str:
@@ -77,42 +81,76 @@ def get_all_holdings() -> dict[str, Any]:
         category = str(pf_df["category"].iloc[0])
         platform_total = float(pf_df["value_usd"].sum())
 
-        sections: list[dict] = []
-        for asset_type, type_df in pf_df.groupby("asset_type"):
-            type_df = type_df.sort_values("value_usd", ascending=False)
-            rows = []
-            for _, row in type_df.iterrows():
-                try:
-                    qty = float(row["quantity"]) if row["quantity"] is not None else 0.0
-                except (ValueError, TypeError):
-                    qty = 0.0
-                try:
-                    price = float(row["price"]) if row["price"] is not None else None
-                except (ValueError, TypeError):
-                    price = None
-
-                rows.append({
-                    "symbol":    str(row["platform_symbol"] or "—"),
-                    "name":      str(row["platform_asset_name"] or ""),
-                    "quantity":  _fmt_qty(qty),
-                    "price":     _fmt_price(price),
-                    "value_usd": round(float(row["value_usd"]), 2),
+        def _build_sections(sub_df) -> list[dict]:
+            sections = []
+            for asset_type, type_df in sub_df.groupby("asset_type"):
+                type_df = type_df.sort_values("value_usd", ascending=False)
+                rows = []
+                for _, row in type_df.iterrows():
+                    try:
+                        qty = float(row["quantity"]) if row["quantity"] is not None else 0.0
+                    except (ValueError, TypeError):
+                        qty = 0.0
+                    try:
+                        price = float(row["price"]) if row["price"] is not None else None
+                    except (ValueError, TypeError):
+                        price = None
+                    rows.append({
+                        "symbol":    str(row["platform_symbol"] or "—"),
+                        "name":      str(row["platform_asset_name"] or ""),
+                        "quantity":  _fmt_qty(qty),
+                        "price":     _fmt_price(price),
+                        "value_usd": round(float(row["value_usd"]), 2),
+                    })
+                sections.append({
+                    "label":     ASSET_TYPE_LABEL.get(str(asset_type), str(asset_type)),
+                    "total_usd": round(float(type_df["value_usd"].sum()), 2),
+                    "rows":      rows,
                 })
+            sections.sort(key=lambda s: -abs(s["total_usd"]))
+            return sections
 
-            sections.append({
-                "label":     ASSET_TYPE_LABEL.get(str(asset_type), str(asset_type)),
-                "total_usd": round(float(type_df["value_usd"].sum()), 2),
-                "rows":      rows,
+        if platform_name in WALLET_PLATFORMS:
+            # Group by account (each = one wallet address, or address+chain for EVM)
+            accounts: list[dict] = []
+            for account_key, acct_df in pf_df.groupby("account_key", sort=False):
+                account_key = str(account_key)
+                label = str(acct_df["account_label"].iloc[0] or account_key)
+                chain_val = acct_df["chain"].dropna().iloc[0] if "chain" in acct_df.columns and not acct_df["chain"].dropna().empty else None
+                # Full address from label:
+                #   SUI label  = full address (e.g. "0x655b10ed73...")
+                #   EVM label  = "0xaddr... (chain)" — strip the " (chain)" suffix
+                if platform_name == "evm_wallet":
+                    address_part = label.split(" (")[0].strip()
+                else:
+                    address_part = label  # SUI: label IS the full address
+                acct_total = float(acct_df["value_usd"].sum())
+                accounts.append({
+                    "account_key": account_key,
+                    "address":     address_part,
+                    "chain":       chain_val,
+                    "label":       label,
+                    "total_usd":   round(acct_total, 2),
+                    "sections":    _build_sections(acct_df),
+                })
+            accounts.sort(key=lambda a: -a["total_usd"])
+            platforms.append({
+                **meta,
+                "name":      platform_name,
+                "category":  category,
+                "total_usd": round(platform_total, 2),
+                "sections":  [],
+                "accounts":  accounts,
             })
-
-        sections.sort(key=lambda s: -abs(s["total_usd"]))
-        platforms.append({
-            **meta,
-            "name":      platform_name,
-            "category":  category,
-            "total_usd": round(platform_total, 2),
-            "sections":  sections,
-        })
+        else:
+            sections = _build_sections(pf_df)
+            platforms.append({
+                **meta,
+                "name":      platform_name,
+                "category":  category,
+                "total_usd": round(platform_total, 2),
+                "sections":  sections,
+            })
 
     # ── Yuanta from JSON ──────────────────────────────────────────────────────
     yuanta_detail = get_yuanta_holdings_detail()
