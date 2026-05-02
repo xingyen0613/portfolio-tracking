@@ -9,6 +9,7 @@ Price source: CoinGecko simple/price (free, no key, batch query)
 Stablecoins: fixed $1
 """
 
+import os
 import time
 from datetime import datetime, timezone
 
@@ -135,6 +136,26 @@ CHAIN_CONFIG: dict[str, dict] = {
     },
 }
 
+
+# ── Merge user tokens from EVM_TOKENS_<chain> env vars ───────────────────────────
+# Format per var: contract:symbol:decimals:is_stable:coingecko_id
+# Multiple tokens: comma-separated. coingecko_id can be "-" for stablecoins.
+# Example: EVM_TOKENS_ethereum=0xABC...:TOKEN:18:false:token-id,0xDEF...:USDT:6:true:-
+for _chain in list(CHAIN_CONFIG.keys()):
+    _raw = os.environ.get(f"EVM_TOKENS_{_chain}", "").strip()
+    if not _raw:
+        continue
+    for _entry in _raw.split(","):
+        _parts = [p.strip() for p in _entry.strip().split(":")]
+        if len(_parts) != 5:
+            continue
+        _addr, _sym, _dec, _stable, _cg = _parts
+        CHAIN_CONFIG[_chain]["tokens"][_addr.lower()] = {
+            "symbol":      _sym,
+            "decimals":    int(_dec),
+            "is_stable":   _stable.lower() == "true",
+            "coingecko_id": None if _cg in ("-", "") else _cg,
+        }
 
 # ── Module-level price cache (shared across all connector instances in one batch) ─
 # All coingecko_ids needed by any chain are collected here; first call fetches all,
