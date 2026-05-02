@@ -26,12 +26,30 @@ _CALL_DELAY   = 0.1
 
 STABLECOINS = {"USDT", "USDC", "DAI", "BUSD", "TUSD", "FRAX", "LUSD", "USDE", "FDUSD", "USDS", "PYUSD"}
 
-# Known stablecoin mints (supplement symbol-based check)
+# Known stablecoin mints
 SOL_STABLECOIN_MINTS = {
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",  # USDT
-    "USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX",   # USDH
-    "7kbnvuGBxxj8AG9qp8Scn56muWGaRaFqxg1FsRp3PuqV",  # UXD
+}
+
+# Hardcoded fallback metadata for common tokens — used when Jupiter is unavailable
+KNOWN_MINTS: dict[str, dict] = {
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {"symbol": "USDC",  "name": "USD Coin",   "decimals": 6},
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": {"symbol": "USDT",  "name": "Tether USD",  "decimals": 6},
+    "So11111111111111111111111111111111111111112":    {"symbol": "SOL",   "name": "Wrapped SOL", "decimals": 9},
+    "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs": {"symbol": "ETH",   "name": "Wrapped ETH (Wormhole)", "decimals": 8},
+    "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh": {"symbol": "WBTC",  "name": "Wrapped BTC (Wormhole)", "decimals": 8},
+    "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So":  {"symbol": "mSOL",  "name": "Marinade staked SOL",    "decimals": 9},
+    "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1":  {"symbol": "bSOL",  "name": "BlazeStake Staked SOL",  "decimals": 9},
+    "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn": {"symbol": "JitoSOL","name": "Jito Staked SOL",       "decimals": 9},
+    "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v":  {"symbol": "JupSOL","name": "Jupiter Staked SOL",      "decimals": 9},
+    "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN":  {"symbol": "JUP",   "name": "Jupiter",                "decimals": 6},
+    "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": {"symbol": "BONK",  "name": "Bonk",                   "decimals": 5},
+    "WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk":  {"symbol": "WEN",   "name": "WEN",                    "decimals": 5},
+    "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4": {"symbol": "JLP",   "name": "Jupiter Liquidity Provider Token", "decimals": 6},
+    "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3": {"symbol": "PYTH",  "name": "Pyth Network",           "decimals": 6},
+    "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE":  {"symbol": "ORCA",  "name": "Orca",                   "decimals": 6},
+    "rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof":  {"symbol": "RENDER","name": "Render Token",            "decimals": 8},
 }
 
 # ── Module-level caches ────────────────────────────────────────────────────────
@@ -52,12 +70,14 @@ def _classify(symbol: str) -> str:
 
 
 def _ensure_jupiter_cache() -> None:
-    """Fetch Jupiter token list once per process. mint → {symbol, name, decimals}."""
+    """Populate token cache: start with KNOWN_MINTS, then enrich from Jupiter if reachable."""
     global _jupiter_cache, _jupiter_loaded
     if _jupiter_loaded:
         return
+    # Always seed with hardcoded fallbacks first
+    _jupiter_cache.update(KNOWN_MINTS)
     try:
-        resp = requests.get(JUPITER_TOKEN_LIST, timeout=30)
+        resp = requests.get(JUPITER_TOKEN_LIST, timeout=15)
         resp.raise_for_status()
         for token in resp.json():
             mint = token.get("address", "")
@@ -67,9 +87,10 @@ def _ensure_jupiter_cache() -> None:
                     "name":     token.get("name", ""),
                     "decimals": int(token.get("decimals", 9)),
                 }
-        _jupiter_loaded = True
-    except Exception:
-        pass  # proceed without metadata; tokens will show mint as symbol
+        print(f"  [sol_wallet] Jupiter token list loaded ({len(_jupiter_cache)} tokens)")
+    except Exception as e:
+        print(f"  [sol_wallet] Jupiter unavailable ({e}), using {len(_jupiter_cache)} hardcoded tokens")
+    _jupiter_loaded = True
 
 
 def _ensure_sol_price() -> float | None:
@@ -253,7 +274,7 @@ class SolWalletConnector(BaseConnector):
             holdings.append({
                 "platform_symbol":     symbol,
                 "platform_asset_name": name or symbol,
-                "asset_type":          _classify(symbol),
+                "asset_type":          "stablecoin" if is_stable else "crypto",
                 "quantity":            ui_amount,
                 "price":               price,
                 "value":               val,
