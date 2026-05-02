@@ -7,7 +7,7 @@ import { api } from '../../api/client'
 interface HoldingRow  { symbol: string; name: string; quantity: string; price: string; value_usd: number }
 interface Section     { label: string; total_usd: number; rows: HoldingRow[] }
 interface Account     { account_key: string; address: string; chain: string | null; label: string; total_usd: number; sections: Section[] }
-interface Platform    { name: string; display: string; abbr: string; color: string; fg: string; category: string; total_usd: number; sections: Section[]; accounts?: Account[] }
+interface Platform    { name: string; display: string; abbr: string; color: string; fg: string; category: string; total_usd: number; sections: Section[]; accounts?: Account[]; chain?: string | null }
 interface Summary     { total_usd: number; crypto_usd?: number; us_stock_usd?: number; tw_stock_usd?: number }
 interface HoldingsData{ summary: Summary; platforms: Platform[] }
 

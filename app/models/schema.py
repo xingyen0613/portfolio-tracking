@@ -99,6 +99,7 @@ INSERT OR IGNORE INTO platforms (name, display_name) VALUES
     ('firsttrade', 'FirstTrade'),
     ('sui_wallet', 'SUI Wallet'),
     ('evm_wallet', 'EVM Wallet'),
+    ('sol_wallet', 'Solana Wallet'),
     ('ibkr', 'IBKR');
 """
 

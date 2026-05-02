@@ -15,9 +15,10 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 from app.storage.sqlite import get_conn, init_db
-from config.settings import ENABLED_PLATFORMS, ENV_PATH, PLATFORM_CATEGORY
+from config.settings import ENABLED_PLATFORMS, ENV_PATH, PLATFORM_CATEGORY, WALLETS_ENV_PATH
 
 load_dotenv(ENV_PATH)
+load_dotenv(WALLETS_ENV_PATH, override=True)
 
 
 def _now() -> str:
@@ -45,14 +46,24 @@ def _get_connectors(platform: str) -> list:
         if not addresses:
             raise ValueError("SUI_WALLET_ADDRESSES not set in .env")
         return [SuiWalletConnector(addr) for addr in addresses]
+    if platform == "sol_wallet":
+        from app.connectors.sol_wallet_connector import SolWalletConnector
+        api_key = os.environ.get("ALCHEMY_API_KEY", "")
+        if not api_key:
+            raise ValueError("ALCHEMY_API_KEY not set in .env")
+        addresses_raw = os.environ.get("SOL_WALLET_ADDRESSES", "")
+        addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
+        if not addresses:
+            raise ValueError("SOL_WALLET_ADDRESSES not set in .env.wallets")
+        return [SolWalletConnector(addr, api_key) for addr in addresses]
     if platform == "ibkr":
         from app.connectors.ibkr_connector import IBKRConnector
         return [IBKRConnector()]
     if platform == "evm_wallet":
         from app.connectors.evm_wallet_connector import EVMWalletConnector
-        api_key = os.environ.get("ETHERSCAN_API_KEY", "")
+        api_key = os.environ.get("ALCHEMY_API_KEY", "")
         if not api_key:
-            raise ValueError("ETHERSCAN_API_KEY not set in .env")
+            raise ValueError("ALCHEMY_API_KEY not set in .env")
         addresses_raw = os.environ.get("EVM_WALLET_ADDRESSES", "")
         addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
         if not addresses:
@@ -72,6 +83,19 @@ def _ensure_sui_accounts(addresses: list[str]) -> None:
             conn.execute(
                 """INSERT OR IGNORE INTO accounts (platform_id, account_key, label)
                    SELECT id, ?, ? FROM platforms WHERE name = 'sui_wallet'""",
+                (account_key, addr),
+            )
+
+
+def _ensure_sol_accounts(addresses: list[str]) -> None:
+    """Ensure each Solana wallet address has an account record in DB."""
+    from app.storage.sqlite import get_conn
+    for addr in addresses:
+        account_key = addr[:10] if len(addr) >= 10 else addr
+        with get_conn() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO accounts (platform_id, account_key, label)
+                   SELECT id, ?, ? FROM platforms WHERE name = 'sol_wallet'""",
                 (account_key, addr),
             )
 
@@ -180,6 +204,11 @@ def run_batch(platforms: list[str]) -> None:
     init_db()
 
     # Ensure wallet accounts exist in DB if needed
+    if "sol_wallet" in platforms:
+        addresses_raw = os.environ.get("SOL_WALLET_ADDRESSES", "")
+        addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
+        if addresses:
+            _ensure_sol_accounts(addresses)
     if "sui_wallet" in platforms:
         addresses_raw = os.environ.get("SUI_WALLET_ADDRESSES", "")
         addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
@@ -258,7 +287,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     platforms = [args.platform] if args.platform else ENABLED_PLATFORMS
-    implemented = {"binance", "okx", "mexc", "bybit", "sui_wallet", "ibkr", "evm_wallet"}
+    implemented = {"binance", "okx", "mexc", "bybit", "sui_wallet", "sol_wallet", "ibkr", "evm_wallet"}
     platforms = [p for p in platforms if p in implemented]
 
     if not platforms:

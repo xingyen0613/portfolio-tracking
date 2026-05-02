@@ -27,6 +27,7 @@ PLATFORM_META: dict[str, dict] = {
     "mexc":       {"display": "MEXC",              "abbr": "MX",  "color": "#0C94E4", "fg": "#fff"},
     "bybit":      {"display": "Bybit",             "abbr": "BY",  "color": "#F7A600", "fg": "#000"},
     "sui_wallet": {"display": "SUI Wallet",        "abbr": "SUI", "color": "#6fbcf0", "fg": "#000"},
+    "sol_wallet": {"display": "Solana Wallet",     "abbr": "SOL", "color": "#9945FF", "fg": "#fff"},
     "evm_wallet": {"display": "EVM Wallet",        "abbr": "EVM", "color": "#627eea", "fg": "#fff"},
     "ibkr":       {"display": "IBKR（美股）",       "abbr": "IB",  "color": "#c0392b", "fg": "#fff"},
     "firsttrade": {"display": "Firsttrade（美股）", "abbr": "FT",  "color": "#2c8af8", "fg": "#fff"},
@@ -36,7 +37,7 @@ PLATFORM_META: dict[str, dict] = {
 CATEGORY_ORDER = {"crypto": 0, "us_stock": 1, "tw_stock": 2}
 
 # Platforms where holdings should be grouped by wallet address
-WALLET_PLATFORMS = {"sui_wallet", "evm_wallet"}
+WALLET_PLATFORMS = {"sui_wallet", "sol_wallet", "evm_wallet"}
 
 
 def _fmt_qty(q: float, decimals: int = 4) -> str:
