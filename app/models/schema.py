@@ -53,7 +53,8 @@ CREATE TABLE IF NOT EXISTS normalized_holdings (
     original_currency TEXT NOT NULL,
     price_source    TEXT,               -- 'platform' or null
     snapshot_date   TEXT NOT NULL,      -- YYYY-MM-DD
-    parser_version  TEXT NOT NULL
+    parser_version  TEXT NOT NULL,
+    chain           TEXT                -- e.g. 'ethereum', 'arbitrum' — NULL for non-EVM platforms
 );
 
 CREATE TABLE IF NOT EXISTS account_snapshots (
@@ -97,6 +98,8 @@ INSERT OR IGNORE INTO platforms (name, display_name) VALUES
     ('yuanta', '元大證券'),
     ('firsttrade', 'FirstTrade'),
     ('sui_wallet', 'SUI Wallet'),
+    ('evm_wallet', 'EVM Wallet'),
+    ('sol_wallet', 'Solana Wallet'),
     ('ibkr', 'IBKR');
 """
 

@@ -1,6 +1,8 @@
 .env
 .env.plaid
 .env.ibkr
+config/.env.alchemy
+config/.env.wallets
 .secrets/
 
 # 測試腳本預設忽略，只追蹤 yuanta pipeline scripts
