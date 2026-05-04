@@ -65,7 +65,9 @@ def get_latest_date(ticker: str) -> str | None:
 
 
 def main(start: str | None = None):
-    end = date.today().strftime("%Y-%m-%d")
+    # yfinance end is exclusive, so use tomorrow to include today's data
+    end = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+    today = date.today().strftime("%Y-%m-%d")
 
     for ticker, name in TICKERS.items():
         latest = get_latest_date(ticker)
@@ -75,7 +77,7 @@ def main(start: str | None = None):
         else:
             fetch_start = start or DEFAULT_START
 
-        if fetch_start >= end:
+        if fetch_start > today:
             print(f"  {name} ({ticker}): already up to date ({latest})")
             continue
 

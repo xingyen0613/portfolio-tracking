@@ -1,6 +1,6 @@
 # Portfolio Tracking
 
-個人資產追蹤系統，整合 CEX（Binance、OKX、MEXC、Bybit）、SUI 鏈上錢包、IBKR 美股、Firsttrade 美股，以及元大證券（台股）資料，每日快照存入 SQLite。
+個人資產追蹤系統，整合 CEX（Binance、OKX、MEXC、Bybit）、EVM 多鏈錢包、Solana 錢包、SUI 鏈上錢包、IBKR 美股、Firsttrade 美股，以及元大證券（台股）資料，每日快照存入 SQLite。
 
 ## 文件
 
@@ -14,10 +14,27 @@
 | OKX | Spot + Savings | ccxt API | USD |
 | MEXC | Spot + Futures（合約帳戶） | ccxt API | USD |
 | Bybit | UNIFIED（現貨/衍生品）+ Funding | ccxt API | USD |
+| EVM Wallet | 原生幣 + ERC-20 token（9 條鏈：ETH、BNB、Arbitrum、Optimism、Base、Avalanche、Polygon、Linea、Stable） | Alchemy RPC + CoinGecko | USD |
+| Solana Wallet | SOL + SPL token | Helius RPC + CoinGecko | USD |
 | SUI Wallet | Token 餘額 | Sui 公鏈 RPC + Pyth oracle | USD |
 | IBKR | 美股持倉 + 現金（含負值保證金） | Flex Web Service API | USD |
 | Firsttrade | 美股持倉 | 手動輸入（connector 待實作） | USD |
 | 元大證券 | 台股每日淨資產（持股市值 - 融資餘額） | 月對帳單 PDF 解析 | TWD |
+
+## EVM 多鏈錢包 Pipeline
+
+透過 Alchemy 自動探索每個地址下的 token 持倉，不需白名單：
+
+- 設定：`ALCHEMY_API_KEY` 填入 `.env`；地址填入 `config/.env.wallets`（格式：`EVM_ADDRESS_<NAME>=0x...`）
+- 每個地址可指定鏈（`EVM_CHAIN_<NAME>=eth`），預設跑所有 9 條鏈
+- Token 自動探索 via `alchemy_getTokenBalances`；定價 via CoinGecko by contract address
+- Stable chain（Stability Network）所有 token 固定 $1
+
+## Solana 錢包 Pipeline
+
+- 設定：地址填入 `config/.env.wallets`（格式：`SOL_ADDRESS_<NAME>=...`）
+- 原生 SOL + 所有 SPL token 持倉自動抓取；定價 via CoinGecko
+- `asset_type` 區分 `native`（SOL）與 `token`（SPL）
 
 ## IBKR 美股 Pipeline
 
@@ -64,38 +81,20 @@ uv run python -m app.jobs.run_batch --platform okx
 uv run python -m app.jobs.run_batch --platform mexc
 uv run python -m app.jobs.run_batch --platform bybit
 uv run python -m app.jobs.run_batch --platform sui_wallet
+uv run python -m app.jobs.run_batch --platform evm_wallet
+uv run python -m app.jobs.run_batch --platform sol_wallet
 uv run python -m app.jobs.run_batch --platform ibkr
 ```
 
 ### Dashboard（React + FastAPI）
 
-目前主要 Dashboard 為 React 前端 + FastAPI 後端。
+Dashboard 為 React 前端 + FastAPI 後端，**開機自動啟動**（launchd 管理）。
 
-**Step 1：啟動後端 API**
+瀏覽器開 `http://localhost:5173` 即可使用，不需要手動啟動任何指令。
 
-```bash
-uv run uvicorn backend.main:app --port 8000 --reload
-```
+每次開頁面都會從 SQLite 讀取最新資料。
 
-**Step 2：啟動前端開發伺服器**
-
-```bash
-cd frontend && npm run dev -- --port 5173
-```
-
-瀏覽器開 `http://localhost:5173`
-
-每次開頁面都會從 SQLite 讀取最新資料，不需要重跑指令。
-
-> 首次執行需先安裝前端依賴：`cd frontend && npm install`
-
-#### Benchmark 資料（初次或補資料時執行）
-
-```bash
-uv run python scripts/fetch_benchmarks.py
-```
-
-抓取 S&P 500 / 元大台灣50 / BTC 歷史收盤價，存入 `benchmark_prices` 表。支援增量更新（只抓缺失日期）。
+> 首次安裝需先執行：`cd frontend && npm install`
 
 ---
 
@@ -112,6 +111,14 @@ uv run streamlit run app/dashboard/main.py --server.port 857
 ---
 
 ## 自動化設定
+
+### 目前已設定的自動化
+
+| 觸發方式 | 內容 |
+|---------|------|
+| 每天 23:00（cron） | `run_batch`（所有平台）+ benchmark 增量更新 |
+| 每月 5 日 09:00（cron） | 元大 PDF pipeline |
+| 開機自動（launchd） | FastAPI port 8000 + React dev server port 5173 |
 
 ### Cron（定時資料抓取）
 
@@ -136,14 +143,21 @@ crontab -e
 | 儲存並退出 | `:wq` 再按 Enter |
 | 不儲存退出 | `:q!` 再按 Enter |
 
-#### 常用排程範例
+#### 目前排程
+
+```
+# 每天 23:00 執行（所有平台 + benchmark）
+0 23 * * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python -m app.jobs.run_batch >> data/logs/cron.log 2>&1
+
+# 每月 5 日 09:00 執行元大 PDF pipeline
+0 9 5 * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python scripts/yuanta_run_pipeline.py >> data/logs/yuanta.log 2>&1
+```
+
+#### 其他常用排程範例
 
 Cron 格式：`分 時 日 月 星期`
 
 ```
-# 每天 23:00 執行一次（幣圈）
-0 23 * * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python -m app.jobs.run_batch >> data/logs/cron.log 2>&1
-
 # 每小時整點執行
 0 * * * * cd /Users/yen/claude/Portfolio-Tracking && /Users/yen/.local/bin/uv run python -m app.jobs.run_batch >> data/logs/cron.log 2>&1
 
@@ -196,64 +210,43 @@ Platforms: binance, okx, mexc, bybit, sui_wallet
 
 ---
 
-### launchd（Dashboard 開機自動啟動）
+### launchd（開機自動啟動 FastAPI + React）
 
-launchd 是 macOS 原生服務管理器，用來讓 Dashboard 開機後自動在背景跑。與 cron 無關，兩者並行：
+launchd 是 macOS 原生服務管理器，讓服務在開機後自動在背景常駐。與 cron 無關，兩者並行：
 
 | | cron | launchd |
 |---|---|---|
-| 用途 | 定時執行 batch | 開機啟動、常駐 dashboard |
+| 用途 | 定時執行一次後結束 | 常駐服務，掛掉自動重啟 |
 | 設定方式 | `crontab -e` | `~/Library/LaunchAgents/*.plist` |
 
-#### 初次設定
+目前管理兩個服務：
 
-**Step 1：產生 plist 設定檔**（只需做一次）
+| plist 檔案 | 服務 | Port |
+|-----------|------|------|
+| `com.portfolio.dashboard.plist` | FastAPI 後端 | 8000 |
+| `com.portfolio.frontend.plist` | React dev server | 5173 |
 
-```bash
-cd /Users/yen/claude/Portfolio-Tracking
-
-sed \
-  -e 's|/YOUR_HOME|'"$HOME"'|g' \
-  -e 's|/YOUR_PROJECT_PATH|'"$(pwd)"'|g' \
-  com.portfolio.dashboard.plist.example > com.portfolio.dashboard.plist
-```
-
-確認內容是否正確（路徑應全部是絕對路徑）：
-
-```bash
-cat com.portfolio.dashboard.plist
-```
-
-**Step 2：安裝到 LaunchAgents**
-
-```bash
-cd /Users/yen/claude/Portfolio-Tracking
-
-cp com.portfolio.dashboard.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.portfolio.dashboard.plist
-```
-
-> ⚠️ `cp` 指令必須在專案根目錄執行，或改用絕對路徑：
-> ```bash
-> cp /Users/yen/claude/Portfolio-Tracking/com.portfolio.dashboard.plist ~/Library/LaunchAgents/
-> ```
-
-**確認是否在跑：**
+#### 確認狀態
 
 ```bash
 launchctl list | grep portfolio
 ```
 
-有輸出（PID 不是 `-`）表示正在運行。
+兩個都有 PID（不是 `-`）表示正常運行。
 
 #### 停止 / 重啟
 
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.portfolio.dashboard.plist   # 停止
-launchctl load   ~/Library/LaunchAgents/com.portfolio.dashboard.plist   # 啟動
+# FastAPI
+launchctl unload ~/Library/LaunchAgents/com.portfolio.dashboard.plist
+launchctl load   ~/Library/LaunchAgents/com.portfolio.dashboard.plist
+
+# React frontend
+launchctl unload ~/Library/LaunchAgents/com.portfolio.frontend.plist
+launchctl load   ~/Library/LaunchAgents/com.portfolio.frontend.plist
 ```
 
-#### 更新設定後重新載入
+#### 更新 plist 後重新載入
 
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.portfolio.dashboard.plist
@@ -261,7 +254,14 @@ cp /Users/yen/claude/Portfolio-Tracking/com.portfolio.dashboard.plist ~/Library/
 launchctl load   ~/Library/LaunchAgents/com.portfolio.dashboard.plist
 ```
 
-Dashboard log：`data/logs/dashboard.log`
+#### Logs
+
+```
+data/logs/dashboard.log        FastAPI stdout
+data/logs/dashboard.error.log  FastAPI stderr
+data/logs/frontend.log         React stdout
+data/logs/frontend.error.log   React stderr
+```
 
 ---
 

@@ -34,3 +34,5 @@
 - 必須帶 `User-Agent: Python/3` header
 - 兩步驟：SendRequest（q=query_id）→ GetStatement（q=reference_code，非 referenceCode）
 - 持倉：OpenPosition levelOfDetail=SUMMARY；現金：EquitySummaryByReportDateInBase 最新 reportDate 的 cash 欄（可為負值）
+
+# 每次有新的開發進度完成，或是修正、優化後，且等用戶確認ok後，要更新相關文黨。包括但不限於@readme.md, @plan.md, etc.

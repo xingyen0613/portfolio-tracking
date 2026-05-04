@@ -9,10 +9,14 @@ Usage:
 
 import argparse
 import os
+import sys
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from dotenv import load_dotenv
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
 
 from app.storage.sqlite import get_conn, init_db
 from config.settings import ENABLED_PLATFORMS, ENV_PATH, PLATFORM_CATEGORY, WALLETS_ENV_PATH
@@ -279,6 +283,20 @@ def run_batch(platforms: list[str]) -> None:
     print(f"\n[Batch {batch_id[:8]}] Done — status: {batch_status}")
     success = sum(1 for r in results if r.status == "success")
     print(f"  {success}/{len(results)} source runs succeeded\n")
+
+    _fetch_benchmarks()
+
+
+def _fetch_benchmarks() -> None:
+    """Incremental benchmark price update — only fetches dates missing from DB."""
+    import subprocess
+    print("[benchmarks] Updating benchmark prices...")
+    result = subprocess.run(
+        [sys.executable, str(_SCRIPTS_DIR / "fetch_benchmarks.py")],
+        cwd=str(_SCRIPTS_DIR.parent),
+    )
+    if result.returncode != 0:
+        print("[benchmarks] Warning: fetch failed (non-critical)")
 
 
 if __name__ == "__main__":
