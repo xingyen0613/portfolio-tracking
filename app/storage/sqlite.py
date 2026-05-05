@@ -1,43 +1,28 @@
-import sqlite3
-from contextlib import contextmanager
-from pathlib import Path
+import subprocess
+import sys
 
-from app.models.schema import CREATE_TABLES, SEED_ACCOUNTS, SEED_PLATFORMS
-from config.settings import DB_PATH, LOGS_DIR, SQLITE_DIR
+from config.db import get_conn
+from config.settings import LOGS_DIR
 
 
 def init_db() -> None:
-    SQLITE_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        check=True,
+    )
+
+
+def fetch_one(query: str, params: tuple = ()) -> dict | None:
     with get_conn() as conn:
-        conn.executescript(CREATE_TABLES)
-        conn.executescript(SEED_PLATFORMS)
-        conn.executescript(SEED_ACCOUNTS)
+        cur = conn.execute(query, params)
+        return cur.fetchone()
 
 
-@contextmanager
-def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
-
-def fetch_one(query: str, params: tuple = ()) -> sqlite3.Row | None:
+def fetch_all(query: str, params: tuple = ()) -> list[dict]:
     with get_conn() as conn:
-        return conn.execute(query, params).fetchone()
-
-
-def fetch_all(query: str, params: tuple = ()) -> list[sqlite3.Row]:
-    with get_conn() as conn:
-        return conn.execute(query, params).fetchall()
+        cur = conn.execute(query, params)
+        return cur.fetchall()
 
 
 def execute(query: str, params: tuple = ()) -> None:
@@ -50,7 +35,7 @@ def get_account_id(platform_name: str, account_key: str) -> int:
         """
         SELECT a.id FROM accounts a
         JOIN platforms p ON a.platform_id = p.id
-        WHERE p.name = ? AND a.account_key = ?
+        WHERE p.name = %s AND a.account_key = %s
         """,
         (platform_name, account_key),
     )

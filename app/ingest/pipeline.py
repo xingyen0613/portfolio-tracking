@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from config.settings import PARSER_VERSION, RAW_DIR
-from app.storage.sqlite import get_account_id, get_conn
+from config.db import get_conn
+from app.storage.sqlite import get_account_id
 
 
 def _now() -> str:
@@ -32,7 +33,7 @@ def _store_raw_file(batch_id: str, platform: str, account_key: str,
     return str(file_path), payload_hash
 
 
-def run_source_pipeline(connector, batch_id: str):
+def run_source_pipeline(connector, batch_id: str, user_id: str):
     from app.connectors.base import RunResult
 
     platform = connector.platform_name
@@ -49,8 +50,8 @@ def run_source_pipeline(connector, batch_id: str):
     # Create source_run record
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO source_runs (id, batch_id, account_id, started_at, status) VALUES (?,?,?,?,?)",
-            (source_run_id, batch_id, account_id, started_at, "running"),
+            "INSERT INTO source_runs (id, batch_id, account_id, started_at, status, user_id) VALUES (%s,%s,%s,%s,%s,%s)",
+            (source_run_id, batch_id, account_id, started_at, "running", user_id),
         )
 
     try:
@@ -71,10 +72,10 @@ def run_source_pipeline(connector, batch_id: str):
             with get_conn() as conn:
                 conn.execute(
                     """INSERT INTO raw_payloads
-                       (id, source_run_id, resource_type, file_path, payload_hash, fetched_at, parser_status)
-                       VALUES (?,?,?,?,?,?,?)""",
+                       (id, source_run_id, resource_type, file_path, payload_hash, fetched_at, parser_status, user_id)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
                     (raw_payload_id, source_run_id, resource_type,
-                     file_path, payload_hash, fetched_at, "pending"),
+                     file_path, payload_hash, fetched_at, "pending", user_id),
                 )
             raw_payload_ids.append((raw_payload_id, item))
 
@@ -106,8 +107,8 @@ def run_source_pipeline(connector, batch_id: str):
                     """INSERT INTO normalized_holdings
                        (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
                         asset_type, quantity, price, value, original_currency,
-                        price_source, snapshot_date, parser_version, chain)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        price_source, snapshot_date, parser_version, chain, user_id)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                     (
                         str(uuid.uuid4()), source_run_id,
                         raw_payload_ids[0][0],  # link to first raw payload
@@ -122,12 +123,13 @@ def run_source_pipeline(connector, batch_id: str):
                         snapshot_date,
                         PARSER_VERSION,
                         h.get("chain"),
+                        user_id,
                     ),
                 )
 
             # Mark raw payloads as parsed
             conn.execute(
-                "UPDATE raw_payloads SET parser_status='parsed' WHERE source_run_id=?",
+                "UPDATE raw_payloads SET parser_status='parsed' WHERE source_run_id=%s",
                 (source_run_id,),
             )
 
@@ -138,17 +140,21 @@ def run_source_pipeline(connector, batch_id: str):
                 total_value = sum(values) if values else None
 
             conn.execute(
-                """INSERT OR REPLACE INTO account_snapshots
-                   (id, batch_id, account_id, snapshot_date, total_value, currency, created_at)
-                   VALUES (?,?,?,?,?,?,?)""",
+                """INSERT INTO account_snapshots
+                   (id, batch_id, account_id, snapshot_date, total_value, currency, created_at, user_id)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                   ON CONFLICT (account_id, snapshot_date, batch_id) DO UPDATE SET
+                     total_value=EXCLUDED.total_value,
+                     currency=EXCLUDED.currency,
+                     created_at=EXCLUDED.created_at""",
                 (str(uuid.uuid4()), batch_id, account_id,
-                 snapshot_date, total_value, currency, _now()),
+                 snapshot_date, total_value, currency, _now(), user_id),
             )
 
         # Mark source_run success
         with get_conn() as conn:
             conn.execute(
-                "UPDATE source_runs SET status='success', finished_at=? WHERE id=?",
+                "UPDATE source_runs SET status='success', finished_at=%s WHERE id=%s",
                 (_now(), source_run_id),
             )
 
@@ -157,7 +163,7 @@ def run_source_pipeline(connector, batch_id: str):
     except Exception as e:
         with get_conn() as conn:
             conn.execute(
-                "UPDATE source_runs SET status='failed', finished_at=?, error_message=? WHERE id=?",
+                "UPDATE source_runs SET status='failed', finished_at=%s, error_message=%s WHERE id=%s",
                 (_now(), str(e), source_run_id),
             )
         return RunResult(source_run_id, platform, account_key, "failed", str(e))

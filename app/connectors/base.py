@@ -36,7 +36,7 @@ class BaseConnector(ABC):
             original_currency, price_source (optional)
         """
 
-    def run(self, batch_id: str) -> RunResult:
+    def run(self, batch_id: str, user_id: str) -> RunResult:
         """Full pipeline: authenticate → fetch → store raw → parse → snapshot."""
         from app.ingest.pipeline import run_source_pipeline
-        return run_source_pipeline(self, batch_id)
+        return run_source_pipeline(self, batch_id, user_id)

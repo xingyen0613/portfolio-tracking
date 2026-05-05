@@ -11,6 +11,7 @@ scripts/*
 !scripts/yuanta_*.py
 !scripts/fetch_benchmarks.py
 !scripts/zero_out_firsttrade.py
+!scripts/migrate_sqlite_to_pg.py
 .venv/
 data/
 __pycache__/

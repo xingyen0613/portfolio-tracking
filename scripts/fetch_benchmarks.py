@@ -8,14 +8,15 @@ Usage:
 """
 
 import argparse
-import sqlite3
+import sys
 from datetime import date, timedelta
-
 from pathlib import Path
 
 import yfinance as yf
 
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "sqlite" / "portfolio.db"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from config.db import get_conn
 
 TICKERS = {
     "^GSPC": "S&P 500",
@@ -32,9 +33,8 @@ def fetch_and_store(ticker: str, start: str, end: str) -> int:
     if df.empty:
         return 0
 
-    # Flatten MultiIndex columns if present
-    if isinstance(df.columns, type(df.columns)) and hasattr(df.columns, 'levels'):
-        df.columns = df.columns.droplevel(1) if df.columns.nlevels > 1 else df.columns
+    if hasattr(df.columns, 'levels') and df.columns.nlevels > 1:
+        df.columns = df.columns.droplevel(1)
 
     rows = []
     for dt, row in df.iterrows():
@@ -48,31 +48,33 @@ def fetch_and_store(ticker: str, start: str, end: str) -> int:
             float(row.get("Close", row.get("close", 0)) or 0),
         ))
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_conn() as conn:
         conn.executemany(
-            "INSERT OR REPLACE INTO benchmark_prices (date, ticker, open, high, low, close) VALUES (?,?,?,?,?,?)",
+            """INSERT INTO benchmark_prices (date, ticker, open, high, low, close)
+               VALUES (%s,%s,%s,%s,%s,%s)
+               ON CONFLICT (date, ticker) DO UPDATE SET
+                 open=EXCLUDED.open, high=EXCLUDED.high,
+                 low=EXCLUDED.low, close=EXCLUDED.close""",
             rows,
         )
     return len(rows)
 
 
 def get_latest_date(ticker: str) -> str | None:
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_conn() as conn:
         row = conn.execute(
-            "SELECT MAX(date) FROM benchmark_prices WHERE ticker = ?", (ticker,)
+            "SELECT MAX(date) FROM benchmark_prices WHERE ticker = %s", (ticker,)
         ).fetchone()
-    return row[0] if row else None
+    return row["max"] if row else None
 
 
 def main(start: str | None = None):
-    # yfinance end is exclusive, so use tomorrow to include today's data
     end = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
     today = date.today().strftime("%Y-%m-%d")
 
     for ticker, name in TICKERS.items():
         latest = get_latest_date(ticker)
         if latest is not None and not start:
-            # Incremental: start from day after latest stored date
             fetch_start = (date.fromisoformat(latest) + timedelta(days=1)).strftime("%Y-%m-%d")
         else:
             fetch_start = start or DEFAULT_START

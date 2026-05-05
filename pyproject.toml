@@ -7,6 +7,8 @@ requires-python = ">=3.11"
 dependencies = [
     "ccxt>=4.5.48",
     "pandas>=3.0.2",
+    "psycopg2-binary>=2.9.9",
+    "alembic>=1.14",
     "pydantic>=2.12.5",
     "python-dotenv>=1.2.2",
     "plaid-python==29.0.0",

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).parent.parent
@@ -43,3 +44,12 @@ CATEGORY_LABEL = {
 
 # Exchange rate (TWD per USD) — hardcoded until live FX API is added
 TWD_PER_USD: float = 31.5
+
+# PostgreSQL connection (production & local Docker)
+DATABASE_URL: str = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://portfolio:portfolio_dev@localhost:5432/portfolio",
+)
+
+# Fixed UUID for the system owner (developer's data before multi-user launch)
+SYSTEM_OWNER_ID = "00000000-0000-0000-0000-000000000001"

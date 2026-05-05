@@ -18,7 +18,8 @@ from dotenv import load_dotenv
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
 
-from app.storage.sqlite import get_conn, init_db
+from config.db import get_conn
+from app.storage.sqlite import init_db
 from config.settings import ENABLED_PLATFORMS, ENV_PATH, PLATFORM_CATEGORY, WALLETS_ENV_PATH
 
 load_dotenv(ENV_PATH)
@@ -78,36 +79,35 @@ def _get_connectors(platform: str) -> list:
     raise ValueError(f"Unknown platform: {platform}")
 
 
-def _ensure_sui_accounts(addresses: list[str]) -> None:
+def _ensure_sui_accounts(addresses: list[str], user_id: str) -> None:
     """Ensure each SUI wallet address has an account record in DB."""
-    from app.storage.sqlite import get_conn
     for addr in addresses:
         account_key = addr[:10] if len(addr) >= 10 else addr
         with get_conn() as conn:
             conn.execute(
-                """INSERT OR IGNORE INTO accounts (platform_id, account_key, label)
-                   SELECT id, ?, ? FROM platforms WHERE name = 'sui_wallet'""",
-                (account_key, addr),
+                """INSERT INTO accounts (platform_id, account_key, label, user_id)
+                   SELECT id, %s, %s, %s FROM platforms WHERE name = 'sui_wallet'
+                   ON CONFLICT (platform_id, account_key, user_id) DO NOTHING""",
+                (account_key, addr, user_id),
             )
 
 
-def _ensure_sol_accounts(addresses: list[str]) -> None:
+def _ensure_sol_accounts(addresses: list[str], user_id: str) -> None:
     """Ensure each Solana wallet address has an account record in DB."""
-    from app.storage.sqlite import get_conn
     for addr in addresses:
         account_key = addr[:10] if len(addr) >= 10 else addr
         with get_conn() as conn:
             conn.execute(
-                """INSERT OR IGNORE INTO accounts (platform_id, account_key, label)
-                   SELECT id, ?, ? FROM platforms WHERE name = 'sol_wallet'""",
-                (account_key, addr),
+                """INSERT INTO accounts (platform_id, account_key, label, user_id)
+                   SELECT id, %s, %s, %s FROM platforms WHERE name = 'sol_wallet'
+                   ON CONFLICT (platform_id, account_key, user_id) DO NOTHING""",
+                (account_key, addr, user_id),
             )
 
 
-def _ensure_evm_accounts(addresses: list[str], chains: list[str]) -> None:
+def _ensure_evm_accounts(addresses: list[str], chains: list[str], user_id: str) -> None:
     """Ensure one account record per (address, chain) exists under evm_wallet platform."""
     from app.connectors.evm_wallet_connector import CHAIN_CONFIG
-    from app.storage.sqlite import get_conn
     for addr in addresses:
         addr_lower = addr.lower()
         for chain in chains:
@@ -117,13 +117,14 @@ def _ensure_evm_accounts(addresses: list[str], chains: list[str]) -> None:
             label = f"{addr} ({chain})"
             with get_conn() as conn:
                 conn.execute(
-                    """INSERT OR IGNORE INTO accounts (platform_id, account_key, label)
-                       SELECT id, ?, ? FROM platforms WHERE name = 'evm_wallet'""",
-                    (account_key, label),
+                    """INSERT INTO accounts (platform_id, account_key, label, user_id)
+                       SELECT id, %s, %s, %s FROM platforms WHERE name = 'evm_wallet'
+                       ON CONFLICT (platform_id, account_key, user_id) DO NOTHING""",
+                    (account_key, label, user_id),
                 )
 
 
-def _aggregate_categories(batch_id: str) -> None:
+def _aggregate_categories(batch_id: str, user_id: str) -> None:
     """After all source runs finish, write category totals to category_snapshots.
 
     For each date touched by this batch, computes the category total using each
@@ -139,11 +140,11 @@ def _aggregate_categories(batch_id: str) -> None:
         dates_rows = conn.execute("""
             SELECT DISTINCT acs.snapshot_date
             FROM account_snapshots acs
-            WHERE acs.batch_id = ?
+            WHERE acs.batch_id = %s
               AND acs.total_value IS NOT NULL
         """, (batch_id,)).fetchall()
 
-    dates = [row[0] for row in dates_rows]
+    dates = [row["snapshot_date"] for row in dates_rows]
     if not dates:
         return
 
@@ -166,7 +167,7 @@ def _aggregate_categories(batch_id: str) -> None:
                       FROM account_snapshots acs2
                       JOIN accounts a2 ON acs2.account_id = a2.id
                       WHERE a2.platform_id = a.platform_id
-                        AND acs2.snapshot_date <= ?
+                        AND acs2.snapshot_date <= %s
                         AND acs2.total_value IS NOT NULL
                         AND acs2.currency = 'USD'
                   )
@@ -181,23 +182,23 @@ def _aggregate_categories(batch_id: str) -> None:
             """, (snapshot_date,)).fetchall()
 
             grouped: dict[str, float] = defaultdict(float)
-            for pname, total_value in platform_values:
-                cat = PLATFORM_CATEGORY.get(pname)
+            for row in platform_values:
+                cat = PLATFORM_CATEGORY.get(row["name"])
                 if cat:
-                    grouped[cat] += total_value or 0.0
+                    grouped[cat] += row["total_value"] or 0.0
 
             for category, total_value in grouped.items():
-                existing = conn.execute(
-                    "SELECT source FROM category_snapshots WHERE snapshot_date=? AND category=?",
-                    (snapshot_date, category),
-                ).fetchone()
-                if existing and existing[0] == "manual":
-                    continue
                 conn.execute(
-                    """INSERT OR REPLACE INTO category_snapshots
-                       (id, snapshot_date, category, total_value, currency, source, batch_id, created_at)
-                       VALUES (?,?,?,?,?,?,?,?)""",
-                    (str(uuid.uuid4()), snapshot_date, category, total_value, "USD", "auto", batch_id, now),
+                    """INSERT INTO category_snapshots
+                       (id, snapshot_date, category, total_value, currency, source, batch_id, created_at, user_id)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                       ON CONFLICT (snapshot_date, category, user_id) DO UPDATE SET
+                         total_value=EXCLUDED.total_value,
+                         source=EXCLUDED.source,
+                         batch_id=EXCLUDED.batch_id,
+                         created_at=EXCLUDED.created_at
+                       WHERE category_snapshots.source <> 'manual'""",
+                    (str(uuid.uuid4()), snapshot_date, category, total_value, "USD", "auto", batch_id, now, user_id),
                 )
                 written += 1
 
@@ -205,6 +206,9 @@ def _aggregate_categories(batch_id: str) -> None:
 
 
 def run_batch(platforms: list[str]) -> None:
+    from config.settings import SYSTEM_OWNER_ID
+    user_id = SYSTEM_OWNER_ID
+
     init_db()
 
     # Ensure wallet accounts exist in DB if needed
@@ -212,19 +216,19 @@ def run_batch(platforms: list[str]) -> None:
         addresses_raw = os.environ.get("SOL_WALLET_ADDRESSES", "")
         addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
         if addresses:
-            _ensure_sol_accounts(addresses)
+            _ensure_sol_accounts(addresses, user_id)
     if "sui_wallet" in platforms:
         addresses_raw = os.environ.get("SUI_WALLET_ADDRESSES", "")
         addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
         if addresses:
-            _ensure_sui_accounts(addresses)
+            _ensure_sui_accounts(addresses, user_id)
     if "evm_wallet" in platforms:
         addresses_raw = os.environ.get("EVM_WALLET_ADDRESSES", "")
         addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
         chains_raw = os.environ.get("EVM_CHAINS", "ethereum")
         chains = [c.strip() for c in chains_raw.split(",") if c.strip()]
         if addresses:
-            _ensure_evm_accounts(addresses, chains)
+            _ensure_evm_accounts(addresses, chains, user_id)
 
     batch_id = str(uuid.uuid4())
     started_at = _now()
@@ -233,8 +237,8 @@ def run_batch(platforms: list[str]) -> None:
 
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO batches (id, started_at, status) VALUES (?,?,?)",
-            (batch_id, started_at, "running"),
+            "INSERT INTO batches (id, started_at, status, user_id) VALUES (%s,%s,%s,%s)",
+            (batch_id, started_at, "running", user_id),
         )
 
     results = []
@@ -249,7 +253,7 @@ def run_batch(platforms: list[str]) -> None:
             label = f"{platform}/{connector.account_key}"
             print(f"  → [{label}] Fetching...")
             try:
-                result = connector.run(batch_id)
+                result = connector.run(batch_id, user_id)
                 results.append(result)
                 if result.status == "success":
                     print(f"  ✓ [{label}] Success")
@@ -271,12 +275,12 @@ def run_batch(platforms: list[str]) -> None:
 
     # Aggregate account_snapshots → category_snapshots
     if batch_status in ("success", "partial"):
-        _aggregate_categories(batch_id)
+        _aggregate_categories(batch_id, user_id)
 
     finished_at = _now()
     with get_conn() as conn:
         conn.execute(
-            "UPDATE batches SET status=?, finished_at=? WHERE id=?",
+            "UPDATE batches SET status=%s, finished_at=%s WHERE id=%s",
             (batch_status, finished_at, batch_id),
         )
 

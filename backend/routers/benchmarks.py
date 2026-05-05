@@ -1,9 +1,8 @@
-import sqlite3
 from typing import Any
 
 from fastapi import APIRouter, Query
 
-from config.settings import DB_PATH
+from config.db import get_conn
 
 router = APIRouter()
 
@@ -36,22 +35,22 @@ def get_benchmarks(
         return {"benchmarks": []}
 
     results = []
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_conn() as conn:
         for ticker in requested:
-            sql = "SELECT date, close FROM benchmark_prices WHERE ticker = ?"
+            sql = "SELECT date, close FROM benchmark_prices WHERE ticker = %s"
             params: list = [ticker]
             if start:
-                sql += " AND date >= ?"
+                sql += " AND date >= %s"
                 params.append(start)
             sql += " ORDER BY date"
-            rows = conn.execute(sql, params).fetchall()
+            rows = conn.execute(sql, tuple(params)).fetchall()
             if rows:
                 results.append({
                     "ticker": ticker,
                     "label": TICKER_LABELS.get(ticker, ticker),
                     "color": TICKER_COLORS.get(ticker, "#888"),
-                    "dates": [r[0] for r in rows],
-                    "closes": [r[1] for r in rows],
+                    "dates": [r["date"] for r in rows],
+                    "closes": [r["close"] for r in rows],
                 })
 
     return {"benchmarks": results}

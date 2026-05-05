@@ -1,28 +1,28 @@
 """
-Data access layer for the Streamlit dashboard.
-Reads from SQLite and returns aggregated DataFrames.
+Data access layer for the dashboard.
+Reads from PostgreSQL and returns aggregated DataFrames.
 """
 
 import json
-import sqlite3
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 
 from app.utils.fx import get_fx_rates_series, get_latest_fx_rate, lookup_rate
-from config.settings import DB_PATH, PLATFORM_CATEGORY, TWD_PER_USD
+from config.db import get_conn
+from config.settings import PLATFORM_CATEGORY, ROOT_DIR, TWD_PER_USD
 
+warnings.filterwarnings("ignore", "pandas only supports SQLAlchemy")
 
-def _conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+_YUANTA_DERIVED = ROOT_DIR / "data" / "derived" / "yuanta_poc"
+_YUANTA_RAW = ROOT_DIR / "data" / "raw" / "yuanta_poc"
 
 
 def get_latest_snapshot_date() -> str | None:
     """Return the most recent snapshot date that has holdings."""
-    with _conn() as conn:
+    with get_conn() as conn:
         row = conn.execute(
             "SELECT MAX(snapshot_date) AS d FROM normalized_holdings"
         ).fetchone()
@@ -68,8 +68,8 @@ def get_holdings() -> pd.DataFrame:
           )
         ORDER BY p.name, a.account_key, nh.value DESC NULLS LAST
     """
-    with _conn() as conn:
-        df = pd.read_sql_query(sql, conn)
+    with get_conn() as conn:
+        df = pd.read_sql_query(sql, conn.raw)
 
     df["category"] = df["platform"].map(PLATFORM_CATEGORY).fillna("unknown")
     df["value_usd"] = pd.to_numeric(df["value"], errors="coerce")
@@ -87,8 +87,8 @@ def get_snapshot_history() -> pd.DataFrame:
         FROM category_snapshots
         ORDER BY snapshot_date, category
     """
-    with _conn() as conn:
-        df = pd.read_sql_query(sql, conn)
+    with get_conn() as conn:
+        df = pd.read_sql_query(sql, conn.raw)
 
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     df["total_value"] = pd.to_numeric(df["total_value"], errors="coerce")
@@ -130,8 +130,8 @@ def get_crypto_platform_daily() -> pd.DataFrame:
         GROUP BY p.name, acs.snapshot_date
         ORDER BY acs.snapshot_date
     """
-    with _conn() as conn:
-        df = pd.read_sql_query(sql, conn)
+    with get_conn() as conn:
+        df = pd.read_sql_query(sql, conn.raw)
 
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
@@ -170,8 +170,8 @@ def get_crypto_symbol_breakdown() -> pd.DataFrame:
         GROUP BY nh.snapshot_date, nh.platform_symbol
         ORDER BY nh.snapshot_date, value_usd DESC
     """
-    with _conn() as conn:
-        df = pd.read_sql_query(sql, conn)
+    with get_conn() as conn:
+        df = pd.read_sql_query(sql, conn.raw)
     if not df.empty:
         df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
         df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
@@ -201,8 +201,8 @@ def get_us_stock_platform_daily() -> pd.DataFrame:
         GROUP BY p.name, acs.snapshot_date
         ORDER BY acs.snapshot_date
     """
-    with _conn() as conn:
-        df = pd.read_sql_query(sql, conn)
+    with get_conn() as conn:
+        df = pd.read_sql_query(sql, conn.raw)
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
     return df
@@ -237,8 +237,8 @@ def get_us_stock_symbol_breakdown() -> pd.DataFrame:
         GROUP BY nh.snapshot_date, nh.platform_symbol
         ORDER BY nh.snapshot_date, value_usd DESC
     """
-    with _conn() as conn:
-        df = pd.read_sql_query(sql, conn)
+    with get_conn() as conn:
+        df = pd.read_sql_query(sql, conn.raw)
     if not df.empty:
         df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
         df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
@@ -251,12 +251,9 @@ def get_tw_stock_symbol_breakdown() -> pd.DataFrame:
     Source: daily_net_asset.json holdings_value (TWD per symbol).
     Only includes trading days where holdings_value is non-empty.
     """
-    project_root = Path(DB_PATH).parent.parent.parent
-    derived_dir = project_root / "data" / "derived" / "yuanta_poc"
-
     rates = get_fx_rates_series()
     rows = []
-    for na_file in sorted(derived_dir.glob("*/daily_net_asset.json")):
+    for na_file in sorted(_YUANTA_DERIVED.glob("*/daily_net_asset.json")):
         with open(na_file, encoding="utf-8") as f:
             data = json.load(f)
         for entry in data.get("daily", []):
@@ -304,8 +301,8 @@ def get_tw_stock_platform_daily() -> pd.DataFrame:
         GROUP BY p.name, acs.snapshot_date
         ORDER BY acs.snapshot_date
     """
-    with _conn() as conn:
-        df = pd.read_sql_query(sql, conn)
+    with get_conn() as conn:
+        df = pd.read_sql_query(sql, conn.raw)
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     df["total_twd"] = pd.to_numeric(df["total_twd"], errors="coerce")
 
@@ -334,7 +331,7 @@ def get_platform_latest_account_snapshot() -> dict[str, dict]:
             LIMIT 1
         )
     """
-    with _conn() as conn:
+    with get_conn() as conn:
         rows = conn.execute(sql).fetchall()
     result: dict[str, dict] = {}
     for row in rows:
@@ -365,8 +362,8 @@ def get_latest_category_totals() -> pd.DataFrame:
         )
           AND total_value > 0
     """
-    with _conn() as conn:
-        df = pd.read_sql_query(sql, conn)
+    with get_conn() as conn:
+        df = pd.read_sql_query(sql, conn.raw)
     df["total_value"] = pd.to_numeric(df["total_value"], errors="coerce")
     latest_rate = get_latest_fx_rate()
     df["value_usd"] = df.apply(
@@ -383,13 +380,8 @@ def get_yuanta_holdings_detail() -> dict:
     daily_net_asset.json (latest trading day values).
     Returns empty dict if no data available.
     """
-    project_root = Path(DB_PATH).parent.parent.parent
-    derived_dir = project_root / "data" / "derived" / "yuanta_poc"
-    raw_dir = project_root / "data" / "raw" / "yuanta_poc"
-
-    # Find latest month with daily_net_asset.json
     months = sorted(
-        [p.parent.name for p in derived_dir.glob("*/daily_net_asset.json")],
+        [p.parent.name for p in _YUANTA_DERIVED.glob("*/daily_net_asset.json")],
         reverse=True,
     )
     if not months:
@@ -397,8 +389,7 @@ def get_yuanta_holdings_detail() -> dict:
 
     latest_month = months[0]
 
-    # Latest non-null entry from daily_net_asset.json
-    with open(derived_dir / latest_month / "daily_net_asset.json", encoding="utf-8") as f:
+    with open(_YUANTA_DERIVED / latest_month / "daily_net_asset.json", encoding="utf-8") as f:
         na_data = json.load(f)
     latest_entry = next(
         (e for e in reversed(na_data["daily"]) if e.get("net_asset") is not None),
@@ -409,17 +400,16 @@ def get_yuanta_holdings_detail() -> dict:
 
     holdings_value = {k: float(v) for k, v in (latest_entry.get("holdings_value") or {}).items()}
 
-    # Name→symbol cache (for pledged holdings that have no symbol in PDF)
-    cache_path = derived_dir / "name_to_symbol_cache.json"
+    cache_path = _YUANTA_DERIVED / "name_to_symbol_cache.json"
     name_to_sym: dict[str, str] = {}
     if cache_path.exists():
         with open(cache_path, encoding="utf-8") as f:
             name_to_sym = json.load(f)
 
-    # parsed.json — owned vs pledged distinction (end-of-month snapshot)
     owned: list[dict] = []
     pledged: list[dict] = []
-    parsed_path = raw_dir / latest_month / "parsed.json"
+    parsed_path = _YUANTA_RAW / latest_month / "parsed.json"
+    parsed: dict = {}
     if parsed_path.exists():
         with open(parsed_path, encoding="utf-8") as f:
             parsed = json.load(f)
@@ -448,7 +438,7 @@ def get_yuanta_holdings_detail() -> dict:
     owned.sort(key=lambda x: x["value_twd"] or 0, reverse=True)
     pledged.sort(key=lambda x: x["value_twd"] or 0, reverse=True)
 
-    summary = parsed.get("summary", {}) if parsed_path.exists() else {}
+    summary = parsed.get("summary", {})
     return {
         "date": latest_entry["date"],
         "month": latest_month,
@@ -473,18 +463,22 @@ def get_yuanta_latest() -> dict:
         ORDER BY acs.snapshot_date DESC, acs.created_at DESC
         LIMIT 1
     """
-    with _conn() as conn:
+    with get_conn() as conn:
         row = conn.execute(sql).fetchone()
     if not row:
         return {}
-    return {"snapshot_date": row[0], "total_value": row[1], "currency": row[2]}
+    return {
+        "snapshot_date": row["snapshot_date"],
+        "total_value": row["total_value"],
+        "currency": row["currency"],
+    }
 
 
 def get_batch_info(batch_id: str) -> dict:
     """Return metadata for a batch."""
-    with _conn() as conn:
+    with get_conn() as conn:
         row = conn.execute(
-            "SELECT * FROM batches WHERE id = ?", (batch_id,)
+            "SELECT * FROM batches WHERE id = %s", (batch_id,)
         ).fetchone()
     if not row:
         return {}
