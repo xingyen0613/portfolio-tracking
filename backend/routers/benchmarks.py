@@ -1,7 +1,8 @@
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.auth.deps import get_current_user
 from config.db import get_conn
 
 router = APIRouter()
@@ -25,6 +26,7 @@ TICKER_COLORS = {
 def get_benchmarks(
     tickers: str = Query("^GSPC,0050.TW,BTC-USD"),
     start: str = Query(""),
+    _: dict = Depends(get_current_user),
 ) -> dict[str, Any]:
     """
     Return daily close prices for requested benchmark tickers.

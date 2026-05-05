@@ -2,8 +2,9 @@ from datetime import date
 from typing import Any
 
 import pandas as pd
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.auth.deps import get_current_user
 from app.dashboard.data import (
     get_snapshot_history,
     get_latest_category_totals,
@@ -42,8 +43,11 @@ def _build_pivot(df: pd.DataFrame) -> pd.DataFrame:
 # ── /api/portfolio/history ────────────────────────────────────────────────────
 
 @router.get("/history")
-def portfolio_history(window: str = Query("3M")) -> dict[str, Any]:
-    df = get_snapshot_history()
+def portfolio_history(
+    window: str = Query("3M"),
+    current_user: dict = Depends(get_current_user),
+) -> dict[str, Any]:
+    df = get_snapshot_history(current_user["id"])
     pivot = _build_pivot(df)
 
     days = WINDOW_DAYS.get(window)
@@ -63,8 +67,8 @@ def portfolio_history(window: str = Query("3M")) -> dict[str, Any]:
 # ── /api/portfolio/allocation ─────────────────────────────────────────────────
 
 @router.get("/allocation")
-def portfolio_allocation() -> dict[str, Any]:
-    cat_df = get_latest_category_totals()
+def portfolio_allocation(current_user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    cat_df = get_latest_category_totals(current_user["id"])
     total = float(cat_df["value_usd"].sum())
 
     categories = [
@@ -81,10 +85,14 @@ def portfolio_allocation() -> dict[str, Any]:
 
 
 @router.get("/allocation/{category}")
-def portfolio_allocation_drilldown(category: str) -> dict[str, Any]:
+def portfolio_allocation_drilldown(
+    category: str,
+    current_user: dict = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = current_user["id"]
     fetchers = {
-        "crypto":   get_crypto_symbol_breakdown,
-        "us_stock": get_us_stock_symbol_breakdown,
+        "crypto":   lambda: get_crypto_symbol_breakdown(user_id),
+        "us_stock": lambda: get_us_stock_symbol_breakdown(user_id),
         "tw_stock": get_tw_stock_symbol_breakdown,
     }
     label = CATEGORY_LABEL.get(category, category)
@@ -120,19 +128,23 @@ def portfolio_allocation_drilldown(category: str) -> dict[str, Any]:
 # which requires a server restart anyway.
 _breakdown_cache: dict[str, "pd.DataFrame"] = {}
 
-def _get_breakdown(category: str) -> "pd.DataFrame":
-    if category not in _breakdown_cache:
+def _get_breakdown(category: str, user_id: str) -> "pd.DataFrame":
+    cache_key = f"{user_id}:{category}"
+    if cache_key not in _breakdown_cache:
         fetcher = {
-            "crypto":   get_crypto_symbol_breakdown,
-            "us_stock": get_us_stock_symbol_breakdown,
+            "crypto":   lambda: get_crypto_symbol_breakdown(user_id),
+            "us_stock": lambda: get_us_stock_symbol_breakdown(user_id),
             "tw_stock": get_tw_stock_symbol_breakdown,
         }[category]
-        _breakdown_cache[category] = fetcher()
-    return _breakdown_cache[category]
+        _breakdown_cache[cache_key] = fetcher()
+    return _breakdown_cache[cache_key]
 
 
 @router.get("/snapshot")
-def portfolio_snapshot(date: str = Query(...)) -> dict[str, Any]:
+def portfolio_snapshot(
+    date: str = Query(...),
+    current_user: dict = Depends(get_current_user),
+) -> dict[str, Any]:
     """Symbol-level breakdown for each category on or before `date`."""
     try:
         target = pd.Timestamp(date)
@@ -141,7 +153,7 @@ def portfolio_snapshot(date: str = Query(...)) -> dict[str, Any]:
 
     result: dict[str, Any] = {}
     for category in ("crypto", "us_stock", "tw_stock"):
-        df = _get_breakdown(category)
+        df = _get_breakdown(category, current_user["id"])
         if df.empty:
             result[category] = {"actual_date": None, "items": []}
             continue
@@ -172,8 +184,11 @@ def portfolio_snapshot(date: str = Query(...)) -> dict[str, Any]:
 # ── /api/portfolio/metrics ────────────────────────────────────────────────────
 
 @router.get("/metrics")
-def portfolio_metrics(window: str = Query("YTD")) -> dict[str, Any]:
-    df = get_snapshot_history()
+def portfolio_metrics(
+    window: str = Query("YTD"),
+    current_user: dict = Depends(get_current_user),
+) -> dict[str, Any]:
+    df = get_snapshot_history(current_user["id"])
     pivot = _build_pivot(df)
 
     if window == "YTD":
@@ -194,8 +209,8 @@ def portfolio_metrics(window: str = Query("YTD")) -> dict[str, Any]:
 # ── /api/portfolio/meta ───────────────────────────────────────────────────────
 
 @router.get("/meta")
-def portfolio_meta() -> dict[str, Any]:
-    last_updated = get_latest_snapshot_date()
+def portfolio_meta(current_user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    last_updated = get_latest_snapshot_date(current_user["id"])
     return {
         "last_updated": last_updated,
         "usd_twd_rate": get_latest_fx_rate(),

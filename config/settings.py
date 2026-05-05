@@ -53,3 +53,9 @@ DATABASE_URL: str = os.environ.get(
 
 # Fixed UUID for the system owner (developer's data before multi-user launch)
 SYSTEM_OWNER_ID = "00000000-0000-0000-0000-000000000001"
+
+# Auth
+GOOGLE_CLIENT_ID: str = os.environ.get("GOOGLE_CLIENT_ID", "")
+JWT_SECRET: str = os.environ.get("JWT_SECRET", "dev-secret-change-in-prod")
+JWT_EXPIRE_DAYS: int = 30
+OWNER_GOOGLE_EMAIL: str = os.environ.get("OWNER_GOOGLE_EMAIL", "")

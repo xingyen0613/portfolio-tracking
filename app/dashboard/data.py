@@ -20,16 +20,17 @@ _YUANTA_DERIVED = ROOT_DIR / "data" / "derived" / "yuanta_poc"
 _YUANTA_RAW = ROOT_DIR / "data" / "raw" / "yuanta_poc"
 
 
-def get_latest_snapshot_date() -> str | None:
+def get_latest_snapshot_date(user_id: str) -> str | None:
     """Return the most recent snapshot date that has holdings."""
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT MAX(snapshot_date) AS d FROM normalized_holdings"
+            "SELECT MAX(snapshot_date) AS d FROM normalized_holdings WHERE user_id = %s",
+            (user_id,),
         ).fetchone()
     return row["d"] if row else None
 
 
-def get_holdings() -> pd.DataFrame:
+def get_holdings(user_id: str) -> pd.DataFrame:
     """
     Return the latest holdings per account.
     For each account, picks the most recent successful source_run
@@ -58,6 +59,7 @@ def get_holdings() -> pd.DataFrame:
         JOIN accounts a     ON sr.account_id = a.id
         JOIN platforms p    ON a.platform_id = p.id
         WHERE sr.status = 'success'
+          AND a.user_id = %s
           AND sr.id IN (
               SELECT sr2.id FROM source_runs sr2
               WHERE sr2.account_id = a.id AND sr2.status = 'success'
@@ -69,7 +71,7 @@ def get_holdings() -> pd.DataFrame:
         ORDER BY p.name, a.account_key, nh.value DESC NULLS LAST
     """
     with get_conn() as conn:
-        df = pd.read_sql_query(sql, conn.raw)
+        df = pd.read_sql_query(sql, conn.raw, params=(user_id,))
 
     df["category"] = df["platform"].map(PLATFORM_CATEGORY).fillna("unknown")
     df["value_usd"] = pd.to_numeric(df["value"], errors="coerce")
@@ -77,7 +79,7 @@ def get_holdings() -> pd.DataFrame:
     return df
 
 
-def get_snapshot_history() -> pd.DataFrame:
+def get_snapshot_history(user_id: str) -> pd.DataFrame:
     """
     Return category-level daily totals from category_snapshots (materialized layer).
     Used for the time series chart.
@@ -85,10 +87,11 @@ def get_snapshot_history() -> pd.DataFrame:
     sql = """
         SELECT snapshot_date, category, total_value, currency, source
         FROM category_snapshots
+        WHERE user_id = %s
         ORDER BY snapshot_date, category
     """
     with get_conn() as conn:
-        df = pd.read_sql_query(sql, conn.raw)
+        df = pd.read_sql_query(sql, conn.raw, params=(user_id,))
 
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     df["total_value"] = pd.to_numeric(df["total_value"], errors="coerce")
@@ -103,7 +106,7 @@ def get_snapshot_history() -> pd.DataFrame:
     return df
 
 
-def get_crypto_platform_daily() -> pd.DataFrame:
+def get_crypto_platform_daily(user_id: str) -> pd.DataFrame:
     """
     Return per-date per-platform totals for crypto platforms.
     Used only for the hover breakdown in the 幣圈 line.
@@ -119,6 +122,7 @@ def get_crypto_platform_daily() -> pd.DataFrame:
         JOIN accounts a  ON acs.account_id = a.id
         JOIN platforms p ON a.platform_id = p.id
         WHERE acs.total_value IS NOT NULL
+          AND acs.user_id = %s
           AND p.name IN ('binance', 'okx', 'mexc', 'bybit', 'sui_wallet')
           AND acs.id = (
               SELECT id FROM account_snapshots
@@ -131,14 +135,14 @@ def get_crypto_platform_daily() -> pd.DataFrame:
         ORDER BY acs.snapshot_date
     """
     with get_conn() as conn:
-        df = pd.read_sql_query(sql, conn.raw)
+        df = pd.read_sql_query(sql, conn.raw, params=(user_id,))
 
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
     return df
 
 
-def get_crypto_symbol_breakdown() -> pd.DataFrame:
+def get_crypto_symbol_breakdown(user_id: str) -> pd.DataFrame:
     """
     Return per-date per-token breakdown for crypto platforms.
     Source: normalized_holdings (only available for dates with actual batch runs).
@@ -155,6 +159,7 @@ def get_crypto_symbol_breakdown() -> pd.DataFrame:
         JOIN platforms p    ON a.platform_id = p.id
         WHERE p.name IN ('binance', 'okx', 'mexc', 'bybit', 'sui_wallet')
           AND nh.value IS NOT NULL
+          AND nh.user_id = %s
           AND sr.status = 'success'
           AND sr.id = (
               SELECT sr2.id FROM source_runs sr2
@@ -171,14 +176,14 @@ def get_crypto_symbol_breakdown() -> pd.DataFrame:
         ORDER BY nh.snapshot_date, value_usd DESC
     """
     with get_conn() as conn:
-        df = pd.read_sql_query(sql, conn.raw)
+        df = pd.read_sql_query(sql, conn.raw, params=(user_id,))
     if not df.empty:
         df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
         df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
     return df
 
 
-def get_us_stock_platform_daily() -> pd.DataFrame:
+def get_us_stock_platform_daily(user_id: str) -> pd.DataFrame:
     """Per-date per-platform totals for us_stock (ibkr + firsttrade). Used for hover breakdown."""
     sql = """
         SELECT
@@ -189,6 +194,7 @@ def get_us_stock_platform_daily() -> pd.DataFrame:
         JOIN accounts a  ON acs.account_id = a.id
         JOIN platforms p ON a.platform_id = p.id
         WHERE acs.total_value IS NOT NULL
+          AND acs.user_id = %s
           AND p.name IN ('ibkr', 'firsttrade')
           AND acs.currency = 'USD'
           AND acs.id = (
@@ -202,13 +208,13 @@ def get_us_stock_platform_daily() -> pd.DataFrame:
         ORDER BY acs.snapshot_date
     """
     with get_conn() as conn:
-        df = pd.read_sql_query(sql, conn.raw)
+        df = pd.read_sql_query(sql, conn.raw, params=(user_id,))
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
     return df
 
 
-def get_us_stock_symbol_breakdown() -> pd.DataFrame:
+def get_us_stock_symbol_breakdown(user_id: str) -> pd.DataFrame:
     """Per-date per-stock breakdown for us_stock platforms. Only available on batch-run dates."""
     sql = """
         SELECT
@@ -222,6 +228,7 @@ def get_us_stock_symbol_breakdown() -> pd.DataFrame:
         WHERE p.name IN ('ibkr', 'firsttrade')
           AND nh.asset_type = 'stock'
           AND nh.value IS NOT NULL
+          AND nh.user_id = %s
           AND sr.status = 'success'
           AND sr.id = (
               SELECT sr2.id FROM source_runs sr2
@@ -238,7 +245,7 @@ def get_us_stock_symbol_breakdown() -> pd.DataFrame:
         ORDER BY nh.snapshot_date, value_usd DESC
     """
     with get_conn() as conn:
-        df = pd.read_sql_query(sql, conn.raw)
+        df = pd.read_sql_query(sql, conn.raw, params=(user_id,))
     if not df.empty:
         df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
         df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
@@ -278,7 +285,7 @@ def get_tw_stock_symbol_breakdown() -> pd.DataFrame:
     return df.sort_values(["snapshot_date", "value_usd"], ascending=[True, False])
 
 
-def get_tw_stock_platform_daily() -> pd.DataFrame:
+def get_tw_stock_platform_daily(user_id: str) -> pd.DataFrame:
     """Per-date per-platform totals for tw_stock (yuanta, extensible). Used for hover breakdown."""
     sql = """
         SELECT
@@ -289,6 +296,7 @@ def get_tw_stock_platform_daily() -> pd.DataFrame:
         JOIN accounts a  ON acs.account_id = a.id
         JOIN platforms p ON a.platform_id = p.id
         WHERE acs.total_value IS NOT NULL
+          AND acs.user_id = %s
           AND p.name IN ('yuanta')
           AND acs.currency = 'TWD'
           AND acs.id = (
@@ -302,7 +310,7 @@ def get_tw_stock_platform_daily() -> pd.DataFrame:
         ORDER BY acs.snapshot_date
     """
     with get_conn() as conn:
-        df = pd.read_sql_query(sql, conn.raw)
+        df = pd.read_sql_query(sql, conn.raw, params=(user_id,))
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     df["total_twd"] = pd.to_numeric(df["total_twd"], errors="coerce")
 
@@ -313,7 +321,7 @@ def get_tw_stock_platform_daily() -> pd.DataFrame:
     return df
 
 
-def get_platform_latest_account_snapshot() -> dict[str, dict]:
+def get_platform_latest_account_snapshot(user_id: str) -> dict[str, dict]:
     """
     Return the latest account_snapshot per platform (by snapshot_date, then created_at).
     Used to detect platforms that have been zeroed out more recently than their last holdings.
@@ -324,7 +332,8 @@ def get_platform_latest_account_snapshot() -> dict[str, dict]:
         FROM account_snapshots acs
         JOIN accounts a  ON acs.account_id = a.id
         JOIN platforms p ON a.platform_id = p.id
-        WHERE acs.id = (
+        WHERE acs.user_id = %s
+          AND acs.id = (
             SELECT id FROM account_snapshots
             WHERE account_id = acs.account_id
             ORDER BY snapshot_date DESC, created_at DESC
@@ -332,7 +341,7 @@ def get_platform_latest_account_snapshot() -> dict[str, dict]:
         )
     """
     with get_conn() as conn:
-        rows = conn.execute(sql).fetchall()
+        rows = conn.execute(sql, (user_id,)).fetchall()
     result: dict[str, dict] = {}
     for row in rows:
         platform = row["platform"]
@@ -346,24 +355,20 @@ def get_platform_latest_account_snapshot() -> dict[str, dict]:
     return result
 
 
-def get_latest_category_totals() -> pd.DataFrame:
+def get_latest_category_totals(user_id: str) -> pd.DataFrame:
     """
     Return the latest total value per category from category_snapshots.
     Used for the pie chart so all categories (crypto/tw_stock/us_stock) appear
     even if they don't have normalized_holdings (no connector yet).
     """
     sql = """
-        SELECT category, total_value, currency
+        SELECT DISTINCT ON (category) category, total_value, currency
         FROM category_snapshots
-        WHERE (category, snapshot_date) IN (
-            SELECT category, MAX(snapshot_date)
-            FROM category_snapshots
-            GROUP BY category
-        )
-          AND total_value > 0
+        WHERE user_id = %s AND total_value > 0
+        ORDER BY category, snapshot_date DESC
     """
     with get_conn() as conn:
-        df = pd.read_sql_query(sql, conn.raw)
+        df = pd.read_sql_query(sql, conn.raw, params=(user_id,))
     df["total_value"] = pd.to_numeric(df["total_value"], errors="coerce")
     latest_rate = get_latest_fx_rate()
     df["value_usd"] = df.apply(
@@ -451,7 +456,7 @@ def get_yuanta_holdings_detail() -> dict:
     }
 
 
-def get_yuanta_latest() -> dict:
+def get_yuanta_latest(user_id: str) -> dict:
     """Return the latest daily net_asset snapshot for yuanta from account_snapshots."""
     sql = """
         SELECT acs.snapshot_date, acs.total_value, acs.currency
@@ -459,12 +464,13 @@ def get_yuanta_latest() -> dict:
         JOIN accounts a  ON acs.account_id = a.id
         JOIN platforms p ON a.platform_id = p.id
         WHERE p.name = 'yuanta'
+          AND acs.user_id = %s
           AND acs.total_value IS NOT NULL
         ORDER BY acs.snapshot_date DESC, acs.created_at DESC
         LIMIT 1
     """
     with get_conn() as conn:
-        row = conn.execute(sql).fetchone()
+        row = conn.execute(sql, (user_id,)).fetchone()
     if not row:
         return {}
     return {

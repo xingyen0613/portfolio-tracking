@@ -1,7 +1,8 @@
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.auth.deps import get_current_user
 from app.dashboard.data import (
     get_holdings,
     get_latest_category_totals,
@@ -58,9 +59,10 @@ def _fmt_price(p: float | None, currency: str = "USD") -> str:
 
 
 @router.get("")
-def get_all_holdings() -> dict[str, Any]:
-    df = get_holdings()
-    cat_df = get_latest_category_totals()
+def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    user_id = current_user["id"]
+    df = get_holdings(user_id)
+    cat_df = get_latest_category_totals(user_id)
 
     # ── Summary stat cards ────────────────────────────────────────────────────
     total = float(cat_df["value_usd"].sum())

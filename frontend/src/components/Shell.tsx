@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 import HoldingsTab from './tabs/HoldingsTab'
 import AllocationTab from './tabs/AllocationTab'
 import TrendTab from './tabs/TrendTab'
@@ -11,6 +12,7 @@ const TABS = ['持倉明細', '資產配置', '資產走勢'] as const
 
 export default function Shell() {
   const [activeTab, setActiveTab] = useState<number>(2)
+  const { user, logout } = useAuth()
 
   const { data: meta } = useQuery<MetaData>({
     queryKey: ['portfolio/meta'],
@@ -54,6 +56,27 @@ export default function Shell() {
           <span style={{ color: 'var(--fg3)' }}>
             1 USD = {meta?.usd_twd_rate?.toFixed(2) ?? '--'} TWD
           </span>
+          {user && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
+              {user.picture && (
+                <img
+                  src={user.picture}
+                  alt={user.name}
+                  style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }}
+                />
+              )}
+              <span style={{ color: 'var(--fg2)', fontSize: 11 }}>{user.name || user.email}</span>
+              <span
+                onClick={logout}
+                style={{
+                  color: 'var(--fg3)', cursor: 'pointer', fontSize: 11,
+                  padding: '2px 7px', borderRadius: 4, border: '1px solid var(--bdr)',
+                }}
+              >
+                登出
+              </span>
+            </span>
+          )}
         </div>
       </div>
 
