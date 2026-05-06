@@ -52,14 +52,41 @@ Firsttrade 目前無 connector，持倉以手動方式寫入：直接 INSERT 進
 
 元大每月電子對帳單 PDF → 解析 → 日重建 → 收盤價抓取 → 每日淨資產 → 寫入主系統 DB
 
+每月 5 日 cron 自動執行。需要手動觸發時：
+
+```bash
+# 一鍵執行（自動判斷哪些月份需要處理、哪些步驟可以 skip）
+uv run python scripts/yuanta_run_pipeline.py
+
+# 指定月份
+uv run python scripts/yuanta_run_pipeline.py --month 2026-04
+
+# 強制重跑（忽略所有 checkpoint）
+uv run python scripts/yuanta_run_pipeline.py --force
+
+# 確認會跑哪些步驟（不真的執行）
+uv run python scripts/yuanta_run_pipeline.py --dry-run
 ```
-Gmail 下載 PDF          scripts/yuanta_gmail_poc.py --fetch --all
-PDF 解析                scripts/yuanta_pdf_parse_poc.py --batch
-日持股重建              scripts/yuanta_daily_reconstruct_poc.py --batch
-收盤價抓取（Yahoo）     scripts/yuanta_price_fetch_poc.py --batch
-每日淨資產計算          scripts/yuanta_net_asset_poc.py --batch
-寫入主系統 DB           scripts/yuanta_insert_poc.py --batch
+
+#### Gmail PDF 下載（手動）
+
+自動流程找不到 PDF 時，可以單獨觸發 Gmail 下載：
+
+```bash
+# 下載所有未下載的月份
+uv run python scripts/yuanta_gmail_poc.py --fetch --all
+
+# 只下載特定月份
+uv run python scripts/yuanta_gmail_poc.py --fetch --month 2026-04
+
+# 列出可下載的信件（不下載）
+uv run python scripts/yuanta_gmail_poc.py --list --all
 ```
+
+> **初次設定 Gmail OAuth**（只需做一次）：
+> 1. GCP Console → 啟用 Gmail API → 建立 OAuth 2.0 Desktop 憑證
+> 2. 下載 `credentials.json` → 放到 `.secrets/gmail_credentials.json`
+> 3. 執行 `uv run python scripts/yuanta_gmail_poc.py --auth` 完成瀏覽器授權
 
 - 收盤價只有交易日有值，非交易日 net_asset 存 `null`（不 forward-fill，留給前端處理）
 - 幣別：TWD（不換算 USD，category_snapshots tw_stock 亦以 TWD 儲存）

@@ -54,8 +54,13 @@ def authenticate():
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except Exception:
+                # Token revoked or invalid — delete and re-authenticate
+                TOKEN_FILE.unlink(missing_ok=True)
+                creds = None
+        if not creds or not creds.valid:
             flow = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS_FILE), SCOPES)
             creds = flow.run_local_server(port=0)
         SECRETS_DIR.mkdir(exist_ok=True)
@@ -214,6 +219,9 @@ def main() -> int:
 
     if args.all:
         after = None  # no time filter → full history
+    elif args.month:
+        # Search from the start of the specified month
+        after = f"{args.month[:4]}/{args.month[5:7]}/01"
     else:
         today = date.today()
         after = f"{today.year}/{today.month:02d}/01"
