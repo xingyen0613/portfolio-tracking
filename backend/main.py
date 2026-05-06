@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -5,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.utils.fx import ensure_updated
 from backend.routers import auth, benchmarks, holdings, portfolio
+
+_default_origins = "http://localhost:5173,http://127.0.0.1:5173"
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", _default_origins).split(",")
 
 
 @asynccontextmanager
@@ -17,7 +21,7 @@ app = FastAPI(title="Portfolio Tracking API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
