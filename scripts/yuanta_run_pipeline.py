@@ -12,7 +12,7 @@ Usage:
 """
 
 import argparse
-import sqlite3
+import os
 import subprocess
 import sys
 from datetime import date
@@ -20,12 +20,11 @@ from pathlib import Path
 from calendar import monthrange
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-RAW_DIR      = PROJECT_ROOT / "data" / "raw" / "yuanta_poc"
-DERIVED_DIR  = PROJECT_ROOT / "data" / "derived" / "yuanta_poc"
-DB_PATH      = PROJECT_ROOT / "data" / "sqlite" / "portfolio.db"
+RAW_DIR      = Path(os.environ.get("RAW_DATA_DIR",  str(PROJECT_ROOT / "data" / "raw")))  / "yuanta_poc"
+DERIVED_DIR  = Path(os.environ.get("DERIVED_DATA_DIR", str(PROJECT_ROOT / "data" / "derived"))) / "yuanta_poc"
 SCRIPTS_DIR  = PROJECT_ROOT / "scripts"
 
-YUANTA_ACCOUNT_ID = 4
+YUANTA_ACCOUNT_ID = 5  # PostgreSQL integer ID (yuanta account in accounts table)
 
 
 # ---------------------------------------------------------------------------
@@ -96,15 +95,21 @@ def _net_asset_exists(month: str) -> bool:
 
 
 def _in_db(month: str) -> bool:
-    if not DB_PATH.exists():
+    """Return True when normalized_holdings already contains tw_stock data for this month."""
+    try:
+        sys.path.insert(0, str(PROJECT_ROOT))
+        import config.settings  # triggers load_dotenv
+        from config.db import get_conn
+        with get_conn() as conn:
+            cur = conn.execute(
+                "SELECT COUNT(*) FROM normalized_holdings "
+                "WHERE asset_type = 'tw_stock' AND CAST(snapshot_date AS TEXT) LIKE %s",
+                (f"{month}-%",),
+            )
+            row = cur.fetchone()
+            return (row["count"] > 0) if row else False
+    except Exception:
         return False
-    with sqlite3.connect(DB_PATH) as conn:
-        count = conn.execute(
-            "SELECT COUNT(*) FROM account_snapshots "
-            "WHERE account_id = ? AND snapshot_date LIKE ? AND total_value IS NOT NULL",
-            (YUANTA_ACCOUNT_ID, f"{month}-%"),
-        ).fetchone()[0]
-    return count > 0
 
 
 # ---------------------------------------------------------------------------

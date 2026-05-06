@@ -1,39 +1,82 @@
 """
-Insert Yuanta PoC daily_net_asset.json into main system SQLite.
+Insert Yuanta monthly parsed data into PostgreSQL (Supabase).
 
-Reads:  data/derived/yuanta_poc/<YYYY-MM>/daily_net_asset.json
-Writes: account_snapshots (account_id=4, currency=TWD)
-        category_snapshots (tw_stock, currency=TWD) — replaces all existing rows
+For each month:
+  - Creates batch + source_run records
+  - Creates raw_payload (payload_json = parsed.json content)
+  - Writes normalized_holdings (per stock per trading day, shares > 0)
+  - Writes account_snapshots (daily total_value, TWD)
+  - Writes category_snapshots (tw_stock, TWD)
 
 Usage:
-  --batch       Insert all months found under data/derived/yuanta_poc/
-  --month YYYY-MM  Insert one month only
-  --dry-run     Print rows without writing to DB
+  uv run python scripts/yuanta_insert_poc.py --month YYYY-MM
+  uv run python scripts/yuanta_insert_poc.py --batch
+  uv run python scripts/yuanta_insert_poc.py --month YYYY-MM --dry-run
 """
 
 import argparse
+import hashlib
 import json
+import os
 import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DERIVED_DIR = PROJECT_ROOT / "data" / "derived" / "yuanta_poc"
-DB_PATH = PROJECT_ROOT / "data" / "sqlite" / "portfolio.db"
+DERIVED_DIR  = Path(os.environ.get("DERIVED_DATA_DIR", str(PROJECT_ROOT / "data" / "derived"))) / "yuanta_poc"
+RAW_DIR      = Path(os.environ.get("RAW_DATA_DIR",     str(PROJECT_ROOT / "data" / "raw")))     / "yuanta_poc"
 
-YUANTA_ACCOUNT_ID = 4
-CURRENCY = "TWD"
+CURRENCY       = "TWD"
+PARSER_VERSION = "1.0.0"
+YUANTA_ACCOUNT_ID = 5  # PostgreSQL integer ID
+
+sys.path.insert(0, str(PROJECT_ROOT))
+import config.settings  # triggers load_dotenv
+from config.db import get_conn
+from config.settings import SYSTEM_OWNER_ID, PLATFORM_CATEGORY
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# ---------------------------------------------------------------------------
+# Data loaders
+# ---------------------------------------------------------------------------
+
 def load_net_asset(month: str) -> list[dict]:
     path = DERIVED_DIR / month / "daily_net_asset.json"
     with open(path, encoding="utf-8") as f:
         return json.load(f)["daily"]
+
+
+def load_daily_holdings(month: str) -> list[dict]:
+    path = DERIVED_DIR / month / "daily_holdings.json"
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)["daily"]
+
+
+def load_prices(month: str) -> dict[str, dict[str, float]]:
+    """Return {date: {symbol: price_float}} for the month."""
+    path = DERIVED_DIR / "prices" / f"{month}.json"
+    try:
+        with open(path, encoding="utf-8") as f:
+            raw = json.load(f)["prices"]
+        return {
+            date_str: {sym: float(p) for sym, p in day_prices.items()}
+            for date_str, day_prices in raw.items()
+        }
+    except FileNotFoundError:
+        return {}
+
+
+def load_parsed_json(month: str) -> dict | None:
+    path = RAW_DIR / month / "parsed.json"
+    if not path.exists():
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
 
 
 def collect_months() -> list[str]:
@@ -44,149 +87,229 @@ def collect_months() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# DB helpers
-# ---------------------------------------------------------------------------
-
-def get_tw_stock_account_ids(conn) -> list[int]:
-    """Return all account_ids belonging to tw_stock platforms."""
-    sys.path.insert(0, str(PROJECT_ROOT))
-    from config.settings import PLATFORM_CATEGORY
-    tw_platforms = [name for name, cat in PLATFORM_CATEGORY.items() if cat == "tw_stock"]
-    rows = conn.execute(
-        f"SELECT a.id FROM accounts a JOIN platforms p ON a.platform_id = p.id "
-        f"WHERE p.name IN ({','.join('?' for _ in tw_platforms)})",
-        tw_platforms,
-    ).fetchall()
-    return [r[0] for r in rows]
-
-
-def compute_category_snapshots(conn, tw_account_ids: list[int]) -> dict[str, float]:
-    """
-    For each date that has tw_stock account data, return {date: total_value}.
-    Uses the latest non-null value per account per date (dedup by created_at).
-    Only includes dates where at least one account has a non-null value.
-    """
-    if not tw_account_ids:
-        return {}
-
-    placeholders = ",".join("?" for _ in tw_account_ids)
-    rows = conn.execute(f"""
-        SELECT acs.snapshot_date, SUM(acs.total_value)
-        FROM account_snapshots acs
-        WHERE acs.account_id IN ({placeholders})
-          AND acs.total_value IS NOT NULL
-          AND acs.id = (
-              SELECT id FROM account_snapshots
-              WHERE account_id = acs.account_id
-                AND snapshot_date = acs.snapshot_date
-                AND total_value IS NOT NULL
-              ORDER BY created_at DESC LIMIT 1
-          )
-        GROUP BY acs.snapshot_date
-        HAVING SUM(acs.total_value) IS NOT NULL
-        ORDER BY acs.snapshot_date
-    """, tw_account_ids).fetchall()
-    return {r[0]: r[1] for r in rows}
-
-
-# ---------------------------------------------------------------------------
 # Insert
 # ---------------------------------------------------------------------------
 
-def insert_months(months: list[str], dry_run: bool = False) -> None:
-    import sqlite3
-    conn = sqlite3.connect(DB_PATH)
+def _has_account_snapshots(month: str) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT COUNT(*) FROM account_snapshots "
+            "WHERE account_id = %s AND CAST(snapshot_date AS TEXT) LIKE %s",
+            (YUANTA_ACCOUNT_ID, f"{month}-%"),
+        )
+        row = cur.fetchone()
+        return (row["count"] > 0) if row else False
 
-    # Step 1: Create batch
-    batch_id = str(uuid.uuid4())
+
+def insert_months(months: list[str], dry_run: bool = False) -> None:
     now = _now()
+    batch_id = str(uuid.uuid4())
 
     if not dry_run:
-        conn.execute(
-            "INSERT INTO batches (id, started_at, finished_at, status) VALUES (?,?,?,?)",
-            (batch_id, now, now, "completed"),
-        )
+        with get_conn() as conn:
+            conn.execute(
+                "INSERT INTO batches (id, started_at, status, user_id) VALUES (%s,%s,%s,%s)",
+                (batch_id, now, "running", SYSTEM_OWNER_ID),
+            )
 
-    # Step 2: Insert account_snapshots
-    total_inserted = 0
-    total_null = 0
+    total_holdings = 0
+    total_snapshots = 0
 
     for month in months:
+        print(f"\n# --- {month} ---", file=sys.stderr)
+
+        # Load data
         try:
-            entries = load_net_asset(month)
+            net_asset_entries = load_net_asset(month)
         except FileNotFoundError:
             print(f"  WARN: no daily_net_asset.json for {month}, skipping", file=sys.stderr)
             continue
 
-        for entry in entries:
-            date = entry["date"]
-            raw = entry.get("net_asset")
-            total_value = float(raw) if raw is not None else None
+        try:
+            daily_holdings = load_daily_holdings(month)
+        except FileNotFoundError:
+            daily_holdings = []
 
-            if dry_run:
-                print(f"  [dry] account_snapshots account_id={YUANTA_ACCOUNT_ID} "
-                      f"date={date} value={total_value} currency={CURRENCY}")
-            else:
-                conn.execute(
-                    """INSERT INTO account_snapshots
-                       (id, batch_id, account_id, snapshot_date, total_value, currency, created_at)
-                       VALUES (?,?,?,?,?,?,?)""",
-                    (str(uuid.uuid4()), batch_id, YUANTA_ACCOUNT_ID,
-                     date, total_value, CURRENCY, now),
-                )
+        prices = load_prices(month)
+        parsed_json = load_parsed_json(month)
 
-            if total_value is None:
-                total_null += 1
-            else:
-                total_inserted += 1
-
-        print(f"  [{month}] {len(entries)} days processed", file=sys.stderr)
-
-    print(f"  account_snapshots: {total_inserted} non-null + {total_null} null rows",
-          file=sys.stderr)
-
-    # Step 3: Rebuild tw_stock category_snapshots
-    if not dry_run:
-        conn.execute("DELETE FROM category_snapshots WHERE category = 'tw_stock'")
-        print("  deleted all tw_stock category_snapshots", file=sys.stderr)
-
-    tw_account_ids = get_tw_stock_account_ids(conn) if not dry_run else [YUANTA_ACCOUNT_ID]
-
-    if not dry_run:
-        category_totals = compute_category_snapshots(conn, tw_account_ids)
-    else:
-        # For dry-run: compute from local JSON data
-        category_totals: dict[str, float] = {}
-        for month in months:
-            try:
-                entries = load_net_asset(month)
-            except FileNotFoundError:
-                continue
-            for entry in entries:
-                raw = entry.get("net_asset")
-                if raw is not None:
-                    category_totals[entry["date"]] = float(raw)
-
-    cat_inserted = 0
-    for date, total in sorted(category_totals.items()):
         if dry_run:
-            print(f"  [dry] category_snapshots date={date} tw_stock={total} currency={CURRENCY}")
-        else:
+            _dry_run_month(month, net_asset_entries, daily_holdings, prices)
+            continue
+
+        source_run_id = str(uuid.uuid4())
+
+        with get_conn() as conn:
             conn.execute(
-                """INSERT OR REPLACE INTO category_snapshots
-                   (id, snapshot_date, category, total_value, currency, source, batch_id, created_at)
-                   VALUES (?,?,?,?,?,?,?,?)""",
-                (str(uuid.uuid4()), date, "tw_stock", total, CURRENCY, "auto", batch_id, now),
+                "INSERT INTO source_runs (id, batch_id, account_id, started_at, status, user_id) VALUES (%s,%s,%s,%s,%s,%s)",
+                (source_run_id, batch_id, YUANTA_ACCOUNT_ID, now, "running", SYSTEM_OWNER_ID),
             )
-        cat_inserted += 1
 
-    print(f"  category_snapshots tw_stock: {cat_inserted} rows", file=sys.stderr)
+        # Create raw_payload from parsed.json (one per month = one per statement)
+        raw_payload_id = str(uuid.uuid4())
+        if parsed_json is not None:
+            file_path = str(RAW_DIR / month / "parsed.json")
+            content = json.dumps(parsed_json, ensure_ascii=False)
+            payload_hash = hashlib.sha256(content.encode()).hexdigest()
+        else:
+            file_path = f"yuanta_poc/{month}/parsed.json"
+            payload_hash = ""
 
-    if not dry_run:
-        conn.commit()
-        print(f"  batch_id: {batch_id}", file=sys.stderr)
+        with get_conn() as conn:
+            conn.execute(
+                """INSERT INTO raw_payloads
+                   (id, source_run_id, resource_type, file_path, payload_hash, fetched_at, parser_status, payload_json, user_id)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (raw_payload_id, source_run_id, "yuanta_parsed_statement",
+                 file_path, payload_hash, now, "parsed",
+                 json.dumps(parsed_json) if parsed_json else None,
+                 SYSTEM_OWNER_ID),
+            )
 
-    conn.close()
+        # normalized_holdings: per stock per trading day (shares > 0, price available)
+        holdings_written = 0
+        with get_conn() as conn:
+            for day in daily_holdings:
+                date_str = day["date"]
+                day_prices = prices.get(date_str, {})
+
+                for h in day.get("holdings", []):
+                    symbol = h.get("symbol")
+                    shares = h.get("shares", 0)
+                    if not symbol or shares <= 0:
+                        continue
+
+                    price = day_prices.get(symbol)
+                    value = round(shares * price, 2) if price is not None else None
+
+                    conn.execute(
+                        """INSERT INTO normalized_holdings
+                           (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
+                            asset_type, quantity, price, value, original_currency,
+                            price_source, snapshot_date, parser_version, chain, user_id)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (
+                            str(uuid.uuid4()), source_run_id, raw_payload_id,
+                            symbol, h.get("name"),
+                            "tw_stock",
+                            float(shares),
+                            price,
+                            value,
+                            CURRENCY,
+                            "historical" if price is not None else None,
+                            date_str,
+                            PARSER_VERSION,
+                            None,
+                            SYSTEM_OWNER_ID,
+                        ),
+                    )
+                    holdings_written += 1
+
+        total_holdings += holdings_written
+        print(f"  normalized_holdings: {holdings_written} rows", file=sys.stderr)
+
+        # account_snapshots: one per day — skip if migrated data already exists
+        if _has_account_snapshots(month):
+            print(f"  account_snapshots: skipped (data already exists)", file=sys.stderr)
+        else:
+            snapshots_written = 0
+            with get_conn() as conn:
+                for entry in net_asset_entries:
+                    date_str = entry["date"]
+                    raw = entry.get("net_asset")
+                    total_value = float(raw) if raw is not None else None
+
+                    conn.execute(
+                        """INSERT INTO account_snapshots
+                           (id, batch_id, account_id, snapshot_date, total_value, currency, created_at, user_id)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                           ON CONFLICT (account_id, snapshot_date, batch_id) DO NOTHING""",
+                        (str(uuid.uuid4()), batch_id, YUANTA_ACCOUNT_ID,
+                         date_str, total_value, CURRENCY, now, SYSTEM_OWNER_ID),
+                    )
+                    snapshots_written += 1
+            total_snapshots += snapshots_written
+            print(f"  account_snapshots: {snapshots_written} rows", file=sys.stderr)
+
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE source_runs SET status='success', finished_at=%s WHERE id=%s",
+                (now, source_run_id),
+            )
+
+    if dry_run:
+        return
+
+    # Rebuild tw_stock category_snapshots from account_snapshots
+    _rebuild_category_snapshots(batch_id, now)
+
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE batches SET status='success', finished_at=%s WHERE id=%s",
+            (now, batch_id),
+        )
+
+    print(f"\n# done — {total_holdings} normalized_holdings, {total_snapshots} account_snapshots", file=sys.stderr)
+    print(f"  batch_id: {batch_id}", file=sys.stderr)
+
+
+def _rebuild_category_snapshots(batch_id: str, now: str) -> None:
+    """Upsert tw_stock category_snapshots from all account_snapshots."""
+    tw_platforms = [name for name, cat in PLATFORM_CATEGORY.items() if cat == "tw_stock"]
+
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT acs.snapshot_date, SUM(acs.total_value) AS total_value
+            FROM account_snapshots acs
+            JOIN accounts a ON acs.account_id = a.id
+            JOIN platforms p ON a.platform_id = p.id
+            WHERE p.name = ANY(%s)
+              AND acs.total_value IS NOT NULL
+              AND acs.user_id = %s
+              AND acs.id = (
+                  SELECT id FROM account_snapshots
+                  WHERE account_id = acs.account_id
+                    AND snapshot_date = acs.snapshot_date
+                    AND total_value IS NOT NULL
+                  ORDER BY created_at DESC LIMIT 1
+              )
+            GROUP BY acs.snapshot_date
+            HAVING SUM(acs.total_value) IS NOT NULL
+            ORDER BY acs.snapshot_date
+        """, (tw_platforms, SYSTEM_OWNER_ID)).fetchall()
+
+        written = 0
+        for row in rows:
+            conn.execute(
+                """INSERT INTO category_snapshots
+                   (id, snapshot_date, category, total_value, currency, source, batch_id, created_at, user_id)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                   ON CONFLICT (snapshot_date, category, user_id) DO UPDATE SET
+                     total_value = EXCLUDED.total_value,
+                     source = EXCLUDED.source,
+                     batch_id = EXCLUDED.batch_id,
+                     created_at = EXCLUDED.created_at
+                   WHERE category_snapshots.source <> 'manual'""",
+                (str(uuid.uuid4()), row["snapshot_date"], "tw_stock",
+                 row["total_value"], CURRENCY, "auto", batch_id, now, SYSTEM_OWNER_ID),
+            )
+            written += 1
+
+    print(f"  category_snapshots tw_stock: {written} rows upserted", file=sys.stderr)
+
+
+def _dry_run_month(month: str, net_asset_entries: list, daily_holdings: list, prices: dict) -> None:
+    for entry in net_asset_entries[:3]:
+        print(f"  [dry] account_snapshots date={entry['date']} value={entry.get('net_asset')}")
+    print(f"  [dry] ... {len(net_asset_entries)} total days")
+
+    count = sum(
+        1
+        for day in daily_holdings
+        for h in day.get("holdings", [])
+        if h.get("symbol") and h.get("shares", 0) > 0 and prices.get(day["date"], {}).get(h["symbol"])
+    )
+    print(f"  [dry] normalized_holdings: ~{count} rows with price")
 
 
 # ---------------------------------------------------------------------------
@@ -194,9 +317,7 @@ def insert_months(months: list[str], dry_run: bool = False) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Insert Yuanta PoC net_asset data into main SQLite DB"
-    )
+    parser = argparse.ArgumentParser(description="Insert Yuanta data into PostgreSQL")
     parser.add_argument("--batch", action="store_true",
                         help="Insert all months under data/derived/yuanta_poc/")
     parser.add_argument("--month", help="Insert one month, e.g. 2026-03")
