@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import sys
 import uuid
@@ -30,20 +31,37 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _get_connectors(platform: str) -> list:
+def _get_credentials(user_id: str, platform_name: str) -> dict:
+    """Fetch decrypted credentials from user_connectors. Returns {} if not found."""
+    try:
+        from app.auth.encryption import decrypt
+        with get_conn() as conn:
+            cur = conn.execute(
+                "SELECT credentials_json FROM user_connectors WHERE user_id=%s AND platform_name=%s AND status='active'",
+                (user_id, platform_name),
+            )
+            row = cur.fetchone()
+        if row and row["credentials_json"]:
+            return json.loads(decrypt(row["credentials_json"]))
+    except Exception:
+        pass
+    return {}
+
+
+def _get_connectors(platform: str, credentials: dict) -> list:
     """Return list of connector instances for a platform (SUI = one per address)."""
     if platform == "binance":
         from app.connectors.binance_connector import BinanceConnector
-        return [BinanceConnector()]
+        return [BinanceConnector(credentials)]
     if platform == "okx":
         from app.connectors.okx_connector import OKXConnector
-        return [OKXConnector()]
+        return [OKXConnector(credentials)]
     if platform == "mexc":
         from app.connectors.mexc_connector import MexcConnector
-        return [MexcConnector()]
+        return [MexcConnector(credentials)]
     if platform == "bybit":
         from app.connectors.bybit_connector import BybitConnector
-        return [BybitConnector()]
+        return [BybitConnector(credentials)]
     if platform == "sui_wallet":
         from app.connectors.sui_wallet_connector import SuiWalletConnector
         addresses_raw = os.environ.get("SUI_WALLET_ADDRESSES", "")
@@ -53,9 +71,9 @@ def _get_connectors(platform: str) -> list:
         return [SuiWalletConnector(addr) for addr in addresses]
     if platform == "sol_wallet":
         from app.connectors.sol_wallet_connector import SolWalletConnector
-        api_key = os.environ.get("ALCHEMY_API_KEY", "")
+        api_key = credentials.get("api_key") or os.environ.get("ALCHEMY_API_KEY", "")
         if not api_key:
-            raise ValueError("ALCHEMY_API_KEY not set in .env")
+            raise ValueError("ALCHEMY_API_KEY not set")
         addresses_raw = os.environ.get("SOL_WALLET_ADDRESSES", "")
         addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
         if not addresses:
@@ -63,12 +81,12 @@ def _get_connectors(platform: str) -> list:
         return [SolWalletConnector(addr, api_key) for addr in addresses]
     if platform == "ibkr":
         from app.connectors.ibkr_connector import IBKRConnector
-        return [IBKRConnector()]
+        return [IBKRConnector(credentials)]
     if platform == "evm_wallet":
         from app.connectors.evm_wallet_connector import EVMWalletConnector
-        api_key = os.environ.get("ALCHEMY_API_KEY", "")
+        api_key = credentials.get("api_key") or os.environ.get("ALCHEMY_API_KEY", "")
         if not api_key:
-            raise ValueError("ALCHEMY_API_KEY not set in .env")
+            raise ValueError("ALCHEMY_API_KEY not set")
         addresses_raw = os.environ.get("EVM_WALLET_ADDRESSES", "")
         addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
         if not addresses:
@@ -244,7 +262,8 @@ def run_batch(platforms: list[str]) -> None:
     results = []
     for platform in platforms:
         try:
-            connectors = _get_connectors(platform)
+            credentials = _get_credentials(user_id, platform)
+            connectors = _get_connectors(platform, credentials)
         except Exception as e:
             print(f"  ✗ [{platform}] Setup error: {e}")
             continue

@@ -31,8 +31,8 @@ class BinanceConnector(BaseConnector):
 
     def authenticate(self) -> None:
         self._exchange = ccxt.binance({
-            "apiKey": os.environ["BINANCE_API_KEY"],
-            "secret": os.environ["BINANCE_API_SECRET"],
+            "apiKey": self._credentials.get("api_key") or os.environ["BINANCE_API_KEY"],
+            "secret": self._credentials.get("secret") or os.environ["BINANCE_API_SECRET"],
             "options": {"defaultType": "spot"},
         })
 

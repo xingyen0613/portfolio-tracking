@@ -31,8 +31,8 @@ class BybitConnector(BaseConnector):
 
     def authenticate(self) -> None:
         self._exchange = ccxt.bybit({
-            "apiKey": os.environ["BYBIT_API_KEY"],
-            "secret": os.environ["BYBIT_API_SECRET"],
+            "apiKey": self._credentials.get("api_key") or os.environ["BYBIT_API_KEY"],
+            "secret": self._credentials.get("secret") or os.environ["BYBIT_API_SECRET"],
         })
 
     def fetch_raw(self) -> list[dict]:

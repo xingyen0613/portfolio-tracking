@@ -31,8 +31,8 @@ class MexcConnector(BaseConnector):
 
     def authenticate(self) -> None:
         self._exchange = ccxt.mexc({
-            "apiKey": os.environ["MEXC_API_KEY"],
-            "secret": os.environ["MEXC_API_SECRET"],
+            "apiKey": self._credentials.get("api_key") or os.environ["MEXC_API_KEY"],
+            "secret": self._credentials.get("secret") or os.environ["MEXC_API_SECRET"],
         })
 
     def fetch_raw(self) -> list[dict]:

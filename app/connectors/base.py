@@ -16,6 +16,9 @@ class BaseConnector(ABC):
     account_key: str = "account_main"
     use_pricer: bool = True  # set False to skip market price enrichment
 
+    def __init__(self, credentials: dict | None = None):
+        self._credentials: dict = credentials or {}
+
     @abstractmethod
     def authenticate(self) -> None:
         """Load credentials and initialize API client."""

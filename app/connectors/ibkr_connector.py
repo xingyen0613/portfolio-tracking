@@ -22,8 +22,8 @@ class IBKRConnector(BaseConnector):
     use_pricer = False  # IBKR provides mark prices directly
 
     def authenticate(self) -> None:
-        self.token = os.getenv("IBKR_FLEX_TOKEN")
-        self.query_id = os.getenv("IBKR_FLEX_QUERY_ID")
+        self.token = self._credentials.get("flex_token") or os.getenv("IBKR_FLEX_TOKEN")
+        self.query_id = self._credentials.get("query_id") or os.getenv("IBKR_FLEX_QUERY_ID")
         if not self.token or not self.query_id:
             raise RuntimeError("IBKR_FLEX_TOKEN and IBKR_FLEX_QUERY_ID must be set")
 

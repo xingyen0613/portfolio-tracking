@@ -31,9 +31,9 @@ class OKXConnector(BaseConnector):
 
     def authenticate(self) -> None:
         self._exchange = ccxt.okx({
-            "apiKey": os.environ["OKX_API_KEY"],
-            "secret": os.environ["OKX_API_SECRET"],
-            "password": os.environ["OKX_PASSPHRASE"],
+            "apiKey": self._credentials.get("api_key") or os.environ["OKX_API_KEY"],
+            "secret": self._credentials.get("secret") or os.environ["OKX_API_SECRET"],
+            "password": self._credentials.get("passphrase") or os.environ["OKX_PASSPHRASE"],
         })
 
     def fetch_raw(self) -> list[dict]:

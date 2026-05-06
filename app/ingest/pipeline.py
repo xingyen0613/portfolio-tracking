@@ -1,12 +1,18 @@
 import hashlib
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from config.settings import PARSER_VERSION, RAW_DIR
+from config.settings import PARSER_VERSION, RAW_DIR as _DEFAULT_RAW_DIR
 from config.db import get_conn
 from app.storage.sqlite import get_account_id
+
+
+def _raw_dir() -> Path:
+    custom = os.environ.get("RAW_DATA_DIR")
+    return Path(custom) if custom else _DEFAULT_RAW_DIR
 
 
 def _now() -> str:
@@ -22,7 +28,7 @@ def _store_raw_file(batch_id: str, platform: str, account_key: str,
     """Write raw payload to filesystem. Returns (file_path, payload_hash)."""
     date_str = fetched_at[:10]  # YYYY-MM-DD
     ts = fetched_at.replace(":", "").replace("-", "").replace("+", "Z")[:15]
-    dir_path = RAW_DIR / date_str / f"batch_{batch_id[:8]}" / platform / account_key
+    dir_path = _raw_dir() / date_str / f"batch_{batch_id[:8]}" / platform / account_key
     dir_path.mkdir(parents=True, exist_ok=True)
     file_path = dir_path / f"{resource_type}_{ts}.json"
 
@@ -72,10 +78,11 @@ def run_source_pipeline(connector, batch_id: str, user_id: str):
             with get_conn() as conn:
                 conn.execute(
                     """INSERT INTO raw_payloads
-                       (id, source_run_id, resource_type, file_path, payload_hash, fetched_at, parser_status, user_id)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                       (id, source_run_id, resource_type, file_path, payload_hash, fetched_at, parser_status, payload_json, user_id)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                     (raw_payload_id, source_run_id, resource_type,
-                     file_path, payload_hash, fetched_at, "pending", user_id),
+                     file_path, payload_hash, fetched_at, "pending",
+                     json.dumps(payload), user_id),
                 )
             raw_payload_ids.append((raw_payload_id, item))
 
