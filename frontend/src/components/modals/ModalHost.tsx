@@ -1,14 +1,12 @@
 import type { ModalState } from '../../App'
+import AddSourceModal from './AddSourceModal'
+import ConnectSourceModal from './ConnectSourceModal'
 
 interface Props {
   modal: ModalState | null
   setModal: (m: ModalState | null) => void
 }
 
-/**
- * Slice 3 will populate this with AddSourceModal / ConnectSourceModal.
- * For now, just provide the backdrop infrastructure.
- */
 export default function ModalHost({ modal, setModal }: Props) {
   if (!modal) return null
   const close = () => setModal(null)
@@ -19,15 +17,21 @@ export default function ModalHost({ modal, setModal }: Props) {
         if (e.target === e.currentTarget) close()
       }}
     >
-      <div className="modal" style={{ padding: 20 }}>
-        <div className="modal-head">
-          <div>
-            <div className="modal-title">{modal.kind}</div>
-            <div className="modal-sub">Coming in Slice 3</div>
+      {modal.kind === 'addSource' && <AddSourceModal close={close} setModal={setModal} />}
+      {modal.kind === 'connect' && (
+        <ConnectSourceModal templateId={modal.templateId} close={close} setModal={setModal} />
+      )}
+      {modal.kind === 'editSource' && (
+        <div className="modal" style={{ padding: 20 }}>
+          <div className="modal-head">
+            <div className="modal-title">Edit source</div>
+            <button className="modal-close" onClick={close}>×</button>
           </div>
-          <button className="modal-close" onClick={close}>×</button>
+          <div className="modal-body" style={{ color: 'var(--fg-3)' }}>
+            Coming soon.
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

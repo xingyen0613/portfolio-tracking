@@ -15,7 +15,7 @@ scripts/*
 !scripts/migrate_local_pg_to_supabase.py
 !scripts/populate_user_connectors.py
 .venv/
-data/
+/data/
 __pycache__/
 *.pyc
 *.pyo
