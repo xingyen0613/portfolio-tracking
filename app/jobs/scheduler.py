@@ -20,6 +20,7 @@ from pathlib import Path
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR))
@@ -68,9 +69,17 @@ def run_daily_batch() -> None:
 
 
 def main() -> None:
+    import os
+    from datetime import datetime, timedelta, timezone as tz
     scheduler = BlockingScheduler(timezone="UTC")
     trigger = CronTrigger(hour=15, minute=30, timezone="UTC")
     scheduler.add_job(run_daily_batch, trigger, id="daily_batch", replace_existing=True)
+
+    # TEST ONLY: run once 30 seconds after startup — remove after verification
+    if os.environ.get("SCHEDULER_STARTUP_TEST") == "1":
+        run_at = datetime.now(tz.utc) + timedelta(seconds=30)
+        scheduler.add_job(run_daily_batch, DateTrigger(run_date=run_at), id="startup_test")
+        log.info("STARTUP TEST enabled — batch will run at %s", run_at.isoformat())
 
     log.info("Scheduler started. Daily batch fires at UTC 15:30 (Taiwan 23:30).")
 
