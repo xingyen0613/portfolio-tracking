@@ -64,11 +64,19 @@ def get_holdings(user_id: str) -> pd.DataFrame:
         JOIN platforms p    ON a.platform_id = p.id
         WHERE sr.status = 'success'
           AND a.user_id = %s
-          AND nh.snapshot_date = (
-              SELECT MAX(nh2.snapshot_date)
-              FROM normalized_holdings nh2
-              JOIN source_runs sr2 ON nh2.source_run_id = sr2.id
+          -- Pick only the latest source_run per account (avoids duplicates when
+          -- multiple batches ran the same day)
+          AND sr.id = (
+              SELECT sr2.id FROM source_runs sr2
               WHERE sr2.account_id = a.id AND sr2.status = 'success'
+                AND EXISTS (SELECT 1 FROM normalized_holdings WHERE source_run_id = sr2.id)
+              ORDER BY sr2.started_at DESC LIMIT 1
+          )
+          -- Within that source_run, only the latest snapshot_date (handles
+          -- yuanta which writes a whole month under one source_run)
+          AND nh.snapshot_date = (
+              SELECT MAX(snapshot_date) FROM normalized_holdings
+              WHERE source_run_id = nh.source_run_id
           )
         ORDER BY p.name, a.account_key, nh.value DESC NULLS LAST
     """

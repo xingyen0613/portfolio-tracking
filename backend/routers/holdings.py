@@ -1,5 +1,6 @@
 from typing import Any
 
+import pandas as pd
 from fastapi import APIRouter, Depends
 
 from app.auth.deps import get_current_user
@@ -87,9 +88,26 @@ def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str
         def _build_sections(sub_df) -> list[dict]:
             sections = []
             for asset_type, type_df in sub_df.groupby("asset_type"):
-                type_df = type_df.sort_values("value_usd", ascending=False)
+                # Aggregate by symbol within each asset_type. Connectors split a
+                # holding across resource_types (spot / earn / funding ...) but
+                # we don't surface that distinction; show one row per symbol.
+                agg = (
+                    type_df.groupby("platform_symbol", dropna=False)
+                    .agg(
+                        platform_asset_name=("platform_asset_name", "first"),
+                        quantity=("quantity", lambda s: pd.to_numeric(s, errors="coerce").sum()),
+                        price=("price", lambda s: pd.to_numeric(s, errors="coerce").dropna().iloc[0] if pd.to_numeric(s, errors="coerce").notna().any() else None),
+                        value_usd=("value_usd", "sum"),
+                    )
+                    .reset_index()
+                    .sort_values("value_usd", ascending=False)
+                )
                 rows = []
-                for _, row in type_df.iterrows():
+                for _, row in agg.iterrows():
+                    value_usd = round(float(row["value_usd"]), 2)
+                    # Filter out dust (< $5)
+                    if abs(value_usd) < 5:
+                        continue
                     try:
                         qty = float(row["quantity"]) if row["quantity"] is not None else 0.0
                     except (ValueError, TypeError):
@@ -103,13 +121,14 @@ def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str
                         "name":      str(row["platform_asset_name"] or ""),
                         "quantity":  _fmt_qty(qty),
                         "price":     _fmt_price(price),
-                        "value_usd": round(float(row["value_usd"]), 2),
+                        "value_usd": value_usd,
                     })
-                sections.append({
-                    "label":     ASSET_TYPE_LABEL.get(str(asset_type), str(asset_type)),
-                    "total_usd": round(float(type_df["value_usd"].sum()), 2),
-                    "rows":      rows,
-                })
+                if rows:
+                    sections.append({
+                        "label":     ASSET_TYPE_LABEL.get(str(asset_type), str(asset_type)),
+                        "total_usd": round(sum(r["value_usd"] for r in rows), 2),
+                        "rows":      rows,
+                    })
             sections.sort(key=lambda s: -abs(s["total_usd"]))
             return sections
 
@@ -155,53 +174,92 @@ def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str
                 "sections":  sections,
             })
 
-    # ── Yuanta from JSON ──────────────────────────────────────────────────────
+    # ── Yuanta: enrich with pledged + margin from parsed.json ─────────────────
     yuanta_detail = get_yuanta_holdings_detail()
-    if yuanta_detail and not any(p["name"] == "yuanta" for p in platforms):
+    if yuanta_detail:
         fx = get_latest_fx_rate()
-        net_asset_twd  = float(yuanta_detail.get("net_asset") or 0)
-        net_asset_usd  = round(net_asset_twd / fx, 2)
+        net_asset_twd = float(yuanta_detail.get("net_asset") or 0)
+        net_asset_usd = round(net_asset_twd / fx, 2)
 
-        owned_rows = [
-            {
-                "symbol":    h["symbol"],
+        pledged_rows = []
+        for h in yuanta_detail.get("pledged", []) or []:
+            shares = h.get("shares_balance") or 0
+            if shares <= 0:
+                continue
+            pledged_rows.append({
+                "symbol":    h.get("symbol") or "—",
                 "name":      h.get("name", ""),
-                "quantity":  f"{h['shares']:,} 股",
+                "quantity":  f"{int(shares):,} 股",
                 "price":     "—",
-                "value_usd": round((h["value_twd"] or 0) / fx, 2),
-            }
-            for h in yuanta_detail.get("owned", []) if h.get("shares", 0) > 0
-        ]
-
-        sections = []
-        if owned_rows:
-            sections.append({
-                "label":     "自有持股",
-                "total_usd": round(sum(r["value_usd"] for r in owned_rows), 2),
-                "rows":      owned_rows,
+                "value_usd": round(float(h.get("value_twd") or 0) / fx, 2),
             })
 
         margin_twd = float(yuanta_detail.get("margin_balance") or 0)
-        if margin_twd != 0:
-            sections.append({
-                "label":     "融資餘額",
-                "total_usd": round(-margin_twd / fx, 2),
-                "rows": [{
-                    "symbol":    "借貸",
-                    "name":      "融資借款",
-                    "quantity":  "—",
-                    "price":     "—",
-                    "value_usd": round(-margin_twd / fx, 2),
-                }],
-            })
+        margin_usd = round(-margin_twd / fx, 2) if margin_twd else 0
+        margin_rows = [{
+            "symbol":    "借款",
+            "name":      "融資借款",
+            "quantity":  "—",
+            "price":     "—",
+            "value_usd": margin_usd,
+        }] if margin_twd else []
 
-        platforms.append({
-            **PLATFORM_META["yuanta"],
-            "name":      "yuanta",
-            "category":  "tw_stock",
-            "total_usd": net_asset_usd,
-            "sections":  sections,
-        })
+        existing_yuanta = next((p for p in platforms if p["name"] == "yuanta"), None)
+        if existing_yuanta is not None:
+            # Enrich the DB-derived yuanta entry with pledged + margin sections
+            if pledged_rows:
+                existing_yuanta["sections"].append({
+                    "label":     "擔保品",
+                    "total_usd": round(sum(r["value_usd"] for r in pledged_rows), 2),
+                    "rows":      pledged_rows,
+                })
+            if margin_rows:
+                existing_yuanta["sections"].append({
+                    "label":     "融資負債",
+                    "total_usd": margin_usd,
+                    "rows":      margin_rows,
+                })
+            # Use parsed.json's net_asset as the platform total (covers owned + pledged − margin)
+            existing_yuanta["total_usd"] = net_asset_usd
+        else:
+            # No DB rows — build the whole platform from JSON only
+            owned_rows = [
+                {
+                    "symbol":    h["symbol"],
+                    "name":      h.get("name", ""),
+                    "quantity":  f"{h['shares']:,} 股",
+                    "price":     "—",
+                    "value_usd": round((h["value_twd"] or 0) / fx, 2),
+                }
+                for h in yuanta_detail.get("owned", []) if h.get("shares", 0) > 0
+            ]
+            sections = []
+            if owned_rows:
+                sections.append({
+                    "label":     "自有持股",
+                    "total_usd": round(sum(r["value_usd"] for r in owned_rows), 2),
+                    "rows":      owned_rows,
+                })
+            if pledged_rows:
+                sections.append({
+                    "label":     "擔保品",
+                    "total_usd": round(sum(r["value_usd"] for r in pledged_rows), 2),
+                    "rows":      pledged_rows,
+                })
+            if margin_rows:
+                sections.append({
+                    "label":     "融資負債",
+                    "total_usd": margin_usd,
+                    "rows":      margin_rows,
+                })
+
+            platforms.append({
+                **PLATFORM_META["yuanta"],
+                "name":      "yuanta",
+                "category":  "tw_stock",
+                "total_usd": net_asset_usd,
+                "sections":  sections,
+            })
 
     # ── 過濾掉已歸零平台，排序 ────────────────────────────────────────────────
     platforms = [p for p in platforms if p["total_usd"] != 0]

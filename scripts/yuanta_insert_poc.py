@@ -101,6 +101,20 @@ def _existing_snapshot_dates(month: str) -> set[str]:
         return {r["d"] for r in rows}
 
 
+def _existing_holdings_dates(month: str) -> set[str]:
+    """Return the set of yyyy-mm-dd strings that already have tw_stock normalized_holdings."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT DISTINCT CAST(nh.snapshot_date AS TEXT) AS d
+               FROM normalized_holdings nh
+               JOIN source_runs sr ON nh.source_run_id = sr.id
+               WHERE sr.account_id = %s AND nh.asset_type = 'tw_stock'
+                 AND CAST(nh.snapshot_date AS TEXT) LIKE %s""",
+            (YUANTA_ACCOUNT_ID, f"{month}-%"),
+        ).fetchall()
+        return {r["d"] for r in rows}
+
+
 def insert_months(months: list[str], dry_run: bool = False) -> None:
     now = _now()
     batch_id = str(uuid.uuid4())
@@ -167,10 +181,15 @@ def insert_months(months: list[str], dry_run: bool = False) -> None:
             )
 
         # normalized_holdings: per stock per trading day (shares > 0, price available)
+        existing_holding_dates = _existing_holdings_dates(month)
         holdings_written = 0
+        holdings_skipped_days = 0
         with get_conn() as conn:
             for day in daily_holdings:
                 date_str = day["date"]
+                if date_str in existing_holding_dates:
+                    holdings_skipped_days += 1
+                    continue
                 day_prices = prices.get(date_str, {})
 
                 for h in day.get("holdings", []):
@@ -206,7 +225,10 @@ def insert_months(months: list[str], dry_run: bool = False) -> None:
                     holdings_written += 1
 
         total_holdings += holdings_written
-        print(f"  normalized_holdings: {holdings_written} rows", file=sys.stderr)
+        msg = f"  normalized_holdings: {holdings_written} rows"
+        if holdings_skipped_days:
+            msg += f" ({holdings_skipped_days} days skipped, already existed)"
+        print(msg, file=sys.stderr)
 
         # account_snapshots: one per day — skip days that already exist
         existing_dates = _existing_snapshot_dates(month)
