@@ -20,7 +20,6 @@ export default function AddSourceModal({ close, setModal }: Props) {
   const filtered = SOURCE_TEMPLATES.filter(t => cat === 'all' || t.category === cat)
 
   const handlePick = (t: SourceTemplate) => {
-    if (!t.implemented) return
     setModal({ kind: 'connect', templateId: t.id })
   }
 
@@ -56,12 +55,8 @@ export default function AddSourceModal({ close, setModal }: Props) {
             <button
               key={t.id}
               className="src-card"
-              disabled={!t.implemented}
               onClick={() => handlePick(t)}
-              style={{
-                opacity: t.implemented ? 1 : 0.55,
-                cursor: t.implemented ? 'pointer' : 'not-allowed',
-              }}
+              style={{ opacity: t.implemented ? 1 : 0.7 }}
             >
               <div
                 className="platform-abbr"
@@ -75,7 +70,7 @@ export default function AddSourceModal({ close, setModal }: Props) {
                   {t.implemented ? t.desc : (t.comingSoon ?? 'Coming soon')}
                 </div>
               </div>
-              {t.implemented && <Icon name="chevronR" />}
+              <Icon name="chevronR" />
             </button>
           ))}
         </div>
