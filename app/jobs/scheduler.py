@@ -73,7 +73,6 @@ def main() -> None:
     scheduler.add_job(run_daily_batch, trigger, id="daily_batch", replace_existing=True)
 
     log.info("Scheduler started. Daily batch fires at UTC 15:30 (Taiwan 23:30).")
-    log.info("Next run: %s", scheduler.get_jobs()[0].next_run_time)
 
     def _shutdown(signum, frame):
         log.info("Shutdown signal received, stopping scheduler.")
