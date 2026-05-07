@@ -1,38 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
+@import "./styles/v2.css";
 
+/* Backward-compat aliases for legacy components (Slice 2 migration window) */
 :root {
-  --bg:    #0d1117;
-  --surf:  #161b22;
-  --surf2: #1c2128;
-  --surf3: #21262d;
-  --bdr:   #30363d;
-  --bdr2:  #21262d;
-  --fg1:   #e6edf3;
-  --fg2:   #7d8590;
-  --fg3:   #484f58;
-  --blue:  #58a6ff;
-  --gold:  #d29922;
-  --green: #3fb950;
-  --red:   #f85149;
+  --fg1: var(--fg);
+  --fg2: var(--fg-2);
+  --fg3: var(--fg-3);
+  --bdr2: var(--bdr-2);
+  --surf2: var(--surf-2);
+  --surf3: var(--surf-3);
 
-  --c-total:    #58a6ff;
-  --c-crypto:   #d29922;
-  --c-us-stock: #f85149;
-  --c-tw-stock: #3fb950;
+  --blue: var(--accent);
+  --gold: var(--c-crypto);
+  --green: var(--c-pos);
+  --red: var(--c-neg);
+  --c-us-stock: var(--c-us);
+  --c-tw-stock: var(--c-tw);
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  background: var(--bg);
-  color: var(--fg1);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 13px;
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-}
-
-#root { height: 100vh; display: flex; flex-direction: column; }
-
-.mono { font-family: 'JetBrains Mono', monospace; }
+#root { min-height: 100vh; }

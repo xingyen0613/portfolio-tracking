@@ -1,8 +1,54 @@
+import { useEffect, useState } from 'react'
 import { useAuth } from './auth/AuthContext'
 import LoginPage from './pages/LoginPage'
-import Shell from './components/Shell'
+import Sidebar from './components/Sidebar'
+import Topbar from './components/Topbar'
+import ModalHost from './components/modals/ModalHost'
+import DashboardTab from './pages/DashboardTab'
+import SourcesTab from './pages/SourcesTab'
+import AlertsTab from './pages/AlertsTab'
+import SettingsTab from './pages/SettingsTab'
+
+export type Route = 'dashboard' | 'sources' | 'alerts' | 'settings'
+
+export type ModalState =
+  | { kind: 'addSource' }
+  | { kind: 'connect'; templateId: string }
+  | { kind: 'editSource'; connectorId: string }
+
+const ROUTE_KEY = 'pt_route'
+
+function isRoute(v: unknown): v is Route {
+  return v === 'dashboard' || v === 'sources' || v === 'alerts' || v === 'settings'
+}
 
 export default function App() {
   const { token } = useAuth()
-  return token ? <Shell /> : <LoginPage />
+  const [route, setRoute] = useState<Route>(() => {
+    const saved = localStorage.getItem(ROUTE_KEY)
+    return isRoute(saved) ? saved : 'dashboard'
+  })
+  const [modal, setModal] = useState<ModalState | null>(null)
+
+  useEffect(() => {
+    localStorage.setItem(ROUTE_KEY, route)
+  }, [route])
+
+  if (!token) return <LoginPage />
+
+  return (
+    <div className="app">
+      <Sidebar route={route} setRoute={setRoute} />
+      <main className="main">
+        <Topbar route={route} openModal={setModal} />
+        <div className="page">
+          {route === 'dashboard' && <DashboardTab openModal={setModal} />}
+          {route === 'sources' && <SourcesTab openModal={setModal} />}
+          {route === 'alerts' && <AlertsTab />}
+          {route === 'settings' && <SettingsTab />}
+        </div>
+      </main>
+      <ModalHost modal={modal} setModal={setModal} />
+    </div>
+  )
 }
