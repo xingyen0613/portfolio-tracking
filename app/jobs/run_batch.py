@@ -31,37 +31,62 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _get_credentials(user_id: str, platform_name: str) -> dict:
-    """Fetch decrypted credentials from user_connectors. Returns {} if not found."""
+def _get_user_connectors(user_id: str, platform_name: str) -> list[dict]:
+    """
+    Return all active user_connectors rows for (user_id, platform_name).
+
+    Each row: {id, account_key, label, credentials} (credentials decrypted dict).
+    """
+    from app.auth.encryption import decrypt
+    rows = []
     try:
-        from app.auth.encryption import decrypt
         with get_conn() as conn:
             cur = conn.execute(
-                "SELECT credentials_json FROM user_connectors WHERE user_id=%s AND platform_name=%s AND status='active'",
+                """SELECT id, account_key, label, credentials_json
+                   FROM user_connectors
+                   WHERE user_id=%s AND platform_name=%s AND status='active'
+                   ORDER BY created_at""",
                 (user_id, platform_name),
             )
-            row = cur.fetchone()
-        if row and row["credentials_json"]:
-            return json.loads(decrypt(row["credentials_json"]))
+            for row in cur.fetchall():
+                creds = {}
+                if row["credentials_json"]:
+                    try:
+                        creds = json.loads(decrypt(row["credentials_json"]))
+                    except Exception:
+                        pass
+                rows.append({
+                    "id": row["id"],
+                    "account_key": row["account_key"],
+                    "label": row["label"],
+                    "credentials": creds,
+                })
     except Exception:
         pass
-    return {}
+    return rows
 
 
-def _get_connectors(platform: str, credentials: dict) -> list:
-    """Return list of connector instances for a platform (SUI = one per address)."""
+def _instantiate_connectors(platform: str, credentials: dict, account_key: str) -> list:
+    """Return list of connector instances for a single user_connectors row.
+
+    Wallet platforms expand into multiple instances (one per address × chain).
+    Exchange/IBKR return a single instance carrying the user's account_key.
+    """
     if platform == "binance":
         from app.connectors.binance_connector import BinanceConnector
-        return [BinanceConnector(credentials)]
+        return [BinanceConnector(credentials, account_key=account_key)]
     if platform == "okx":
         from app.connectors.okx_connector import OKXConnector
-        return [OKXConnector(credentials)]
+        return [OKXConnector(credentials, account_key=account_key)]
     if platform == "mexc":
         from app.connectors.mexc_connector import MexcConnector
-        return [MexcConnector(credentials)]
+        return [MexcConnector(credentials, account_key=account_key)]
     if platform == "bybit":
         from app.connectors.bybit_connector import BybitConnector
-        return [BybitConnector(credentials)]
+        return [BybitConnector(credentials, account_key=account_key)]
+    if platform == "ibkr":
+        from app.connectors.ibkr_connector import IBKRConnector
+        return [IBKRConnector(credentials, account_key=account_key)]
     if platform == "sui_wallet":
         from app.connectors.sui_wallet_connector import SuiWalletConnector
         addresses_raw = os.environ.get("SUI_WALLET_ADDRESSES", "")
@@ -80,9 +105,6 @@ def _get_connectors(platform: str, credentials: dict) -> list:
         if not addresses:
             raise ValueError("SOL_WALLET_ADDRESSES not configured in user_connectors or env")
         return [SolWalletConnector(addr, api_key) for addr in addresses]
-    if platform == "ibkr":
-        from app.connectors.ibkr_connector import IBKRConnector
-        return [IBKRConnector(credentials)]
     if platform == "evm_wallet":
         from app.connectors.evm_wallet_connector import EVMWalletConnector
         api_key = credentials.get("api_key") or os.environ.get("ALCHEMY_API_KEY", "")
@@ -101,7 +123,6 @@ def _get_connectors(platform: str, credentials: dict) -> list:
 
 
 def _ensure_sui_accounts(addresses: list[str], user_id: str) -> None:
-    """Ensure each SUI wallet address has an account record in DB."""
     for addr in addresses:
         account_key = addr[:10] if len(addr) >= 10 else addr
         with get_conn() as conn:
@@ -114,7 +135,6 @@ def _ensure_sui_accounts(addresses: list[str], user_id: str) -> None:
 
 
 def _ensure_sol_accounts(addresses: list[str], user_id: str) -> None:
-    """Ensure each Solana wallet address has an account record in DB."""
     for addr in addresses:
         account_key = addr[:10] if len(addr) >= 10 else addr
         with get_conn() as conn:
@@ -127,7 +147,6 @@ def _ensure_sol_accounts(addresses: list[str], user_id: str) -> None:
 
 
 def _ensure_evm_accounts(addresses: list[str], chains: list[str], user_id: str) -> None:
-    """Ensure one account record per (address, chain) exists under evm_wallet platform."""
     from app.connectors.evm_wallet_connector import CHAIN_CONFIG
     for addr in addresses:
         addr_lower = addr.lower()
@@ -145,16 +164,19 @@ def _ensure_evm_accounts(addresses: list[str], chains: list[str], user_id: str) 
                 )
 
 
+def _ensure_exchange_or_ibkr_account(platform: str, account_key: str, label: str | None, user_id: str) -> None:
+    """For exchanges and IBKR, ensure the account row exists with the user-given key."""
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO accounts (platform_id, account_key, label, user_id)
+               SELECT id, %s, %s, %s FROM platforms WHERE name = %s
+               ON CONFLICT (platform_id, account_key, user_id) DO NOTHING""",
+            (account_key, label, user_id, platform),
+        )
+
+
 def _aggregate_categories(batch_id: str, user_id: str) -> None:
-    """After all source runs finish, write category totals to category_snapshots.
-
-    For each date touched by this batch, computes the category total using each
-    platform's LATEST known value on or before that date — not just what this batch
-    captured.  This preserves the "carry-forward" behaviour when not all platforms
-    run on the same day (e.g. OKX monthly vs Binance daily).
-
-    Skips any (date, category) that already has source='manual'.
-    """
+    """After all source runs finish, write category totals to category_snapshots."""
     from collections import defaultdict
 
     with get_conn() as conn:
@@ -173,9 +195,6 @@ def _aggregate_categories(batch_id: str, user_id: str) -> None:
     written = 0
     with get_conn() as conn:
         for snapshot_date in dates:
-            # For each platform, get its latest total value on or before snapshot_date.
-            # Dedup: per account, take only the latest record on the resolved date
-            # to avoid double-counting when multiple batches ran on the same day.
             platform_values = conn.execute("""
                 SELECT p.name, SUM(acs.total_value) AS total_value
                 FROM account_snapshots acs
@@ -183,11 +202,13 @@ def _aggregate_categories(batch_id: str, user_id: str) -> None:
                 JOIN platforms p ON a.platform_id = p.id
                 WHERE acs.total_value IS NOT NULL
                   AND acs.currency = 'USD'
+                  AND acs.user_id = %s
                   AND acs.snapshot_date = (
                       SELECT MAX(acs2.snapshot_date)
                       FROM account_snapshots acs2
                       JOIN accounts a2 ON acs2.account_id = a2.id
                       WHERE a2.platform_id = a.platform_id
+                        AND acs2.user_id = %s
                         AND acs2.snapshot_date <= %s
                         AND acs2.total_value IS NOT NULL
                         AND acs2.currency = 'USD'
@@ -200,7 +221,7 @@ def _aggregate_categories(batch_id: str, user_id: str) -> None:
                       ORDER BY created_at DESC LIMIT 1
                   )
                 GROUP BY p.name
-            """, (snapshot_date,)).fetchall()
+            """, (user_id, user_id, snapshot_date)).fetchall()
 
             grouped: dict[str, float] = defaultdict(float)
             for row in platform_values:
@@ -226,39 +247,42 @@ def _aggregate_categories(batch_id: str, user_id: str) -> None:
     print(f"  [category_snapshots] Wrote {written} entries for batch {batch_id[:8]}")
 
 
-def run_batch(platforms: list[str]) -> None:
-    from config.settings import SYSTEM_OWNER_ID
-    user_id = SYSTEM_OWNER_ID
+def _update_connector_health(user_id: str, platform: str, account_key: str,
+                             ok: bool, error_msg: str | None) -> None:
+    """Update user_connectors with latest sync result."""
+    with get_conn() as conn:
+        if ok:
+            conn.execute(
+                """UPDATE user_connectors
+                   SET last_sync_at = NOW(), last_error = NULL, last_error_at = NULL
+                   WHERE user_id=%s AND platform_name=%s AND account_key=%s""",
+                (user_id, platform, account_key),
+            )
+        else:
+            conn.execute(
+                """UPDATE user_connectors
+                   SET last_error = %s, last_error_at = NOW()
+                   WHERE user_id=%s AND platform_name=%s AND account_key=%s""",
+                (error_msg, user_id, platform, account_key),
+            )
 
+
+def run_batch(platforms: list[str], user_id: str,
+              connector_ids: list[str] | None = None) -> str:
+    """
+    Run an ingestion batch for one user.
+
+    platforms: which platforms to run (filtered to whatever connectors the user actually has).
+    connector_ids: if specified, only run these specific user_connectors rows
+                   (used for single-connector immediate test-fetch after POST).
+
+    Returns batch_id.
+    """
     init_db()
-
-    # Ensure wallet accounts exist in DB if needed
-    if "sol_wallet" in platforms:
-        creds = _get_credentials(user_id, "sol_wallet")
-        addresses = creds.get("addresses") or [
-            a.strip() for a in os.environ.get("SOL_WALLET_ADDRESSES", "").split(",") if a.strip()
-        ]
-        if addresses:
-            _ensure_sol_accounts(addresses, user_id)
-    if "sui_wallet" in platforms:
-        addresses_raw = os.environ.get("SUI_WALLET_ADDRESSES", "")
-        addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
-        if addresses:
-            _ensure_sui_accounts(addresses, user_id)
-    if "evm_wallet" in platforms:
-        creds = _get_credentials(user_id, "evm_wallet")
-        addresses = creds.get("addresses") or [
-            a.strip() for a in os.environ.get("EVM_WALLET_ADDRESSES", "").split(",") if a.strip()
-        ]
-        chains = creds.get("chains") or [
-            c.strip() for c in os.environ.get("EVM_CHAINS", "ethereum").split(",") if c.strip()
-        ]
-        if addresses:
-            _ensure_evm_accounts(addresses, chains, user_id)
 
     batch_id = str(uuid.uuid4())
     started_at = _now()
-    print(f"\n[Batch {batch_id[:8]}] Starting — {started_at}")
+    print(f"\n[Batch {batch_id[:8]}] user={user_id[:8]} starting — {started_at}")
     print(f"Platforms: {', '.join(platforms)}\n")
 
     with get_conn() as conn:
@@ -268,26 +292,75 @@ def run_batch(platforms: list[str]) -> None:
         )
 
     results = []
+
     for platform in platforms:
-        try:
-            credentials = _get_credentials(user_id, platform)
-            connectors = _get_connectors(platform, credentials)
-        except Exception as e:
-            print(f"  ✗ [{platform}] Setup error: {e}")
+        connector_rows = _get_user_connectors(user_id, platform)
+        if connector_ids:
+            connector_rows = [r for r in connector_rows if r["id"] in connector_ids]
+        if not connector_rows:
             continue
 
-        for connector in connectors:
-            label = f"{platform}/{connector.account_key}"
-            print(f"  → [{label}] Fetching...")
+        for row in connector_rows:
+            account_key = row["account_key"]
+            label = row["label"]
+            creds = row["credentials"]
+
+            # Ensure accounts row exists for this connector
             try:
-                result = connector.run(batch_id, user_id)
-                results.append(result)
-                if result.status == "success":
-                    print(f"  ✓ [{label}] Success")
-                else:
-                    print(f"  ✗ [{label}] Failed: {result.error_message}")
+                if platform in ("binance", "okx", "mexc", "bybit", "ibkr"):
+                    _ensure_exchange_or_ibkr_account(platform, account_key, label, user_id)
+                elif platform == "sol_wallet":
+                    addresses = creds.get("addresses") or [
+                        a.strip() for a in os.environ.get("SOL_WALLET_ADDRESSES", "").split(",") if a.strip()
+                    ]
+                    if addresses:
+                        _ensure_sol_accounts(addresses, user_id)
+                elif platform == "evm_wallet":
+                    addresses = creds.get("addresses") or [
+                        a.strip() for a in os.environ.get("EVM_WALLET_ADDRESSES", "").split(",") if a.strip()
+                    ]
+                    chains = creds.get("chains") or [
+                        c.strip() for c in os.environ.get("EVM_CHAINS", "ethereum").split(",") if c.strip()
+                    ]
+                    if addresses:
+                        _ensure_evm_accounts(addresses, chains, user_id)
+                elif platform == "sui_wallet":
+                    addresses_raw = os.environ.get("SUI_WALLET_ADDRESSES", "")
+                    addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
+                    if addresses:
+                        _ensure_sui_accounts(addresses, user_id)
             except Exception as e:
-                print(f"  ✗ [{label}] Connector error: {e}")
+                print(f"  ✗ [{platform}/{account_key}] account setup error: {e}")
+
+            # Instantiate and run connector(s) for this row
+            try:
+                connectors = _instantiate_connectors(platform, creds, account_key)
+            except Exception as e:
+                msg = f"Setup error: {e}"
+                print(f"  ✗ [{platform}/{account_key}] {msg}")
+                _update_connector_health(user_id, platform, account_key, False, str(e))
+                continue
+
+            row_ok = True
+            row_err = None
+            for connector in connectors:
+                tag = f"{platform}/{connector.account_key}"
+                print(f"  → [{tag}] Fetching...")
+                try:
+                    result = connector.run(batch_id, user_id)
+                    results.append(result)
+                    if result.status == "success":
+                        print(f"  ✓ [{tag}] Success")
+                    else:
+                        print(f"  ✗ [{tag}] Failed: {result.error_message}")
+                        row_ok = False
+                        row_err = result.error_message
+                except Exception as e:
+                    print(f"  ✗ [{tag}] Connector error: {e}")
+                    row_ok = False
+                    row_err = str(e)
+
+            _update_connector_health(user_id, platform, account_key, row_ok, row_err)
 
     # Determine batch final status
     statuses = [r.status for r in results]
@@ -300,7 +373,6 @@ def run_batch(platforms: list[str]) -> None:
     else:
         batch_status = "failed"
 
-    # Aggregate account_snapshots → category_snapshots
     if batch_status in ("success", "partial"):
         _aggregate_categories(batch_id, user_id)
 
@@ -315,7 +387,7 @@ def run_batch(platforms: list[str]) -> None:
     success = sum(1 for r in results if r.status == "success")
     print(f"  {success}/{len(results)} source runs succeeded\n")
 
-    _fetch_benchmarks()
+    return batch_id
 
 
 def _fetch_benchmarks() -> None:
@@ -331,8 +403,11 @@ def _fetch_benchmarks() -> None:
 
 
 if __name__ == "__main__":
+    from config.settings import SYSTEM_OWNER_ID
+
     parser = argparse.ArgumentParser(description="Run portfolio data ingestion batch")
     parser.add_argument("--platform", help="Run only a specific platform")
+    parser.add_argument("--user-id", default=SYSTEM_OWNER_ID, help="User ID (default: SYSTEM_OWNER_ID)")
     args = parser.parse_args()
 
     platforms = [args.platform] if args.platform else ENABLED_PLATFORMS
@@ -342,4 +417,5 @@ if __name__ == "__main__":
     if not platforms:
         print("No implemented platforms to run.")
     else:
-        run_batch(platforms)
+        run_batch(platforms, args.user_id)
+        _fetch_benchmarks()

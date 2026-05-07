@@ -49,7 +49,7 @@ def run_daily_batch() -> None:
     log.info("Daily batch triggered.")
 
     from config.settings import ENABLED_PLATFORMS
-    from app.jobs.run_batch import run_batch
+    from app.jobs.run_batch import run_batch, _fetch_benchmarks
 
     implemented = {"binance", "okx", "mexc", "bybit", "sol_wallet", "ibkr", "evm_wallet"}
     platforms = [p for p in ENABLED_PLATFORMS if p in implemented]
@@ -61,9 +61,17 @@ def run_daily_batch() -> None:
 
     log.info("Running batch for %d user(s): %s", len(user_ids), user_ids)
 
-    # Currently run_batch uses SYSTEM_OWNER_ID internally.
-    # When multi-user support is added to run_batch, pass user_id here.
-    run_batch(platforms)
+    for user_id in user_ids:
+        try:
+            run_batch(platforms, user_id)
+        except Exception as e:
+            log.error("Batch failed for user %s: %s", user_id, e)
+
+    # Update benchmark prices once, shared across all users
+    try:
+        _fetch_benchmarks()
+    except Exception as e:
+        log.error("Benchmark fetch failed: %s", e)
 
     log.info("Daily batch complete.")
 

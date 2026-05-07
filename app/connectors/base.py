@@ -16,8 +16,10 @@ class BaseConnector(ABC):
     account_key: str = "account_main"
     use_pricer: bool = True  # set False to skip market price enrichment
 
-    def __init__(self, credentials: dict | None = None):
+    def __init__(self, credentials: dict | None = None, account_key: str | None = None):
         self._credentials: dict = credentials or {}
+        if account_key:
+            self.account_key = account_key
 
     @abstractmethod
     def authenticate(self) -> None:
