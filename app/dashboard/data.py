@@ -36,6 +36,10 @@ def get_holdings(user_id: str) -> pd.DataFrame:
     For each account, picks the most recent successful source_run
     regardless of date or batch, so all platforms are always shown
     even if they were last fetched on different days.
+
+    For sources that store multi-day data in a single source_run
+    (e.g. yuanta monthly statements with daily reconstruction), only the
+    latest snapshot_date within that source_run is returned.
     """
     sql = """
         SELECT
@@ -60,13 +64,11 @@ def get_holdings(user_id: str) -> pd.DataFrame:
         JOIN platforms p    ON a.platform_id = p.id
         WHERE sr.status = 'success'
           AND a.user_id = %s
-          AND sr.id IN (
-              SELECT sr2.id FROM source_runs sr2
+          AND nh.snapshot_date = (
+              SELECT MAX(nh2.snapshot_date)
+              FROM normalized_holdings nh2
+              JOIN source_runs sr2 ON nh2.source_run_id = sr2.id
               WHERE sr2.account_id = a.id AND sr2.status = 'success'
-                AND EXISTS (
-                    SELECT 1 FROM normalized_holdings WHERE source_run_id = sr2.id
-                )
-              ORDER BY sr2.started_at DESC LIMIT 1
           )
         ORDER BY p.name, a.account_key, nh.value DESC NULLS LAST
     """
@@ -74,8 +76,11 @@ def get_holdings(user_id: str) -> pd.DataFrame:
         df = pd.read_sql_query(sql, conn.raw, params=(user_id,))
 
     df["category"] = df["platform"].map(PLATFORM_CATEGORY).fillna("unknown")
-    df["value_usd"] = pd.to_numeric(df["value"], errors="coerce")
-    df["value_twd"] = df["value_usd"] * get_latest_fx_rate()
+    raw = pd.to_numeric(df["value"], errors="coerce")
+    fx = get_latest_fx_rate()
+    # Some sources (e.g. yuanta) store values in TWD; others already in USD.
+    df["value_usd"] = raw.where(df["original_currency"] != "TWD", raw / fx)
+    df["value_twd"] = df["value_usd"] * fx
     return df
 
 
