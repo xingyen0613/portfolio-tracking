@@ -21,4 +21,5 @@ dependencies = [
     "uvicorn[standard]>=0.34.0",
     "yfinance>=0.2.54",
     "python-jose[cryptography]>=3.4.0",
+    "apscheduler==3.10.4",
 ]
