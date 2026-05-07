@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
+import { listConnectors, type Connector } from '../../api/connectors'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -115,9 +116,35 @@ function HoldingRowView({ row }: { row: HoldingRow }) {
 
 // ── Platform card ─────────────────────────────────────────────────────────────
 
-function PlatformCard({ p }: { p: Platform }) {
+interface PlatformStatus {
+  label: string
+  cls: string
+  errorMessage?: string
+}
+
+function platformStatus(connectors: Connector[]): PlatformStatus | null {
+  if (connectors.length === 0) return null
+  const errored = connectors.find(c => c.last_error)
+  if (errored) {
+    return { label: 'Error', cls: 'status-error', errorMessage: errored.last_error ?? undefined }
+  }
+  const synced = connectors.find(c => c.last_sync_at)
+  if (synced) return { label: 'Synced', cls: 'status-synced' }
+  return { label: 'Pending', cls: 'status-pending' }
+}
+
+function PlatformCard({
+  p,
+  connectors,
+  onReconnect,
+}: {
+  p: Platform
+  connectors: Connector[]
+  onReconnect?: () => void
+}) {
   const [open, setOpen]       = useState(p.total_usd > 10_000)
   const [hovered, setHovered] = useState(false)
+  const status = platformStatus(connectors)
 
   return (
     <div style={{ background: 'var(--surf)', border: '1px solid var(--bdr)', borderRadius: 8, overflow: 'hidden' }}>
@@ -142,14 +169,45 @@ function PlatformCard({ p }: { p: Platform }) {
           {p.abbr}
         </div>
         <div style={{ fontSize: 13, fontWeight: 600 }}>{p.display}</div>
+        <div style={{ flex: 1 }} />
+        {status && (
+          <span className={`platform-status ${status.cls}`} style={{ marginRight: 4 }}>
+            {status.label}
+          </span>
+        )}
         <div style={{
-          marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', fontSize: 13,
+          fontFamily: 'JetBrains Mono, monospace', fontSize: 13,
           color: p.total_usd < 0 ? 'var(--red)' : 'var(--fg1)',
         }}>
           {fmtUsd(p.total_usd)}
         </div>
         <Chevron open={open} />
       </div>
+
+      {/* Inline error banner with Reconnect CTA */}
+      {status?.errorMessage && open && (
+        <div
+          style={{
+            padding: '10px 14px',
+            background: 'rgba(236,91,126,0.08)',
+            borderBottom: '1px solid var(--bdr2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            fontSize: 12,
+          }}
+        >
+          <div style={{ flex: 1, color: 'var(--c-neg)' }}>
+            <strong>Sync failed:</strong> {status.errorMessage.slice(0, 120)}
+            {status.errorMessage.length > 120 ? '…' : ''}
+          </div>
+          {onReconnect && (
+            <button className="btn btn-outline btn-sm" onClick={onReconnect}>
+              Reconnect
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Collapsible content — maxHeight transition avoids layout jump */}
       <div style={{
@@ -249,11 +307,26 @@ function PlatformCard({ p }: { p: Platform }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function HoldingsTab() {
+interface HoldingsTabProps {
+  onAddSource?: () => void
+}
+
+export default function HoldingsTab({ onAddSource }: HoldingsTabProps = {}) {
   const { data, isLoading } = useQuery<HoldingsData>({
     queryKey: ['holdings'],
     queryFn: () => api.get('/api/holdings').then(r => r.data),
   })
+
+  const { data: connectors = [] } = useQuery({
+    queryKey: ['connectors'],
+    queryFn: listConnectors,
+  })
+
+  const connectorsByPlatform: Record<string, Connector[]> = {}
+  for (const c of connectors) {
+    if (!connectorsByPlatform[c.platform_name]) connectorsByPlatform[c.platform_name] = []
+    connectorsByPlatform[c.platform_name].push(c)
+  }
 
   if (isLoading) {
     return (
@@ -303,7 +376,14 @@ export default function HoldingsTab() {
       </div>
 
       {/* Platform cards */}
-      {platforms.map(p => <PlatformCard key={p.name} p={p} />)}
+      {platforms.map(p => (
+        <PlatformCard
+          key={p.name}
+          p={p}
+          connectors={connectorsByPlatform[p.name] ?? []}
+          onReconnect={onAddSource}
+        />
+      ))}
     </>
   )
 }

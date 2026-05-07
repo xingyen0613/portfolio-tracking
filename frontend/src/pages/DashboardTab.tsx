@@ -1,6 +1,9 @@
+import { useQuery } from '@tanstack/react-query'
 import HoldingsTab from '../components/tabs/HoldingsTab'
 import AllocationTab from '../components/tabs/AllocationTab'
 import TrendTab from '../components/tabs/TrendTab'
+import EmptyState from '../components/EmptyState'
+import { listConnectors } from '../api/connectors'
 import type { ModalState } from '../App'
 
 interface Props {
@@ -9,10 +12,26 @@ interface Props {
 
 /**
  * V2 Dashboard combines Trend + Allocation + Holdings into a single page.
- * The legacy tab components are reused as embedded sections; visual polish to
- * match V2 design comes in Slice 5.
+ * Empty state CTA shows when the user has no connectors yet.
  */
-export default function DashboardTab({ openModal: _openModal }: Props) {
+export default function DashboardTab({ openModal }: Props) {
+  const { data: connectors, isLoading } = useQuery({
+    queryKey: ['connectors'],
+    queryFn: listConnectors,
+  })
+
+  if (!isLoading && connectors && connectors.length === 0) {
+    return (
+      <EmptyState
+        icon="plug"
+        title="Connect your first source"
+        description="Add an exchange, wallet or broker to start tracking your portfolio in one place. Your data syncs automatically every day."
+        ctaLabel="Add a data source"
+        onCta={() => openModal({ kind: 'addSource' })}
+      />
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       <section>
@@ -42,7 +61,7 @@ export default function DashboardTab({ openModal: _openModal }: Props) {
             <div className="section-sub">Click any platform to expand</div>
           </div>
         </div>
-        <HoldingsTab />
+        <HoldingsTab onAddSource={() => openModal({ kind: 'addSource' })} />
       </section>
     </div>
   )
