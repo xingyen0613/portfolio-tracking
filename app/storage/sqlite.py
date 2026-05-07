@@ -30,15 +30,15 @@ def execute(query: str, params: tuple = ()) -> None:
         conn.execute(query, params)
 
 
-def get_account_id(platform_name: str, account_key: str) -> int:
+def get_account_id(platform_name: str, account_key: str, user_id: str) -> int:
     row = fetch_one(
         """
         SELECT a.id FROM accounts a
         JOIN platforms p ON a.platform_id = p.id
-        WHERE p.name = %s AND a.account_key = %s
+        WHERE p.name = %s AND a.account_key = %s AND a.user_id = %s
         """,
-        (platform_name, account_key),
+        (platform_name, account_key, user_id),
     )
     if row is None:
-        raise ValueError(f"Account not found: {platform_name}/{account_key}")
+        raise ValueError(f"Account not found: {platform_name}/{account_key} for user {user_id}")
     return row["id"]

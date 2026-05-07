@@ -49,7 +49,7 @@ def run_source_pipeline(connector, batch_id: str, user_id: str):
     snapshot_date = _snapshot_date()
 
     try:
-        account_id = get_account_id(platform, account_key)
+        account_id = get_account_id(platform, account_key, user_id)
     except ValueError as e:
         return RunResult(source_run_id, platform, account_key, "failed", str(e))
 
