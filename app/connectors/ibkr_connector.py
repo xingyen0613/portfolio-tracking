@@ -28,8 +28,8 @@ class IBKRConnector(BaseConnector):
             raise RuntimeError("IBKR_FLEX_TOKEN and IBKR_FLEX_QUERY_ID must be set")
 
     def fetch_raw(self) -> list[dict]:
-        ref_code, get_url = self._send_request()
-        xml_text = self._get_statement(ref_code, get_url)
+        ref_code, _ = self._send_request()
+        xml_text = self._get_statement(ref_code)
         return [{
             "resource_type": "flex_report",
             "payload": {"raw_xml": xml_text},
@@ -87,13 +87,14 @@ class IBKRConnector(BaseConnector):
 
         return root.findtext("ReferenceCode"), root.findtext("Url")
 
-    def _get_statement(self, ref_code: str, get_url: str,
+    def _get_statement(self, ref_code: str,
                        retries: int = 5, delay: int = 5) -> str:
+        url = f"{_BASE_URL}/GetStatement"
         params = {"t": self.token, "q": ref_code, "v": "3"}
         time.sleep(5)
 
         for attempt in range(1, retries + 1):
-            resp = requests.get(get_url, params=params, headers=_HEADERS, timeout=30)
+            resp = requests.get(url, params=params, headers=_HEADERS, timeout=30)
             resp.raise_for_status()
 
             root = ET.fromstring(resp.text)
