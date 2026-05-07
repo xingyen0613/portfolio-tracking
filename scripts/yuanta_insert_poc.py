@@ -90,15 +90,15 @@ def collect_months() -> list[str]:
 # Insert
 # ---------------------------------------------------------------------------
 
-def _has_account_snapshots(month: str) -> bool:
+def _existing_snapshot_dates(month: str) -> set[str]:
+    """Return the set of yyyy-mm-dd strings that already have an account_snapshot."""
     with get_conn() as conn:
-        cur = conn.execute(
-            "SELECT COUNT(*) FROM account_snapshots "
+        rows = conn.execute(
+            "SELECT DISTINCT CAST(snapshot_date AS TEXT) AS d FROM account_snapshots "
             "WHERE account_id = %s AND CAST(snapshot_date AS TEXT) LIKE %s",
             (YUANTA_ACCOUNT_ID, f"{month}-%"),
-        )
-        row = cur.fetchone()
-        return (row["count"] > 0) if row else False
+        ).fetchall()
+        return {r["d"] for r in rows}
 
 
 def insert_months(months: list[str], dry_run: bool = False) -> None:
@@ -208,28 +208,33 @@ def insert_months(months: list[str], dry_run: bool = False) -> None:
         total_holdings += holdings_written
         print(f"  normalized_holdings: {holdings_written} rows", file=sys.stderr)
 
-        # account_snapshots: one per day — skip if migrated data already exists
-        if _has_account_snapshots(month):
-            print(f"  account_snapshots: skipped (data already exists)", file=sys.stderr)
-        else:
-            snapshots_written = 0
-            with get_conn() as conn:
-                for entry in net_asset_entries:
-                    date_str = entry["date"]
-                    raw = entry.get("net_asset")
-                    total_value = float(raw) if raw is not None else None
+        # account_snapshots: one per day — skip days that already exist
+        existing_dates = _existing_snapshot_dates(month)
+        snapshots_written = 0
+        snapshots_skipped = 0
+        with get_conn() as conn:
+            for entry in net_asset_entries:
+                date_str = entry["date"]
+                if date_str in existing_dates:
+                    snapshots_skipped += 1
+                    continue
+                raw = entry.get("net_asset")
+                total_value = float(raw) if raw is not None else None
 
-                    conn.execute(
-                        """INSERT INTO account_snapshots
-                           (id, batch_id, account_id, snapshot_date, total_value, currency, created_at, user_id)
-                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-                           ON CONFLICT (account_id, snapshot_date, batch_id) DO NOTHING""",
-                        (str(uuid.uuid4()), batch_id, YUANTA_ACCOUNT_ID,
-                         date_str, total_value, CURRENCY, now, SYSTEM_OWNER_ID),
-                    )
-                    snapshots_written += 1
-            total_snapshots += snapshots_written
-            print(f"  account_snapshots: {snapshots_written} rows", file=sys.stderr)
+                conn.execute(
+                    """INSERT INTO account_snapshots
+                       (id, batch_id, account_id, snapshot_date, total_value, currency, created_at, user_id)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                       ON CONFLICT (account_id, snapshot_date, batch_id) DO NOTHING""",
+                    (str(uuid.uuid4()), batch_id, YUANTA_ACCOUNT_ID,
+                     date_str, total_value, CURRENCY, now, SYSTEM_OWNER_ID),
+                )
+                snapshots_written += 1
+        total_snapshots += snapshots_written
+        print(
+            f"  account_snapshots: {snapshots_written} rows written, {snapshots_skipped} skipped (already exist)",
+            file=sys.stderr,
+        )
 
         with get_conn() as conn:
             conn.execute(
