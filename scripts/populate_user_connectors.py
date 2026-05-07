@@ -15,6 +15,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import config.settings  # triggers load_dotenv
+from config.settings import WALLETS_ENV_PATH
+from dotenv import load_dotenv
+load_dotenv(WALLETS_ENV_PATH, override=True)  # load wallet addresses
+
 from config.db import get_conn
 from app.auth.encryption import encrypt
 
@@ -67,6 +71,8 @@ PLATFORMS = [
         "account_key": "account_main",
         "credentials": {
             "api_key": os.environ.get("ALCHEMY_API_KEY", ""),
+            "addresses": [a.strip() for a in os.environ.get("EVM_WALLET_ADDRESSES", "").split(",") if a.strip()],
+            "chains": [c.strip() for c in os.environ.get("EVM_CHAINS", "ethereum").split(",") if c.strip()],
         },
     },
     {
@@ -74,6 +80,7 @@ PLATFORMS = [
         "account_key": "account_main",
         "credentials": {
             "api_key": os.environ.get("ALCHEMY_API_KEY", ""),
+            "addresses": [a.strip() for a in os.environ.get("SOL_WALLET_ADDRESSES", "").split(",") if a.strip()],
         },
     },
 ]

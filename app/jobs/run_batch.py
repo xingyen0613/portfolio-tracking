@@ -74,10 +74,11 @@ def _get_connectors(platform: str, credentials: dict) -> list:
         api_key = credentials.get("api_key") or os.environ.get("ALCHEMY_API_KEY", "")
         if not api_key:
             raise ValueError("ALCHEMY_API_KEY not set")
-        addresses_raw = os.environ.get("SOL_WALLET_ADDRESSES", "")
-        addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
+        addresses = credentials.get("addresses") or [
+            a.strip() for a in os.environ.get("SOL_WALLET_ADDRESSES", "").split(",") if a.strip()
+        ]
         if not addresses:
-            raise ValueError("SOL_WALLET_ADDRESSES not set in .env.wallets")
+            raise ValueError("SOL_WALLET_ADDRESSES not configured in user_connectors or env")
         return [SolWalletConnector(addr, api_key) for addr in addresses]
     if platform == "ibkr":
         from app.connectors.ibkr_connector import IBKRConnector
@@ -87,12 +88,14 @@ def _get_connectors(platform: str, credentials: dict) -> list:
         api_key = credentials.get("api_key") or os.environ.get("ALCHEMY_API_KEY", "")
         if not api_key:
             raise ValueError("ALCHEMY_API_KEY not set")
-        addresses_raw = os.environ.get("EVM_WALLET_ADDRESSES", "")
-        addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
+        addresses = credentials.get("addresses") or [
+            a.strip() for a in os.environ.get("EVM_WALLET_ADDRESSES", "").split(",") if a.strip()
+        ]
         if not addresses:
-            raise ValueError("EVM_WALLET_ADDRESSES not set in .env")
-        chains_raw = os.environ.get("EVM_CHAINS", "ethereum")
-        chains = [c.strip() for c in chains_raw.split(",") if c.strip()]
+            raise ValueError("EVM_WALLET_ADDRESSES not configured in user_connectors or env")
+        chains = credentials.get("chains") or [
+            c.strip() for c in os.environ.get("EVM_CHAINS", "ethereum").split(",") if c.strip()
+        ]
         return [EVMWalletConnector(addr, chain, api_key) for addr in addresses for chain in chains]
     raise ValueError(f"Unknown platform: {platform}")
 
@@ -231,8 +234,10 @@ def run_batch(platforms: list[str]) -> None:
 
     # Ensure wallet accounts exist in DB if needed
     if "sol_wallet" in platforms:
-        addresses_raw = os.environ.get("SOL_WALLET_ADDRESSES", "")
-        addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
+        creds = _get_credentials(user_id, "sol_wallet")
+        addresses = creds.get("addresses") or [
+            a.strip() for a in os.environ.get("SOL_WALLET_ADDRESSES", "").split(",") if a.strip()
+        ]
         if addresses:
             _ensure_sol_accounts(addresses, user_id)
     if "sui_wallet" in platforms:
@@ -241,10 +246,13 @@ def run_batch(platforms: list[str]) -> None:
         if addresses:
             _ensure_sui_accounts(addresses, user_id)
     if "evm_wallet" in platforms:
-        addresses_raw = os.environ.get("EVM_WALLET_ADDRESSES", "")
-        addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
-        chains_raw = os.environ.get("EVM_CHAINS", "ethereum")
-        chains = [c.strip() for c in chains_raw.split(",") if c.strip()]
+        creds = _get_credentials(user_id, "evm_wallet")
+        addresses = creds.get("addresses") or [
+            a.strip() for a in os.environ.get("EVM_WALLET_ADDRESSES", "").split(",") if a.strip()
+        ]
+        chains = creds.get("chains") or [
+            c.strip() for c in os.environ.get("EVM_CHAINS", "ethereum").split(",") if c.strip()
+        ]
         if addresses:
             _ensure_evm_accounts(addresses, chains, user_id)
 
