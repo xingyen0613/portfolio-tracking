@@ -5,8 +5,17 @@ Reads:  data/derived/yuanta_poc/<YYYY-MM>/daily_holdings.json  (Phase 2)
         data/derived/yuanta_poc/prices/<YYYY-MM>.json           (Phase 1B)
 Writes: data/derived/yuanta_poc/<YYYY-MM>/daily_net_asset.json
 
-Formula: net_asset = sum(shares * close_price per holding) - margin_balance
-Non-trading days: forward-fill from previous trading day's close.
+Formula: net_asset = market_value + pending_cash − margin_balance
+  - market_value: sum(shares × close_price) for the day's holdings
+  - pending_cash: running sum of net_cashflow from all transactions + margin txns
+                  starting from the very first month (baseline=0). This captures
+                  the cash that's "in-flight" between trade_date and settle_date,
+                  preventing artificial drops when stocks are sold but settlement
+                  hasn't happened yet.
+  - margin_balance: from the parsed monthly statement
+
+Non-trading days: forward-fill market_value from previous trading day. pending_cash
+and margin_balance are tracked daily regardless of trading.
 """
 
 import argparse
@@ -96,6 +105,20 @@ def load_prices(month: str) -> dict[str, dict[str, str]]:
         return json.load(f)["prices"]
 
 
+def load_official_month_end_net_asset(month: str) -> Decimal | None:
+    """Read yuanta-official month-end net_asset from parsed.json summary."""
+    raw_dir = PROJECT_ROOT / "data" / "raw" / "yuanta_poc"
+    path = raw_dir / month / "parsed.json"
+    if not path.exists():
+        return None
+    with open(path, encoding="utf-8") as f:
+        parsed = json.load(f)
+    raw = parsed.get("summary", {}).get("net_asset")
+    if raw in (None, ""):
+        return None
+    return Decimal(str(raw).replace(",", ""))
+
+
 def write_json(data: dict, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -131,7 +154,42 @@ def resolve_symbol(holding: dict) -> str | None:
     return resolve_name_to_symbol(name) if name else None
 
 
-def compute_net_asset(month: str) -> dict:
+def _sum_daily_cashflow(entry: dict) -> Decimal:
+    """Sum net_cashflow from both transactions and margin transactions for a day.
+
+    Special handling for ``repay_via_sell``: yuanta records this with
+    ``net_cashflow=0`` (sale proceeds went directly to margin, never reached the
+    user's cash account). But our model has already added the underlying sale's
+    net_cashflow on its trade_date. To avoid double-counting, subtract the
+    repay_via_sell amount when it appears in margin_transactions.
+    """
+    total = Decimal(0)
+    for tx in entry.get("transactions_today", []) or []:
+        v = tx.get("net_cashflow")
+        if v not in (None, ""):
+            total += Decimal(str(v).replace(",", ""))
+    for mt in entry.get("margin_transactions_today", []) or []:
+        v = mt.get("net_cashflow")
+        if v not in (None, ""):
+            total += Decimal(str(v).replace(",", ""))
+        repay_sell = mt.get("repay_via_sell")
+        if repay_sell not in (None, ""):
+            total -= Decimal(str(repay_sell).replace(",", ""))
+    return total
+
+
+def _fmt_dec(d: Decimal) -> str:
+    return str(int(d)) if d == d.to_integral_value() else str(d)
+
+
+def compute_net_asset(month: str, start_cum_cash: Decimal = Decimal(0)) -> tuple[dict, Decimal]:
+    """Compute daily net_asset for one month.
+
+    start_cum_cash: cumulative cash flow at the END of the previous month
+                    (= START of this month). For the very first month this is 0.
+
+    Returns (result_dict, end_cum_cash) so callers can chain months.
+    """
     holdings_doc = load_daily_holdings(month)
     prices_raw = load_prices(month)
 
@@ -141,16 +199,22 @@ def compute_net_asset(month: str) -> dict:
     daily_results = []
     warnings = []
 
+    cum_cash = start_cum_cash
+
     for entry in holdings_doc["daily"]:
         day = entry["date"]
         margin_raw = str(entry.get("margin_balance") or "0")
         margin = Decimal(margin_raw.replace(",", ""))
 
+        # Update cum_cash with today's flows (regardless of trading day)
+        cum_cash += _sum_daily_cashflow(entry)
+
         if day not in price_series:
-            # Non-trading day: no price data, leave market_value/net_asset as null
+            # Non-trading day: no market_value, but still track pending_cash + margin
             daily_results.append({
                 "date": day,
                 "market_value": None,
+                "pending_cash": _fmt_dec(cum_cash),
                 "margin_balance": margin_raw,
                 "net_asset": None,
                 "holdings_value": {},
@@ -181,29 +245,58 @@ def compute_net_asset(month: str) -> dict:
             msg = f"{day}: 無價格 — {', '.join(unpriced)}"
             warnings.append(msg)
 
-        net_asset = market_value - margin
-
-        def _fmt(d: Decimal) -> str:
-            return str(int(d)) if d == d.to_integral_value() else str(d)
+        # New net_asset formula: holdings + pending_cash − margin
+        net_asset = market_value + cum_cash - margin
 
         daily_results.append({
             "date": day,
-            "market_value": _fmt(market_value),
+            "market_value": _fmt_dec(market_value),
+            "pending_cash": _fmt_dec(cum_cash),
             "margin_balance": margin_raw,
-            "net_asset": _fmt(net_asset),
+            "net_asset": _fmt_dec(net_asset),
             "holdings_value": holdings_value,
             "unpriced_holdings": unpriced,
         })
 
-    return {
+    # Month-end calibration: align our last-day calculated net_asset with
+    # yuanta-official month-end net_asset. The difference represents cash that
+    # left the yuanta account through external transfers (which yuanta's
+    # statement does not record). Without this anchor, "phantom cash" from
+    # external withdrawals would carry forward to subsequent months and inflate
+    # net_asset over time.
+    correction = Decimal(0)
+    official_end = load_official_month_end_net_asset(month)
+    last_priced_idx = None
+    for i in range(len(daily_results) - 1, -1, -1):
+        if daily_results[i].get("net_asset") is not None:
+            last_priced_idx = i
+            break
+    if official_end is not None and last_priced_idx is not None:
+        our_end_na = Decimal(daily_results[last_priced_idx]["net_asset"])
+        correction = official_end - our_end_na
+        # Apply correction to the LAST trading day onward (jump-aligns to official
+        # value). Earlier days keep the smooth in-month curve.
+        for entry in daily_results[last_priced_idx:]:
+            if entry.get("pending_cash") is not None:
+                entry["pending_cash"] = _fmt_dec(Decimal(entry["pending_cash"]) + correction)
+            if entry.get("net_asset") is not None:
+                entry["net_asset"] = _fmt_dec(Decimal(entry["net_asset"]) + correction)
+        cum_cash += correction
+
+    result = {
         "meta": {
             "month": month,
             "source_holdings": f"data/derived/yuanta_poc/{month}/daily_holdings.json",
             "source_prices": f"data/derived/yuanta_poc/prices/{month}.json",
+            "start_cum_cash": _fmt_dec(start_cum_cash),
+            "end_cum_cash": _fmt_dec(cum_cash),
+            "month_end_correction": _fmt_dec(correction),
+            "official_month_end_net_asset": _fmt_dec(official_end) if official_end is not None else None,
         },
         "daily": daily_results,
         "warnings": warnings,
     }
+    return result, cum_cash
 
 
 # ---------------------------------------------------------------------------
@@ -222,30 +315,43 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    months = []
+    # Always compute in chronological order to chain pending_cash baseline
+    all_months = sorted(
+        p.parent.name
+        for p in DERIVED_DIR.glob("*/daily_holdings.json")
+        if (PRICES_DIR / f"{p.parent.name}.json").exists()
+    )
+    if not all_months:
+        print("No matching month pairs found.", file=sys.stderr)
+        return 1
+
     if args.month:
-        months = [args.month]
-    elif args.batch:
-        months = sorted(
-            p.parent.name
-            for p in DERIVED_DIR.glob("*/daily_holdings.json")
-            if (PRICES_DIR / f"{p.parent.name}.json").exists()
-        )
-        if not months:
-            print("No matching month pairs found.", file=sys.stderr)
+        if args.month not in all_months:
+            print(f"month {args.month} not available (need both daily_holdings.json + prices)", file=sys.stderr)
             return 1
+        # Chain through all earlier months silently to build baseline
+        target_months = all_months[: all_months.index(args.month) + 1]
+    elif args.batch:
+        target_months = all_months
     else:
         parser.print_help()
         return 1
 
-    for month in months:
-        result = compute_net_asset(month)
-        out_path = DERIVED_DIR / month / "daily_net_asset.json"
-        write_json(result, out_path)
-        n_warn = len(result["warnings"])
-        print(f"[{month}] wrote {out_path}" + (f" ({n_warn} warnings)" if n_warn else ""), file=sys.stderr)
-        for w in result["warnings"]:
-            print(f"  WARN {w}", file=sys.stderr)
+    cum_cash = Decimal(0)
+    for month in target_months:
+        result, cum_cash = compute_net_asset(month, start_cum_cash=cum_cash)
+        # Only write the requested month(s) — when --month X, skip writing earlier ones
+        if args.batch or month == args.month:
+            out_path = DERIVED_DIR / month / "daily_net_asset.json"
+            write_json(result, out_path)
+            n_warn = len(result["warnings"])
+            print(
+                f"[{month}] wrote {out_path}  start_cash={result['meta']['start_cum_cash']}  end_cash={result['meta']['end_cum_cash']}"
+                + (f" ({n_warn} warnings)" if n_warn else ""),
+                file=sys.stderr,
+            )
+            for w in result["warnings"]:
+                print(f"  WARN {w}", file=sys.stderr)
 
     return 0
 
