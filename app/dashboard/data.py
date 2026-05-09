@@ -265,12 +265,27 @@ def get_us_stock_symbol_breakdown(user_id: str) -> pd.DataFrame:
     return df
 
 
-def get_tw_stock_symbol_breakdown() -> pd.DataFrame:
+def get_tw_stock_symbol_breakdown(user_id: str) -> pd.DataFrame:
     """
     Return per-date per-stock breakdown for tw_stock (yuanta).
     Source: daily_net_asset.json holdings_value (TWD per symbol).
     Only includes trading days where holdings_value is non-empty.
+
+    Multi-tenancy guard: data is only returned for users who actually own a
+    yuanta account in the DB (currently only SYSTEM_OWNER). Returns an empty
+    DataFrame for any other user, since this data file is shared across the
+    deployment but the source PDFs are owner-specific.
     """
+    with get_conn() as conn:
+        row = conn.execute(
+            """SELECT 1 FROM accounts a
+               JOIN platforms p ON a.platform_id = p.id
+               WHERE p.name='yuanta' AND a.user_id=%s LIMIT 1""",
+            (user_id,),
+        ).fetchone()
+    if not row:
+        return pd.DataFrame(columns=["snapshot_date", "symbol", "value_usd"])
+
     rates = get_fx_rates_series()
     rows = []
     for na_file in sorted(_YUANTA_DERIVED.glob("*/daily_net_asset.json")):

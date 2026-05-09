@@ -93,7 +93,7 @@ def portfolio_allocation_drilldown(
     fetchers = {
         "crypto":   lambda: get_crypto_symbol_breakdown(user_id),
         "us_stock": lambda: get_us_stock_symbol_breakdown(user_id),
-        "tw_stock": get_tw_stock_symbol_breakdown,
+        "tw_stock": lambda: get_tw_stock_symbol_breakdown(user_id),
     }
     label = CATEGORY_LABEL.get(category, category)
 
@@ -134,7 +134,7 @@ def _get_breakdown(category: str, user_id: str) -> "pd.DataFrame":
         fetcher = {
             "crypto":   lambda: get_crypto_symbol_breakdown(user_id),
             "us_stock": lambda: get_us_stock_symbol_breakdown(user_id),
-            "tw_stock": get_tw_stock_symbol_breakdown,
+            "tw_stock": lambda: get_tw_stock_symbol_breakdown(user_id),
         }[category]
         _breakdown_cache[cache_key] = fetcher()
     return _breakdown_cache[cache_key]
