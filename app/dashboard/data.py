@@ -456,6 +456,18 @@ def get_yuanta_holdings_detail() -> dict:
     owned.sort(key=lambda x: x["value_twd"] or 0, reverse=True)
     pledged.sort(key=lambda x: x["value_twd"] or 0, reverse=True)
 
+    # other_assets: futures equity etc. from latest_entry (already extracted by net_asset script)
+    other_assets_raw = latest_entry.get("other_assets") or {}
+    other_assets: list[dict] = []
+    for label, value in other_assets_raw.items():
+        try:
+            v = float(value)
+        except (TypeError, ValueError):
+            continue
+        if v == 0:
+            continue
+        other_assets.append({"label": label, "value_twd": v})
+
     summary = parsed.get("summary", {})
     return {
         "date": latest_entry["date"],
@@ -466,6 +478,7 @@ def get_yuanta_holdings_detail() -> dict:
         "margin_maintenance_pct": summary.get("margin_maintenance_pct"),
         "owned": owned,
         "pledged": pledged,
+        "other_assets": other_assets,
     }
 
 

@@ -119,6 +119,43 @@ def load_official_month_end_net_asset(month: str) -> Decimal | None:
     return Decimal(str(raw).replace(",", ""))
 
 
+def load_other_assets(month: str) -> dict[str, Decimal]:
+    """Extract non-stock holdings from yuanta summary.asset_categories.
+
+    Stocks (上市/上櫃/興櫃) and pledged collateral are already in our
+    market_value via daily_holdings. This pulls out the rest — primarily
+    futures equity (期貨權益總值) — so they can be tracked as separate
+    holding positions instead of being absorbed into cum_cash.
+
+    Returns: {label: Decimal value}, e.g. {"期貨權益": 979030}.
+    """
+    raw_dir = PROJECT_ROOT / "data" / "raw" / "yuanta_poc"
+    path = raw_dir / month / "parsed.json"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        parsed = json.load(f)
+    cats = parsed.get("summary", {}).get("asset_categories") or []
+    other: dict[str, Decimal] = {}
+    for c in cats:
+        category = c.get("category", "")
+        # Skip the stock-related categories already in our market_value
+        if "上市" in category or "上櫃" in category or "興櫃" in category:
+            continue
+        if "擔保品" in category or "不限用途" in category:
+            continue
+        # Anything else (期貨, 認購權證 etc.) becomes a separate position
+        try:
+            value = Decimal(str(c.get("value", "0")).replace(",", ""))
+        except Exception:
+            continue
+        if value != 0:
+            # Strip any parenthesised qualifier for cleaner labels
+            label = category.split("(")[0].strip() or category
+            other[label] = value
+    return other
+
+
 def write_json(data: dict, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -208,6 +245,8 @@ def compute_net_asset(month: str, start_cum_cash: Decimal = Decimal(0)) -> tuple
     """
     holdings_doc = load_daily_holdings(month)
     prices_raw = load_prices(month)
+    other_assets = load_other_assets(month)
+    other_assets_total = sum(other_assets.values(), Decimal(0))
 
     all_days = [e["date"] for e in holdings_doc["daily"]]
     price_series = build_price_series(prices_raw, all_days)
@@ -232,6 +271,7 @@ def compute_net_asset(month: str, start_cum_cash: Decimal = Decimal(0)) -> tuple
                 "market_value": None,
                 "pending_cash": _fmt_dec(cum_cash),
                 "margin_balance": margin_raw,
+                "other_assets": {k: _fmt_dec(v) for k, v in other_assets.items()},
                 "net_asset": None,
                 "holdings_value": {},
                 "unpriced_holdings": [],
@@ -261,14 +301,16 @@ def compute_net_asset(month: str, start_cum_cash: Decimal = Decimal(0)) -> tuple
             msg = f"{day}: 無價格 — {', '.join(unpriced)}"
             warnings.append(msg)
 
-        # New net_asset formula: holdings + pending_cash − margin
-        net_asset = market_value + cum_cash - margin
+        # net_asset = stock holdings (owned + pledged) + other yuanta assets
+        # (futures equity etc., from monthly statement) + pending_cash − margin
+        net_asset = market_value + other_assets_total + cum_cash - margin
 
         daily_results.append({
             "date": day,
             "market_value": _fmt_dec(market_value),
             "pending_cash": _fmt_dec(cum_cash),
             "margin_balance": margin_raw,
+            "other_assets": {k: _fmt_dec(v) for k, v in other_assets.items()},
             "net_asset": _fmt_dec(net_asset),
             "holdings_value": holdings_value,
             "unpriced_holdings": unpriced,

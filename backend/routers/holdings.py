@@ -204,14 +204,34 @@ def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str
             "value_usd": margin_usd,
         }] if margin_twd else []
 
+        # Other assets (futures equity etc.) from yuanta summary
+        other_rows = []
+        for oa in yuanta_detail.get("other_assets", []) or []:
+            v = float(oa.get("value_twd") or 0)
+            if v == 0:
+                continue
+            other_rows.append({
+                "symbol":    oa.get("label", "—"),
+                "name":      oa.get("label", ""),
+                "quantity":  "—",
+                "price":     "—",
+                "value_usd": round(v / fx, 2),
+            })
+
         existing_yuanta = next((p for p in platforms if p["name"] == "yuanta"), None)
         if existing_yuanta is not None:
-            # Enrich the DB-derived yuanta entry with pledged + margin sections
+            # Enrich the DB-derived yuanta entry with pledged + futures + margin sections
             if pledged_rows:
                 existing_yuanta["sections"].append({
                     "label":     "擔保品",
                     "total_usd": round(sum(r["value_usd"] for r in pledged_rows), 2),
                     "rows":      pledged_rows,
+                })
+            if other_rows:
+                existing_yuanta["sections"].append({
+                    "label":     "期貨權益",
+                    "total_usd": round(sum(r["value_usd"] for r in other_rows), 2),
+                    "rows":      other_rows,
                 })
             if margin_rows:
                 existing_yuanta["sections"].append({
@@ -219,7 +239,7 @@ def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str
                     "total_usd": margin_usd,
                     "rows":      margin_rows,
                 })
-            # Use parsed.json's net_asset as the platform total (covers owned + pledged − margin)
+            # Use parsed.json's net_asset as the platform total (covers owned + pledged + other − margin)
             existing_yuanta["total_usd"] = net_asset_usd
         else:
             # No DB rows — build the whole platform from JSON only
