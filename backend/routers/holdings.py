@@ -175,7 +175,21 @@ def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str
             })
 
     # ── Yuanta: enrich with pledged + margin from parsed.json ─────────────────
-    yuanta_detail = get_yuanta_holdings_detail()
+    # Only show yuanta data to users who actually own a yuanta account in the DB
+    # (currently only SYSTEM_OWNER, since yuanta_insert_poc.py writes under that user).
+    # Without this guard, the JSON-based fallback would leak owner's data to any
+    # logged-in user.
+    from config.db import get_conn as _get_conn
+    with _get_conn() as _conn:
+        _row = _conn.execute(
+            """SELECT 1 FROM accounts a
+               JOIN platforms p ON a.platform_id = p.id
+               WHERE p.name='yuanta' AND a.user_id=%s LIMIT 1""",
+            (user_id,),
+        ).fetchone()
+    has_yuanta = _row is not None
+
+    yuanta_detail = get_yuanta_holdings_detail() if has_yuanta else {}
     if yuanta_detail:
         fx = get_latest_fx_rate()
         net_asset_twd = float(yuanta_detail.get("net_asset") or 0)
