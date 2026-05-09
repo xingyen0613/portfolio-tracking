@@ -21,47 +21,89 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100vh', background: 'var(--bg)', fontFamily: "'Plus Jakarta Sans', sans-serif",
-    }}>
-      <div style={{
-        background: 'var(--surf)', border: '1px solid var(--bdr)', borderRadius: 12,
-        padding: '40px 48px', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', gap: 28, minWidth: 320,
-      }}>
-        {/* Brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--blue)' }} />
-          <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--fg1)' }}>Portfolio</span>
-        </div>
-
-        <div style={{ textAlign: 'center', color: 'var(--fg2)', fontSize: 13, lineHeight: 1.6 }}>
-          <div style={{ fontWeight: 600, color: 'var(--fg1)', marginBottom: 4 }}>個人資產追蹤</div>
-          使用 Google 帳號登入以存取您的資產 Dashboard
-        </div>
-
-        {loading ? (
-          <span style={{ color: 'var(--fg3)', fontSize: 13 }}>驗證中⋯</span>
-        ) : (
-          <GoogleLogin
-            onSuccess={res => { if (res.credential) handleLogin(res.credential) }}
-            onError={() => setError('Google 登入失敗，請再試一次')}
-            theme="filled_black"
-            shape="pill"
-            text="signin_with"
-          />
-        )}
-
-        {error && (
-          <div style={{
-            color: '#f85149', fontSize: 12, background: 'rgba(248,81,73,0.1)',
-            border: '1px solid rgba(248,81,73,0.3)', borderRadius: 6,
-            padding: '8px 12px', maxWidth: 280, textAlign: 'center',
-          }}>
-            {error}
+    <div className="login-mobile-stage">
+      <div className="phone-frame">
+        <div className="phone-notch"></div>
+        <div className="phone-screen">
+          <div className="m-brand">
+            <div className="m-brand-mark"></div>
+            <div className="m-brand-name">ALL IN</div>
+            <div className="m-brand-sub">Portfolio tracker</div>
           </div>
-        )}
+
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              padding: '0 4px',
+            }}
+          >
+            <div className="m-headline" style={{ marginBottom: 8 }}>
+              Every account.
+              <br />
+              One number.
+            </div>
+            <div className="m-sub" style={{ marginBottom: 32 }}>
+              Connect exchanges, wallets and brokers — track your full portfolio in one
+              private dashboard.
+            </div>
+
+            {loading ? (
+              <span style={{ color: 'var(--fg-3)', fontSize: 13 }}>驗證中⋯</span>
+            ) : (
+              <GoogleLogin
+                onSuccess={(res) => {
+                  if (res.credential) handleLogin(res.credential)
+                }}
+                onError={() => setError('Google 登入失敗，請再試一次')}
+                theme="filled_black"
+                shape="pill"
+                text="signin_with"
+                size="large"
+                width="240"
+              />
+            )}
+
+            {error && (
+              <div
+                style={{
+                  marginTop: 16,
+                  color: 'var(--c-neg)',
+                  fontSize: 12,
+                  background: 'rgba(236,91,126,0.08)',
+                  border: '1px solid rgba(236,91,126,0.3)',
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  maxWidth: 280,
+                  textAlign: 'center',
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <div
+              className="m-foot"
+              style={{
+                marginTop: 18,
+                fontSize: 11,
+                color: 'var(--fg-3)',
+                lineHeight: 1.5,
+              }}
+            >
+              By continuing you agree to our
+              <br />
+              <span style={{ color: 'var(--fg-2)' }}>Terms</span> ·{' '}
+              <span style={{ color: 'var(--fg-2)' }}>Privacy</span>
+            </div>
+          </div>
+
+          <div className="m-foot">© 2026 ALL IN</div>
+        </div>
       </div>
     </div>
   )

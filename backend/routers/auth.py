@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, HTTPException, status
 from google.auth.exceptions import GoogleAuthError
 from pydantic import BaseModel
@@ -36,14 +38,16 @@ def google_login(body: GoogleLoginRequest):
             )
             user_id = SYSTEM_OWNER_ID
         else:
-            # Upsert regular user by google_id
+            # Upsert regular user by google_id (id is TEXT PK without default,
+            # so we generate a UUID for first-time registrants)
+            new_id = str(uuid.uuid4())
             cur = conn.execute(
-                """INSERT INTO users (google_id, email, name, picture)
-                   VALUES (%s,%s,%s,%s)
+                """INSERT INTO users (id, google_id, email, name, picture)
+                   VALUES (%s,%s,%s,%s,%s)
                    ON CONFLICT (google_id) DO UPDATE
-                     SET name=EXCLUDED.name, picture=EXCLUDED.picture
+                     SET name=EXCLUDED.name, picture=EXCLUDED.picture, email=EXCLUDED.email
                    RETURNING id""",
-                (sub, email, name, picture),
+                (new_id, sub, email, name, picture),
             )
             row = cur.fetchone()
             user_id = str(row["id"])
