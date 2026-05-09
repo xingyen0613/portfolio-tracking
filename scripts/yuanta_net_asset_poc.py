@@ -157,11 +157,24 @@ def resolve_symbol(holding: dict) -> str | None:
 def _sum_daily_cashflow(entry: dict) -> Decimal:
     """Sum net_cashflow from both transactions and margin transactions for a day.
 
-    Special handling for ``repay_via_sell``: yuanta records this with
-    ``net_cashflow=0`` (sale proceeds went directly to margin, never reached the
-    user's cash account). But our model has already added the underlying sale's
-    net_cashflow on its trade_date. To avoid double-counting, subtract the
-    repay_via_sell amount when it appears in margin_transactions.
+    Yuanta's accounting has several "internal offset" cases where the same
+    cash flow is recorded twice in the statement (once as a stock tx, once
+    as a margin sub-account tx). To avoid double-counting:
+
+    - ``repay_via_sell``: sale proceeds redirected directly to margin
+      repayment. Already counted as the sale's net_cashflow on trade_date.
+      Subtract here to neutralize.
+
+    - ``advance_settlement_out``: yuanta advances cash for a same-day sale
+      so the user gets proceeds without waiting T+2. Already counted as
+      the sale's net_cashflow on trade_date. Subtract to avoid duplicating.
+
+    - ``advance_settlement_in``: settles the advance internally on the
+      original settle_date. Yuanta records net_cashflow=0 on the margin_tx
+      (no real cash impact). No adjustment needed beyond the offset above.
+
+    Note: we use *trade_date* throughout — every cash event is anchored
+    to the day the trade happened, mirroring how the user perceives it.
     """
     total = Decimal(0)
     for tx in entry.get("transactions_today", []) or []:
@@ -175,6 +188,9 @@ def _sum_daily_cashflow(entry: dict) -> Decimal:
         repay_sell = mt.get("repay_via_sell")
         if repay_sell not in (None, ""):
             total -= Decimal(str(repay_sell).replace(",", ""))
+        adv_out = mt.get("advance_settlement_out")
+        if adv_out not in (None, ""):
+            total -= Decimal(str(adv_out).replace(",", ""))
     return total
 
 
