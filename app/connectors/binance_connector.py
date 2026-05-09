@@ -160,11 +160,16 @@ class BinanceConnector(BaseConnector):
                     qty = float(row.get("totalAmount", 0))
                     if qty <= 0:
                         continue
-                    if symbol not in seen:
-                        seen.add(symbol)
+                    # Use suffixed key so earn doesn't collide with spot's same
+                    # symbol (matching the convention used by earn_locked /
+                    # funding below). Without this, e.g. earn USDC 3160 gets
+                    # silently dropped if spot also has USDC 0.027.
+                    key = f"{symbol}_flexible"
+                    if key not in seen:
+                        seen.add(key)
                         holdings.append({
                             "platform_symbol": symbol,
-                            "platform_asset_name": symbol,
+                            "platform_asset_name": f"{symbol} (Flexible)",
                             "asset_type": _classify(symbol),
                             "quantity": qty,
                             "price": None,
