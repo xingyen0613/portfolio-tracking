@@ -23,6 +23,8 @@ PLATFORM_REQUIRED_FIELDS = {
     # Alchemy API key is system-level (server ALCHEMY_API_KEY env), not per-user
     "evm_wallet": ["addresses"],
     "sol_wallet": ["addresses"],
+    # SUI uses public RPC + Pyth, no API key needed
+    "sui_wallet": ["addresses"],
 }
 
 SUPPORTED_PLATFORMS = set(PLATFORM_REQUIRED_FIELDS.keys())
@@ -185,6 +187,7 @@ def _resolve_account_ids(conn, platform: str, account_key: str, creds: dict, use
     Mapping rules differ per platform:
       - exchanges/IBKR: 1:1 by account_key
       - sol_wallet:     1:N by addresses (account_key = addr[:10])
+      - sui_wallet:     1:N by addresses (account_key = addr[:10])
       - evm_wallet:     1:N by addresses × chains (account_key = addr[:10] || '_' || short)
     """
     if platform in EXCHANGE_LIKE_PLATFORMS:
@@ -197,7 +200,7 @@ def _resolve_account_ids(conn, platform: str, account_key: str, creds: dict, use
         return [r["id"] for r in rows]
 
     addrs = creds.get("addresses") or []
-    if platform == "sol_wallet":
+    if platform in ("sol_wallet", "sui_wallet"):
         keys = [a[:10] if len(a) >= 10 else a for a in addrs]
         if not keys:
             return []

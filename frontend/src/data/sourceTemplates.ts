@@ -28,6 +28,7 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
   { id: 'coinbase', name: 'Coinbase',          desc: 'Crypto exchange',           category: 'crypto', auth: 'apikey',  abbr: 'CB',   color: '#0052ff', textColor: '#fff', implemented: false, comingSoon: 'Coming soon' },
   { id: 'evm_wallet', name: 'EVM Wallet',      desc: 'Ethereum / Polygon / BSC',  category: 'crypto', auth: 'address', abbr: 'ETH',  color: '#627eea', textColor: '#fff', implemented: true },
   { id: 'sol_wallet', name: 'Solana Wallet',   desc: 'SOL wallet (read-only)',    category: 'crypto', auth: 'address', abbr: 'SOL',  color: '#9945ff', textColor: '#fff', implemented: true },
+  { id: 'sui_wallet', name: 'SUI Wallet',      desc: 'SUI wallet (read-only)',    category: 'crypto', auth: 'address', abbr: 'SUI',  color: '#6fbcf0', textColor: '#000', implemented: true },
   { id: 'ibkr',     name: 'Interactive Brokers', desc: 'US broker · Flex Web',    category: 'us',     auth: 'ibkr',    abbr: 'IBKR', color: '#cc0000', textColor: '#fff', implemented: true },
   { id: 'schwab',   name: 'Charles Schwab',    desc: 'US broker',                 category: 'us',     auth: 'manual',  abbr: 'SCHW', color: '#00a0df', textColor: '#fff', implemented: false, comingSoon: 'Coming soon' },
   { id: 'yuanta',   name: '元大證券',           desc: 'Taiwan broker · Gmail PDF', category: 'tw',     auth: 'email',   abbr: 'YT',   color: '#004b99', textColor: '#fff', implemented: false, comingSoon: 'Owner-only for now' },

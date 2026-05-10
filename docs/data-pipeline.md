@@ -40,6 +40,8 @@ API 呼叫 → [斷點 1] → 解析 → [斷點 2] → 補價格 → [斷點 3]
 
 **執行方式**：`uv run python -m app.jobs.run_batch --platform sui_wallet`
 
+**地址來源**：用戶在 UI 新增 sui_wallet connector 時填入 `credentials.addresses`（已加密存於 `user_connectors`）。**無 env fallback**。
+
 ```
 RPC 查詢（3 次）→ [斷點 1] → 合併解析 → [斷點 2] → 加總 → [斷點 3]
 ```

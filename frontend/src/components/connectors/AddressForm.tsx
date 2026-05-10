@@ -8,8 +8,13 @@ interface Props {
   template: SourceTemplate
 }
 
+const PLACEHOLDER_BY_PLATFORM: Record<string, string> = {
+  sol_wallet: 'So1...111\n7XyZ...',
+  sui_wallet: '0xabc...\n0xdef...',
+}
+
 export default function AddressForm({ credentials, setCredential, template }: Props) {
-  const isSolana = template.id === 'sol_wallet'
+  const placeholder = PLACEHOLDER_BY_PLATFORM[template.id] ?? '0x1234...\n0xabcd...'
 
   const [addressesText, setAddressesText] = useState<string>(() =>
     Array.isArray(credentials.addresses) ? (credentials.addresses as string[]).join('\n') : '',
@@ -27,7 +32,7 @@ export default function AddressForm({ credentials, setCredential, template }: Pr
         <label className="field-label">Public address(es)</label>
         <textarea
           className="textarea"
-          placeholder={isSolana ? 'So1...111\n7XyZ...' : '0x1234...\n0xabcd...'}
+          placeholder={placeholder}
           rows={4}
           value={addressesText}
           onChange={e => setAddressesText(e.target.value)}

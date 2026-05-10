@@ -97,10 +97,9 @@ def _instantiate_connectors(platform: str, credentials: dict, account_key: str) 
         return [IBKRConnector(credentials, account_key=account_key)]
     if platform == "sui_wallet":
         from app.connectors.sui_wallet_connector import SuiWalletConnector
-        addresses_raw = os.environ.get("SUI_WALLET_ADDRESSES", "")
-        addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
+        addresses = credentials.get("addresses") or []
         if not addresses:
-            raise ValueError("SUI_WALLET_ADDRESSES not set in .env")
+            raise ValueError("sui_wallet credentials.addresses is required")
         return [SuiWalletConnector(addr) for addr in addresses]
     if platform == "sol_wallet":
         from app.connectors.sol_wallet_connector import SolWalletConnector
@@ -336,8 +335,7 @@ def run_batch(platforms: list[str], user_id: str,
                     if addresses:
                         _ensure_evm_accounts(addresses, chains, user_id)
                 elif platform == "sui_wallet":
-                    addresses_raw = os.environ.get("SUI_WALLET_ADDRESSES", "")
-                    addresses = [a.strip() for a in addresses_raw.split(",") if a.strip()]
+                    addresses = creds.get("addresses") or []
                     if addresses:
                         _ensure_sui_accounts(addresses, user_id)
             except Exception as e:

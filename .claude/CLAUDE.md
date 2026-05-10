@@ -56,10 +56,11 @@
 - `backend/routers/holdings.py:_build_sections` 在顯示層過濾 `|value_usd| < 5`
 - DB 仍存全量；只有 API response 過濾
 
-### 鏈上錢包查詢（EVM / Solana）
-- Alchemy API key 是**系統級共用資源**（server `ALCHEMY_API_KEY` env），所有用戶共用一把；不接受用戶在 credentials 自填
+### 鏈上錢包查詢（EVM / Solana / SUI）
+- Alchemy API key 是**系統級共用資源**（server `ALCHEMY_API_KEY` env），所有用戶共用一把；不接受用戶在 credentials 自填（僅 EVM / Solana 需要）
 - EVM Wallet 預設查全部支援 chain（`DEFAULT_EVM_CHAINS` = ethereum/bsc/arbitrum/optimism/base/avalanche/polygon/linea）
 - Backend 仍接收 `credentials.chains`（fallback 順序：creds → `EVM_CHAINS` env → `DEFAULT_EVM_CHAINS`），未來放回前端讓用戶選 chain 時不需改 schema
+- SUI Wallet 走公開 SUI RPC + Pyth oracle，**不需任何 API key**；地址只從 `credentials.addresses` 讀，**不再有 `SUI_WALLET_ADDRESSES` env fallback**（與 EVM / SOL 不同）
 - 前端 textarea 用 local raw string state（非 list），避免 split/filter/join 把空行吃掉造成「按 Enter 不換行」的 bug
 
 ### Connector 刪除級聯
@@ -68,7 +69,7 @@
 - **保留**：`category_snapshots`（user-level 聚合，重算成本太高）、`batches`（cross-platform）、`data/raw/` JSON 檔（disk artifact，跨環境難一致管理）
 - Connector → accounts 的對應關係按 platform 不同：
   - exchange / IBKR：1:1 by `account_key`
-  - sol_wallet：1:N by `addr[:10]`
+  - sol_wallet / sui_wallet：1:N by `addr[:10]`
   - evm_wallet：1:N by `addr[:10] || '_' || chain_short`（從 decrypted credentials.addresses 解出）
 
 # 每次有新的開發進度完成，或是修正、優化後，且等用戶確認ok後，要更新相關文黨。包括但不限於@readme.md, @plan.md, etc.
