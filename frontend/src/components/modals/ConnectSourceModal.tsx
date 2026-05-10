@@ -104,6 +104,53 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
 
   const canSubmit = t.implemented
 
+  if (mut.isPending && !success) {
+    return (
+      <div className="modal">
+        <div className="modal-head">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="platform-abbr" style={{ background: t.color, color: t.textColor }}>
+              {t.abbr}
+            </div>
+            <div>
+              <div className="modal-title">Syncing {t.name} in background…</div>
+              <div className="modal-sub">{t.desc}</div>
+            </div>
+          </div>
+          <button className="modal-close" onClick={close}>
+            <Icon name="x" />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div
+            style={{
+              padding: 14,
+              borderRadius: 10,
+              background: 'rgba(240,162,60,0.10)',
+              border: '1px solid rgba(240,162,60,0.35)',
+              color: 'var(--c-crypto)',
+              fontSize: 13,
+              lineHeight: 1.55,
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>First sync in progress</div>
+            We're fetching balances now. Wallet syncs query every chain in parallel and may take
+            10–30 seconds.
+            <div style={{ marginTop: 8, color: 'var(--fg-2)' }}>
+              You can close this window — the sync continues in the background and your Dashboard
+              will update automatically when it finishes.
+            </div>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-primary" onClick={close}>
+            Close
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (success) {
     const isPending = success.fetchStatus === 'pending'
     const isPartial = success.fetchStatus === 'partial'
