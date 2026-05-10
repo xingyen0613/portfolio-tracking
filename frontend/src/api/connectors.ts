@@ -30,10 +30,15 @@ export async function listConnectors(): Promise<Connector[]> {
   return r.data
 }
 
+// First-sync runs synchronously inside this POST (run_batch). Some platforms
+// (binance multi-subaccount, OKX, IBKR Flex queue) can take well over 10s,
+// so we override the client default timeout for create + refresh.
+const SYNC_TIMEOUT_MS = 180000
+
 export async function createConnector(
   payload: ConnectorCreatePayload,
 ): Promise<ConnectorCreateResponse> {
-  const r = await api.post('/api/connectors', payload)
+  const r = await api.post('/api/connectors', payload, { timeout: SYNC_TIMEOUT_MS })
   return r.data
 }
 
@@ -42,6 +47,8 @@ export async function deleteConnector(id: string): Promise<void> {
 }
 
 export async function refreshConnector(id: string): Promise<ConnectorCreateResponse> {
-  const r = await api.post(`/api/connectors/${id}/refresh`)
+  const r = await api.post(`/api/connectors/${id}/refresh`, undefined, {
+    timeout: SYNC_TIMEOUT_MS,
+  })
   return r.data
 }

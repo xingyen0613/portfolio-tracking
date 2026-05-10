@@ -25,21 +25,46 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
   const [credentials, setCredentials] = useState<Record<string, unknown>>({})
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
+  const [success, setSuccess] = useState<
+    | { fetchStatus: 'success' | 'partial' | 'pending' }
+    | null
+  >(null)
 
   const setCredential = (key: string, value: unknown) =>
     setCredentials(prev => ({ ...prev, [key]: value }))
 
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ['connectors'] })
+    qc.invalidateQueries({ queryKey: ['holdings'] })
+    qc.invalidateQueries({ queryKey: ['portfolio/history'] })
+    qc.invalidateQueries({ queryKey: ['portfolio/allocation'] })
+  }
+
   const mut = useMutation({
     mutationFn: (payload: ConnectorCreatePayload) => createConnector(payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['connectors'] })
-      qc.invalidateQueries({ queryKey: ['holdings'] })
-      qc.invalidateQueries({ queryKey: ['portfolio/history'] })
-      qc.invalidateQueries({ queryKey: ['portfolio/allocation'] })
-      close()
+    onSuccess: data => {
+      invalidateAll()
+      setSuccess({
+        fetchStatus:
+          data.fetch_status === 'success' || data.fetch_status === 'partial'
+            ? data.fetch_status
+            : 'pending',
+      })
     },
     onError: (err: unknown) => {
       if (axios.isAxiosError(err)) {
+        // Client-side timeout / aborted before response: the connector row was
+        // saved on the backend before run_batch fired, so treat this as
+        // "added; first sync still running in the background".
+        const isClientTimeout =
+          err.code === 'ECONNABORTED' ||
+          err.code === 'ETIMEDOUT' ||
+          (!err.response && /timeout/i.test(err.message))
+        if (isClientTimeout) {
+          invalidateAll()
+          setSuccess({ fetchStatus: 'pending' })
+          return
+        }
         const status = err.response?.status
         const detail = err.response?.data?.detail
         if (status === 502) {
@@ -78,6 +103,74 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
   }
 
   const canSubmit = t.implemented
+
+  if (success) {
+    const isPending = success.fetchStatus === 'pending'
+    const isPartial = success.fetchStatus === 'partial'
+    const accentColor = isPending
+      ? 'var(--c-crypto)'
+      : isPartial
+        ? 'var(--c-crypto)'
+        : 'var(--c-pos)'
+    const accentBg = isPending
+      ? 'rgba(240,162,60,0.10)'
+      : isPartial
+        ? 'rgba(240,162,60,0.10)'
+        : 'rgba(46,184,138,0.10)'
+    const accentBorder = isPending
+      ? 'rgba(240,162,60,0.35)'
+      : isPartial
+        ? 'rgba(240,162,60,0.35)'
+        : 'rgba(46,184,138,0.35)'
+    const heading = isPending
+      ? `${t.name} added — first sync still running`
+      : isPartial
+        ? `${t.name} added with partial data`
+        : `${t.name} connected`
+    const message = isPending
+      ? 'Credentials saved. The first sync is taking longer than usual and is still running in the background. Holdings will appear in Sources & Dashboard once it finishes.'
+      : isPartial
+        ? 'Credentials saved and the initial sync completed, but some sub-accounts returned partial data. Check the Sources tab for details.'
+        : 'Credentials saved and the first sync completed successfully. Holdings are now visible in your Dashboard.'
+    return (
+      <div className="modal">
+        <div className="modal-head">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="platform-abbr" style={{ background: t.color, color: t.textColor }}>
+              {t.abbr}
+            </div>
+            <div>
+              <div className="modal-title">{heading}</div>
+              <div className="modal-sub">{t.desc}</div>
+            </div>
+          </div>
+          <button className="modal-close" onClick={close}>
+            <Icon name="x" />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div
+            style={{
+              padding: 14,
+              borderRadius: 10,
+              background: accentBg,
+              border: `1px solid ${accentBorder}`,
+              color: accentColor,
+              fontSize: 13,
+              lineHeight: 1.5,
+            }}
+          >
+            {message}
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-primary" onClick={close}>
+            Done
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const handleSubmit = () => {
     setError(null)
