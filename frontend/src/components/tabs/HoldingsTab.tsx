@@ -7,7 +7,7 @@ import { listConnectors, type Connector } from '../../api/connectors'
 
 interface HoldingRow  { symbol: string; name: string; quantity: string; price: string; value_usd: number }
 interface Section     { label: string; total_usd: number; rows: HoldingRow[] }
-interface Account     { account_key: string; address: string; chain: string | null; label: string; total_usd: number; sections: Section[] }
+interface Account     { account_key: string; address: string | null; chain: string | null; label: string; total_usd: number; sections: Section[] }
 interface Platform    { name: string; display: string; abbr: string; color: string; fg: string; category: string; total_usd: number; sections: Section[]; accounts?: Account[]; chain?: string | null }
 interface Summary     { total_usd: number; crypto_usd?: number; us_stock_usd?: number; tw_stock_usd?: number }
 interface HoldingsData{ summary: Summary; platforms: Platform[] }
@@ -37,17 +37,28 @@ function fmtAddr(addr: string): string {
 // ── Address badge row (for wallet platforms) ──────────────────────────────────
 
 function AddressBadge({ account, totalUsd }: { account: Account; totalUsd: number }) {
+  // Wallet accounts have an on-chain address → render as monospaced address + chain.
+  // Non-wallet accounts (multiple connectors on the same exchange) have no
+  // address → render the user-given label instead.
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
       background: 'var(--bg)', borderBottom: '1px solid var(--bdr2)',
     }}>
-      <code style={{
-        fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
-        color: 'var(--fg2)', letterSpacing: '.3px',
-      }}>
-        {fmtAddr(account.address)}
-      </code>
+      {account.address ? (
+        <code style={{
+          fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
+          color: 'var(--fg2)', letterSpacing: '.3px',
+        }}>
+          {fmtAddr(account.address)}
+        </code>
+      ) : (
+        <span style={{
+          fontSize: 12, fontWeight: 500, color: 'var(--fg2)', letterSpacing: '.2px',
+        }}>
+          {account.label}
+        </span>
+      )}
       {account.chain && (
         <span style={{
           fontSize: 10, fontWeight: 600, padding: '1px 5px',

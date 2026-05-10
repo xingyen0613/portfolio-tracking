@@ -179,20 +179,37 @@ def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str
                 s.pop("_order", None)
             return sections
 
-        if platform_name in WALLET_PLATFORMS:
-            # Group by account (each = one wallet address, or address+chain for EVM)
+        is_wallet = platform_name in WALLET_PLATFORMS
+        unique_accounts = pf_df["account_key"].nunique()
+        # Wallets always group by account (one address × chain per account).
+        # Non-wallet platforms only split when the user actually has multiple
+        # connectors on the same platform — single-account stays flat.
+        needs_accounts = is_wallet or unique_accounts > 1
+
+        if needs_accounts:
             accounts: list[dict] = []
             for account_key, acct_df in pf_df.groupby("account_key", sort=False):
                 account_key = str(account_key)
                 label = str(acct_df["account_label"].iloc[0] or account_key)
-                chain_val = acct_df["chain"].dropna().iloc[0] if "chain" in acct_df.columns and not acct_df["chain"].dropna().empty else None
-                # Full address from label:
-                #   SUI label  = full address (e.g. "0x655b10ed73...")
-                #   EVM label  = "0xaddr... (chain)" — strip the " (chain)" suffix
-                if platform_name == "evm_wallet":
-                    address_part = label.split(" (")[0].strip()
-                else:
-                    address_part = label  # SUI: label IS the full address
+
+                # Wallet platforms derive a public address + chain for the badge.
+                # Non-wallet platforms have no on-chain address — leave both null
+                # and let the frontend fall back to displaying `label`.
+                address_part: str | None = None
+                chain_val = None
+                if is_wallet:
+                    chain_val = (
+                        acct_df["chain"].dropna().iloc[0]
+                        if "chain" in acct_df.columns and not acct_df["chain"].dropna().empty
+                        else None
+                    )
+                    if platform_name == "evm_wallet":
+                        # EVM label = "0xaddr... (chain)" — strip the suffix
+                        address_part = label.split(" (")[0].strip()
+                    else:
+                        # SUI / SOL: label IS the full address
+                        address_part = label
+
                 acct_total = float(acct_df["value_usd"].sum())
                 accounts.append({
                     "account_key": account_key,
