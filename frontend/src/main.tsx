@@ -15,11 +15,11 @@ const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <GoogleOAuthProvider clientId={googleClientId}>
-      <AuthProvider>
-        <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
           <App />
-        </QueryClientProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </QueryClientProvider>
     </GoogleOAuthProvider>
   </StrictMode>,
 )
