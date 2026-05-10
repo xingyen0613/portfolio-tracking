@@ -27,6 +27,14 @@ load_dotenv(ENV_PATH)
 load_dotenv(WALLETS_ENV_PATH, override=True)
 
 
+class SystemConfigError(RuntimeError):
+    """Server-side misconfiguration (e.g. missing system-wide API key).
+
+    These are admin/ops problems, not user problems — they must not be
+    written into `user_connectors.last_error` or shown in the UI.
+    """
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -99,7 +107,7 @@ def _instantiate_connectors(platform: str, credentials: dict, account_key: str) 
         # Alchemy is a system-level read-only query tool shared by all users
         api_key = os.environ.get("ALCHEMY_API_KEY", "")
         if not api_key:
-            raise ValueError("ALCHEMY_API_KEY not set on server")
+            raise SystemConfigError("ALCHEMY_API_KEY not set on server")
         addresses = credentials.get("addresses") or [
             a.strip() for a in os.environ.get("SOL_WALLET_ADDRESSES", "").split(",") if a.strip()
         ]
@@ -111,7 +119,7 @@ def _instantiate_connectors(platform: str, credentials: dict, account_key: str) 
         # Alchemy is a system-level read-only query tool shared by all users
         api_key = os.environ.get("ALCHEMY_API_KEY", "")
         if not api_key:
-            raise ValueError("ALCHEMY_API_KEY not set on server")
+            raise SystemConfigError("ALCHEMY_API_KEY not set on server")
         addresses = credentials.get("addresses") or [
             a.strip() for a in os.environ.get("EVM_WALLET_ADDRESSES", "").split(",") if a.strip()
         ]
@@ -338,6 +346,10 @@ def run_batch(platforms: list[str], user_id: str,
             # Instantiate and run connector(s) for this row
             try:
                 connectors = _instantiate_connectors(platform, creds, account_key)
+            except SystemConfigError as e:
+                # Server-side misconfig — log only, do NOT touch user_connectors.last_error
+                print(f"  ⚠ [{platform}/{account_key}] system config error (not user-facing): {e}")
+                continue
             except Exception as e:
                 msg = f"Setup error: {e}"
                 print(f"  ✗ [{platform}/{account_key}] {msg}")
