@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.auth.deps import get_current_user
-from app.auth.encryption import encrypt
+from app.auth.encryption import decrypt, encrypt
 from config.db import get_conn
 
 router = APIRouter()
@@ -20,8 +20,9 @@ PLATFORM_REQUIRED_FIELDS = {
     "mexc":    ["api_key", "secret"],
     "bybit":   ["api_key", "secret"],
     "ibkr":    ["flex_token", "query_id"],
-    "evm_wallet": ["api_key", "addresses"],
-    "sol_wallet": ["api_key", "addresses"],
+    # Alchemy API key is system-level (server ALCHEMY_API_KEY env), not per-user
+    "evm_wallet": ["addresses"],
+    "sol_wallet": ["addresses"],
 }
 
 SUPPORTED_PLATFORMS = set(PLATFORM_REQUIRED_FIELDS.keys())
@@ -175,21 +176,126 @@ def create_connector(body: ConnectorCreate, current_user: dict = Depends(get_cur
     return response
 
 
+EXCHANGE_LIKE_PLATFORMS = {"binance", "okx", "mexc", "bybit", "ibkr"}
+
+
+def _resolve_account_ids(conn, platform: str, account_key: str, creds: dict, user_id: str) -> list[int]:
+    """Find all `accounts.id` rows owned by this connector.
+
+    Mapping rules differ per platform:
+      - exchanges/IBKR: 1:1 by account_key
+      - sol_wallet:     1:N by addresses (account_key = addr[:10])
+      - evm_wallet:     1:N by addresses × chains (account_key = addr[:10] || '_' || short)
+    """
+    if platform in EXCHANGE_LIKE_PLATFORMS:
+        rows = conn.execute(
+            """SELECT a.id FROM accounts a
+               JOIN platforms p ON a.platform_id = p.id
+               WHERE p.name=%s AND a.account_key=%s AND a.user_id=%s""",
+            (platform, account_key, user_id),
+        ).fetchall()
+        return [r["id"] for r in rows]
+
+    addrs = creds.get("addresses") or []
+    if platform == "sol_wallet":
+        keys = [a[:10] if len(a) >= 10 else a for a in addrs]
+        if not keys:
+            return []
+        rows = conn.execute(
+            """SELECT a.id FROM accounts a
+               JOIN platforms p ON a.platform_id = p.id
+               WHERE p.name=%s AND a.user_id=%s AND a.account_key = ANY(%s)""",
+            (platform, user_id, keys),
+        ).fetchall()
+        return [r["id"] for r in rows]
+
+    if platform == "evm_wallet":
+        # account_key = addr_lower[:10] || '_' || chain_short — match by prefix per addr
+        prefixes = [f"{a.lower()[:10]}_%" for a in addrs if len(a) >= 10]
+        if not prefixes:
+            return []
+        like_clause = " OR ".join(["a.account_key LIKE %s"] * len(prefixes))
+        rows = conn.execute(
+            f"""SELECT a.id FROM accounts a
+                JOIN platforms p ON a.platform_id = p.id
+                WHERE p.name='evm_wallet' AND a.user_id=%s AND ({like_clause})""",
+            (user_id, *prefixes),
+        ).fetchall()
+        return [r["id"] for r in rows]
+
+    return []
+
+
 @router.delete("/{connector_id}")
 def delete_connector(connector_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a connector and cascade-remove its historical data.
+
+    Removed: user_connectors, accounts, source_runs, raw_payloads (DB row only),
+             account_snapshots, normalized_holdings — for accounts owned by
+             this connector only.
+    Kept:    category_snapshots (user-level aggregate), batches (cross-platform),
+             on-disk JSON files under data/raw/ (managed separately).
+    """
     user_id = current_user["id"]
+
     with get_conn() as conn:
-        cur = conn.execute(
-            "DELETE FROM user_connectors WHERE id=%s AND user_id=%s RETURNING id",
+        row = conn.execute(
+            """SELECT platform_name, account_key, credentials_json
+               FROM user_connectors WHERE id=%s AND user_id=%s""",
+            (connector_id, user_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Connector not found",
+            )
+
+        creds: dict = {}
+        if row["credentials_json"]:
+            try:
+                creds = json.loads(decrypt(row["credentials_json"]))
+            except Exception:
+                creds = {}
+
+        account_ids = _resolve_account_ids(
+            conn, row["platform_name"], row["account_key"], creds, user_id,
+        )
+
+        cascaded = {"accounts": len(account_ids), "source_runs": 0,
+                    "normalized_holdings": 0, "raw_payloads": 0,
+                    "account_snapshots": 0}
+
+        if account_ids:
+            cascaded["normalized_holdings"] = conn.execute(
+                """DELETE FROM normalized_holdings
+                   WHERE source_run_id IN (
+                       SELECT id FROM source_runs WHERE account_id = ANY(%s)
+                   )""",
+                (account_ids,),
+            ).rowcount
+            cascaded["raw_payloads"] = conn.execute(
+                """DELETE FROM raw_payloads
+                   WHERE source_run_id IN (
+                       SELECT id FROM source_runs WHERE account_id = ANY(%s)
+                   )""",
+                (account_ids,),
+            ).rowcount
+            cascaded["account_snapshots"] = conn.execute(
+                "DELETE FROM account_snapshots WHERE account_id = ANY(%s)",
+                (account_ids,),
+            ).rowcount
+            cascaded["source_runs"] = conn.execute(
+                "DELETE FROM source_runs WHERE account_id = ANY(%s)",
+                (account_ids,),
+            ).rowcount
+            conn.execute("DELETE FROM accounts WHERE id = ANY(%s)", (account_ids,))
+
+        conn.execute(
+            "DELETE FROM user_connectors WHERE id=%s AND user_id=%s",
             (connector_id, user_id),
         )
-        row = cur.fetchone()
-    if not row:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Connector not found",
-        )
-    return {"deleted": connector_id}
+
+    return {"deleted": connector_id, "cascaded": cascaded}
 
 
 @router.post("/{connector_id}/refresh", response_model=ConnectorCreateResponse)

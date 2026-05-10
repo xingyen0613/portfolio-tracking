@@ -7,7 +7,6 @@ Price sources:
   Native tokens : CoinGecko simple/price (module-level cache, TTL=10min)
   ERC-20        : CoinGecko simple/token_price/{platform}?contract_addresses=...
   Stablecoins   : Fixed $1
-  Stable chain  : All tokens fixed $1 (chain 988 not on CoinGecko)
 """
 
 import time
@@ -72,13 +71,9 @@ CHAIN_CONFIG: dict[str, dict] = {
         "short":       "linea",
         "native": {"symbol": "ETH",  "name": "Ethereum",  "decimals": 18, "coingecko_id": "ethereum",    "is_stable": False},
     },
-    "stable": {
-        "subdomain":   "stable-mainnet",
-        "cg_platform": None,  # chain 988 not indexed by CoinGecko — all tokens treated as stablecoin
-        "short":       "stbl",
-        "native": {"symbol": "STBL", "name": "Stability", "decimals": 18, "coingecko_id": None,          "is_stable": True},
-    },
 }
+
+DEFAULT_EVM_CHAINS: list[str] = list(CHAIN_CONFIG.keys())
 
 # ── Module-level native price cache (shared across all connectors in one batch) ─
 _NATIVE_CG_IDS: set[str] = {

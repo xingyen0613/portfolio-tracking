@@ -96,9 +96,10 @@ def _instantiate_connectors(platform: str, credentials: dict, account_key: str) 
         return [SuiWalletConnector(addr) for addr in addresses]
     if platform == "sol_wallet":
         from app.connectors.sol_wallet_connector import SolWalletConnector
-        api_key = credentials.get("api_key") or os.environ.get("ALCHEMY_API_KEY", "")
+        # Alchemy is a system-level read-only query tool shared by all users
+        api_key = os.environ.get("ALCHEMY_API_KEY", "")
         if not api_key:
-            raise ValueError("ALCHEMY_API_KEY not set")
+            raise ValueError("ALCHEMY_API_KEY not set on server")
         addresses = credentials.get("addresses") or [
             a.strip() for a in os.environ.get("SOL_WALLET_ADDRESSES", "").split(",") if a.strip()
         ]
@@ -106,18 +107,19 @@ def _instantiate_connectors(platform: str, credentials: dict, account_key: str) 
             raise ValueError("SOL_WALLET_ADDRESSES not configured in user_connectors or env")
         return [SolWalletConnector(addr, api_key) for addr in addresses]
     if platform == "evm_wallet":
-        from app.connectors.evm_wallet_connector import EVMWalletConnector
-        api_key = credentials.get("api_key") or os.environ.get("ALCHEMY_API_KEY", "")
+        from app.connectors.evm_wallet_connector import EVMWalletConnector, DEFAULT_EVM_CHAINS
+        # Alchemy is a system-level read-only query tool shared by all users
+        api_key = os.environ.get("ALCHEMY_API_KEY", "")
         if not api_key:
-            raise ValueError("ALCHEMY_API_KEY not set")
+            raise ValueError("ALCHEMY_API_KEY not set on server")
         addresses = credentials.get("addresses") or [
             a.strip() for a in os.environ.get("EVM_WALLET_ADDRESSES", "").split(",") if a.strip()
         ]
         if not addresses:
             raise ValueError("EVM_WALLET_ADDRESSES not configured in user_connectors or env")
         chains = credentials.get("chains") or [
-            c.strip() for c in os.environ.get("EVM_CHAINS", "ethereum").split(",") if c.strip()
-        ]
+            c.strip() for c in os.environ.get("EVM_CHAINS", "").split(",") if c.strip()
+        ] or DEFAULT_EVM_CHAINS
         return [EVMWalletConnector(addr, chain, api_key) for addr in addresses for chain in chains]
     raise ValueError(f"Unknown platform: {platform}")
 
@@ -316,12 +318,13 @@ def run_batch(platforms: list[str], user_id: str,
                     if addresses:
                         _ensure_sol_accounts(addresses, user_id)
                 elif platform == "evm_wallet":
+                    from app.connectors.evm_wallet_connector import DEFAULT_EVM_CHAINS
                     addresses = creds.get("addresses") or [
                         a.strip() for a in os.environ.get("EVM_WALLET_ADDRESSES", "").split(",") if a.strip()
                     ]
                     chains = creds.get("chains") or [
-                        c.strip() for c in os.environ.get("EVM_CHAINS", "ethereum").split(",") if c.strip()
-                    ]
+                        c.strip() for c in os.environ.get("EVM_CHAINS", "").split(",") if c.strip()
+                    ] or DEFAULT_EVM_CHAINS
                     if addresses:
                         _ensure_evm_accounts(addresses, chains, user_id)
                 elif platform == "sui_wallet":

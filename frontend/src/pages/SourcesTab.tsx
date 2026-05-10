@@ -134,7 +134,15 @@ export default function SourcesTab({ openModal }: Props) {
 
   const handleRemove = (c: Connector) => {
     const label = c.account_label || c.platform_name
-    if (!confirm(`Remove "${label}"? Historical snapshots will be kept.`)) return
+    if (
+      !confirm(
+        `Remove "${label}"?\n\nThis will also delete all historical data ` +
+          `(holdings, snapshots, source runs) belonging to this connector.\n` +
+          `Other connectors and your account-level history are not affected.\n\n` +
+          `This action cannot be undone.`,
+      )
+    )
+      return
     deleteMut.mutate(c.id)
   }
 
