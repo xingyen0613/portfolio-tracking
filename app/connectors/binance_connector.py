@@ -119,6 +119,70 @@ class BinanceConnector(BaseConnector):
                 "fetch_error": str(e),
             })
 
+        # Cross margin account (槓桿)
+        try:
+            margin = self._exchange.sapiGetMarginAccount({})
+            items.append({
+                "resource_type": "margin_cross",
+                "payload": margin,
+                "fetched_at": _now(),
+            })
+        except Exception as e:
+            items.append({
+                "resource_type": "margin_cross",
+                "payload": {"error": str(e)},
+                "fetched_at": _now(),
+                "fetch_error": str(e),
+            })
+
+        # USD-M futures (U本位永續)
+        try:
+            f = self._exchange.fapiPrivateV2GetAccount({})
+            items.append({
+                "resource_type": "futures_um",
+                "payload": f,
+                "fetched_at": _now(),
+            })
+        except Exception as e:
+            items.append({
+                "resource_type": "futures_um",
+                "payload": {"error": str(e)},
+                "fetched_at": _now(),
+                "fetch_error": str(e),
+            })
+
+        # Coin-M futures (幣本位永續)
+        try:
+            f = self._exchange.dapiPrivateGetAccount({})
+            items.append({
+                "resource_type": "futures_cm",
+                "payload": f,
+                "fetched_at": _now(),
+            })
+        except Exception as e:
+            items.append({
+                "resource_type": "futures_cm",
+                "payload": {"error": str(e)},
+                "fetched_at": _now(),
+                "fetch_error": str(e),
+            })
+
+        # Options margin account (期權)
+        try:
+            o = self._exchange.eapiPrivateGetMarginAccount({})
+            items.append({
+                "resource_type": "options",
+                "payload": o,
+                "fetched_at": _now(),
+            })
+        except Exception as e:
+            items.append({
+                "resource_type": "options",
+                "payload": {"error": str(e)},
+                "fetched_at": _now(),
+                "fetch_error": str(e),
+            })
+
         return items
 
     def parse_holdings(self, raw_items: list[dict]) -> list[dict]:
@@ -212,6 +276,91 @@ class BinanceConnector(BaseConnector):
                             "platform_asset_name": f"{symbol} (Funding)",
                             "asset_type": _classify(symbol),
                             "quantity": qty,
+                            "price": None,
+                            "value": None,
+                            "original_currency": "USD",
+                            "price_source": None,
+                        })
+
+            elif resource_type == "margin_cross":
+                # Cross margin: net asset per coin (positive = collateral, negative = borrow)
+                for row in payload.get("userAssets", []):
+                    symbol = row.get("asset", "")
+                    net = float(row.get("netAsset", 0))
+                    if net == 0:
+                        continue
+                    key = f"{symbol}_margin"
+                    if key not in seen:
+                        seen.add(key)
+                        holdings.append({
+                            "platform_symbol": symbol,
+                            "platform_asset_name": f"{symbol} (Margin)",
+                            "asset_type": _classify(symbol),
+                            "quantity": net,
+                            "price": None,
+                            "value": None,
+                            "original_currency": "USD",
+                            "price_source": None,
+                        })
+
+            elif resource_type == "futures_um":
+                # USD-M futures wallet balance per asset (mostly USDT)
+                for row in payload.get("assets", []):
+                    symbol = row.get("asset", "")
+                    # walletBalance + unrealizedProfit gives total equity
+                    bal = float(row.get("walletBalance", 0)) + float(row.get("unrealizedProfit", 0))
+                    if bal == 0:
+                        continue
+                    key = f"{symbol}_futures_um"
+                    if key not in seen:
+                        seen.add(key)
+                        holdings.append({
+                            "platform_symbol": symbol,
+                            "platform_asset_name": f"{symbol} (USD-M Futures)",
+                            "asset_type": _classify(symbol),
+                            "quantity": bal,
+                            "price": None,
+                            "value": None,
+                            "original_currency": "USD",
+                            "price_source": None,
+                        })
+
+            elif resource_type == "futures_cm":
+                # Coin-M futures wallet balance per coin (BTC, ETH etc.)
+                for row in payload.get("assets", []):
+                    symbol = row.get("asset", "")
+                    bal = float(row.get("walletBalance", 0)) + float(row.get("unrealizedProfit", 0))
+                    if bal == 0:
+                        continue
+                    key = f"{symbol}_futures_cm"
+                    if key not in seen:
+                        seen.add(key)
+                        holdings.append({
+                            "platform_symbol": symbol,
+                            "platform_asset_name": f"{symbol} (Coin-M Futures)",
+                            "asset_type": _classify(symbol),
+                            "quantity": bal,
+                            "price": None,
+                            "value": None,
+                            "original_currency": "USD",
+                            "price_source": None,
+                        })
+
+            elif resource_type == "options":
+                # Options margin account: equity per coin
+                for row in payload.get("asset", []):
+                    symbol = row.get("asset", "")
+                    eq = float(row.get("equity", 0))
+                    if eq == 0:
+                        continue
+                    key = f"{symbol}_options"
+                    if key not in seen:
+                        seen.add(key)
+                        holdings.append({
+                            "platform_symbol": symbol,
+                            "platform_asset_name": f"{symbol} (Options)",
+                            "asset_type": _classify(symbol),
+                            "quantity": eq,
                             "price": None,
                             "value": None,
                             "original_currency": "USD",
