@@ -73,6 +73,23 @@ class BybitConnector(BaseConnector):
                 "fetch_error": str(e),
             })
 
+        # Earn (FlexibleSaving + on-chain staking etc.)
+        for cat in ("FlexibleSaving", "OnChain"):
+            try:
+                resp = self._exchange.privateGetV5EarnPosition({"category": cat})
+                items.append({
+                    "resource_type": f"earn_{cat.lower()}",
+                    "payload": resp.get("result", {}),
+                    "fetched_at": _now(),
+                })
+            except Exception as e:
+                items.append({
+                    "resource_type": f"earn_{cat.lower()}",
+                    "payload": {"error": str(e)},
+                    "fetched_at": _now(),
+                    "fetch_error": str(e),
+                })
+
         return items
 
     def parse_holdings(self, raw_items: list[dict]) -> list[dict]:
@@ -116,6 +133,27 @@ class BybitConnector(BaseConnector):
                         holdings.append({
                             "platform_symbol": symbol,
                             "platform_asset_name": f"{symbol} (Funding)",
+                            "asset_type": _classify(symbol),
+                            "quantity": qty,
+                            "price": None,
+                            "value": None,
+                            "original_currency": "USD",
+                            "price_source": None,
+                        })
+
+            elif resource_type in ("earn_flexiblesaving", "earn_onchain"):
+                cat_label = "FlexibleSaving" if resource_type.endswith("flexiblesaving") else "OnChain"
+                for row in payload.get("list", []) or []:
+                    symbol = row.get("coin", "")
+                    qty = float(row.get("amount", 0))
+                    if qty <= 0:
+                        continue
+                    key = f"{symbol}_{resource_type}"
+                    if key not in seen:
+                        seen.add(key)
+                        holdings.append({
+                            "platform_symbol": symbol,
+                            "platform_asset_name": f"{symbol} (Earn {cat_label})",
                             "asset_type": _classify(symbol),
                             "quantity": qty,
                             "price": None,

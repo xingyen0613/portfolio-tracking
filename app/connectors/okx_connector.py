@@ -55,7 +55,7 @@ class OKXConnector(BaseConnector):
                 "fetch_error": str(e),
             })
 
-        # Savings balance
+        # Savings balance (OKX 金融)
         try:
             savings = self._exchange.privateGetFinanceSavingsBalance({})
             items.append({
@@ -66,6 +66,22 @@ class OKXConnector(BaseConnector):
         except Exception as e:
             items.append({
                 "resource_type": "savings",
+                "payload": {"error": str(e)},
+                "fetched_at": _now(),
+                "fetch_error": str(e),
+            })
+
+        # Funding account balance (OKX 資金帳戶 — separate from trading)
+        try:
+            funding = self._exchange.privateGetAssetBalances({})
+            items.append({
+                "resource_type": "funding",
+                "payload": funding,
+                "fetched_at": _now(),
+            })
+        except Exception as e:
+            items.append({
+                "resource_type": "funding",
                 "payload": {"error": str(e)},
                 "fetched_at": _now(),
                 "fetch_error": str(e),
@@ -116,6 +132,26 @@ class OKXConnector(BaseConnector):
                         holdings.append({
                             "platform_symbol": symbol,
                             "platform_asset_name": f"{symbol} (Savings)",
+                            "asset_type": _classify(symbol),
+                            "quantity": qty,
+                            "price": None,
+                            "value": None,
+                            "original_currency": "USD",
+                            "price_source": None,
+                        })
+
+            elif resource_type == "funding":
+                for row in payload.get("data", []):
+                    symbol = row.get("ccy", "")
+                    qty = float(row.get("bal", 0))
+                    if qty <= 0:
+                        continue
+                    key = f"{symbol}_funding"
+                    if key not in seen:
+                        seen.add(key)
+                        holdings.append({
+                            "platform_symbol": symbol,
+                            "platform_asset_name": f"{symbol} (Funding)",
                             "asset_type": _classify(symbol),
                             "quantity": qty,
                             "price": None,

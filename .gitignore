@@ -14,6 +14,7 @@ scripts/*
 !scripts/migrate_sqlite_to_pg.py
 !scripts/migrate_local_pg_to_supabase.py
 !scripts/populate_user_connectors.py
+!scripts/probe_exchange_balances.py
 .venv/
 /data/
 __pycache__/
