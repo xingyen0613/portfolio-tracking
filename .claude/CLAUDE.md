@@ -56,4 +56,19 @@
 - `backend/routers/holdings.py:_build_sections` 在顯示層過濾 `|value_usd| < 5`
 - DB 仍存全量；只有 API response 過濾
 
+### 鏈上錢包查詢（EVM / Solana）
+- Alchemy API key 是**系統級共用資源**（server `ALCHEMY_API_KEY` env），所有用戶共用一把；不接受用戶在 credentials 自填
+- EVM Wallet 預設查全部支援 chain（`DEFAULT_EVM_CHAINS` = ethereum/bsc/arbitrum/optimism/base/avalanche/polygon/linea）
+- Backend 仍接收 `credentials.chains`（fallback 順序：creds → `EVM_CHAINS` env → `DEFAULT_EVM_CHAINS`），未來放回前端讓用戶選 chain 時不需改 schema
+- 前端 textarea 用 local raw string state（非 list），避免 split/filter/join 把空行吃掉造成「按 Enter 不換行」的 bug
+
+### Connector 刪除級聯
+- `DELETE /api/connectors/{id}` 在單一 transaction 內級聯清掉該 connector 的歷史資料
+- 清除：`accounts / source_runs / normalized_holdings / raw_payloads (DB) / account_snapshots`
+- **保留**：`category_snapshots`（user-level 聚合，重算成本太高）、`batches`（cross-platform）、`data/raw/` JSON 檔（disk artifact，跨環境難一致管理）
+- Connector → accounts 的對應關係按 platform 不同：
+  - exchange / IBKR：1:1 by `account_key`
+  - sol_wallet：1:N by `addr[:10]`
+  - evm_wallet：1:N by `addr[:10] || '_' || chain_short`（從 decrypted credentials.addresses 解出）
+
 # 每次有新的開發進度完成，或是修正、優化後，且等用戶確認ok後，要更新相關文黨。包括但不限於@readme.md, @plan.md, etc.
