@@ -119,6 +119,7 @@ class BybitConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type == "funding":
@@ -139,6 +140,7 @@ class BybitConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type in ("earn_flexiblesaving", "earn_onchain"):
@@ -160,6 +162,7 @@ class BybitConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
         return holdings

@@ -23,6 +23,37 @@ ASSET_TYPE_LABEL = {
     "earn":       "理財",
 }
 
+# resource_type → display label (more granular sub-account categories)
+RESOURCE_TYPE_LABEL = {
+    "spot":               "現貨",
+    "earn_flexible":      "活期理財",
+    "earn_locked":        "定期理財",
+    "earn_flexiblesaving": "活期理財",
+    "earn_onchain":       "鏈上 Earn",
+    "savings":            "餘幣寶",
+    "funding":            "資金帳戶",
+    "margin_cross":       "槓桿",
+    "futures_um":         "U本位永續",
+    "futures_cm":         "幣本位永續",
+    "futures":            "合約",
+    "options":            "期權",
+    "stock":              "持股",
+    "cash":               "現金",
+    "wallet":             "持幣",
+}
+
+# Display order — earlier entries appear first when sorting sections
+RESOURCE_TYPE_ORDER = {
+    "spot": 0, "wallet": 0, "stock": 0,
+    "cash": 1,
+    "savings": 2, "earn_flexible": 3, "earn_flexiblesaving": 3,
+    "earn_locked": 4, "earn_onchain": 5,
+    "funding": 6,
+    "margin_cross": 7,
+    "futures": 8, "futures_um": 8, "futures_cm": 9,
+    "options": 10,
+}
+
 PLATFORM_META: dict[str, dict] = {
     "binance":    {"display": "Binance",           "abbr": "BN",  "color": "#F0B90B", "fg": "#000"},
     "okx":        {"display": "OKX",               "abbr": "OK",  "color": "#1a1a1a", "fg": "#fff"},
@@ -86,11 +117,20 @@ def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str
         platform_total = float(pf_df["value_usd"].sum())
 
         def _build_sections(sub_df) -> list[dict]:
+            """Group rows into sections by resource_type (spot / earn / futures
+            etc.). Falls back to asset_type for legacy rows where
+            resource_type is NULL (pre-migration 007 data).
+            """
+            # Use resource_type when present, fall back to asset_type for legacy rows
+            sub_df = sub_df.copy()
+            sub_df["section_key"] = sub_df["resource_type"].where(
+                sub_df["resource_type"].notna() & (sub_df["resource_type"] != ""),
+                sub_df["asset_type"],
+            )
+
             sections = []
-            for asset_type, type_df in sub_df.groupby("asset_type"):
-                # Aggregate by symbol within each asset_type. Connectors split a
-                # holding across resource_types (spot / earn / funding ...) but
-                # we don't surface that distinction; show one row per symbol.
+            for section_key, type_df in sub_df.groupby("section_key"):
+                # Aggregate by symbol within each section
                 agg = (
                     type_df.groupby("platform_symbol", dropna=False)
                     .agg(
@@ -124,12 +164,19 @@ def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str
                         "value_usd": value_usd,
                     })
                 if rows:
+                    label = RESOURCE_TYPE_LABEL.get(
+                        str(section_key),
+                        ASSET_TYPE_LABEL.get(str(section_key), str(section_key)),
+                    )
                     sections.append({
-                        "label":     ASSET_TYPE_LABEL.get(str(asset_type), str(asset_type)),
+                        "label":     label,
                         "total_usd": round(sum(r["value_usd"] for r in rows), 2),
                         "rows":      rows,
+                        "_order":    RESOURCE_TYPE_ORDER.get(str(section_key), 99),
                     })
-            sections.sort(key=lambda s: -abs(s["total_usd"]))
+            sections.sort(key=lambda s: (s["_order"], -abs(s["total_usd"])))
+            for s in sections:
+                s.pop("_order", None)
             return sections
 
         if platform_name in WALLET_PLATFORMS:

@@ -216,6 +216,7 @@ class BinanceConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type == "earn_flexible":
@@ -240,6 +241,7 @@ class BinanceConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type == "earn_locked":
@@ -260,6 +262,7 @@ class BinanceConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type == "funding":
@@ -280,6 +283,7 @@ class BinanceConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type == "margin_cross":
@@ -301,6 +305,7 @@ class BinanceConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type == "futures_um":
@@ -323,6 +328,7 @@ class BinanceConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type == "futures_cm":
@@ -344,6 +350,7 @@ class BinanceConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type == "options":
@@ -365,6 +372,7 @@ class BinanceConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
         return holdings

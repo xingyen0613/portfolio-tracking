@@ -322,6 +322,7 @@ class EVMWalletConnector(BaseConnector):
                 "original_currency":   "USD",
                 "price_source":        price_source,
                 "chain":               self.chain_name,
+                "resource_type":       "wallet",
             })
 
         return holdings

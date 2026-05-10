@@ -281,6 +281,7 @@ class SolWalletConnector(BaseConnector):
                 "original_currency":   "USD",
                 "price_source":        price_source,
                 "chain":               None,
+                "resource_type":       "wallet",
             })
 
         return holdings

@@ -55,6 +55,7 @@ class IBKRConnector(BaseConnector):
                 "value": float(pos.get("positionValueInBase", 0)),
                 "original_currency": "USD",
                 "price_source": "platform",
+                "resource_type": "stock",
             })
 
         # Cash from EquitySummaryInBase (latest reportDate)
@@ -71,6 +72,7 @@ class IBKRConnector(BaseConnector):
                 "value": cash,
                 "original_currency": "USD",
                 "price_source": "platform",
+                "resource_type": "cash",
             })
 
         return holdings

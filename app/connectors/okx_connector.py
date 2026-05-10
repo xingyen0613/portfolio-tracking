@@ -116,6 +116,7 @@ class OKXConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type == "savings":
@@ -138,6 +139,7 @@ class OKXConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type == "funding":
@@ -158,6 +160,7 @@ class OKXConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
         return holdings

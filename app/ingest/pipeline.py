@@ -114,8 +114,9 @@ def run_source_pipeline(connector, batch_id: str, user_id: str):
                     """INSERT INTO normalized_holdings
                        (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
                         asset_type, quantity, price, value, original_currency,
-                        price_source, snapshot_date, parser_version, chain, user_id)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        price_source, snapshot_date, parser_version, chain, user_id,
+                        resource_type)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                     (
                         str(uuid.uuid4()), source_run_id,
                         raw_payload_ids[0][0],  # link to first raw payload
@@ -131,6 +132,7 @@ def run_source_pipeline(connector, batch_id: str, user_id: str):
                         PARSER_VERSION,
                         h.get("chain"),
                         user_id,
+                        h.get("resource_type"),
                     ),
                 )
 

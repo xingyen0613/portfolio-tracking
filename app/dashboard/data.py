@@ -56,6 +56,7 @@ def get_holdings(user_id: str) -> pd.DataFrame:
             nh.original_currency,
             nh.snapshot_date,
             nh.chain,
+            nh.resource_type,
             sr.id         AS source_run_id,
             sr.started_at AS fetched_at
         FROM normalized_holdings nh

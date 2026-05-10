@@ -229,6 +229,7 @@ class SuiWalletConnector(BaseConnector):
                 "value":              usd_value,
                 "original_currency":  "USD",
                 "price_source":       "pyth" if COIN_FEED_MAP.get(ct) != "__STABLE__" else "stable",
+                "resource_type":      "wallet",
             })
 
         return holdings

@@ -99,6 +99,7 @@ class MexcConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
             elif resource_type == "futures":
@@ -118,6 +119,7 @@ class MexcConnector(BaseConnector):
                             "value": None,
                             "original_currency": "USD",
                             "price_source": None,
+                            "resource_type": resource_type,
                         })
 
         return holdings
