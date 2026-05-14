@@ -65,6 +65,7 @@ PLATFORM_META: dict[str, dict] = {
     "ibkr":       {"display": "IBKR（美股）",       "abbr": "IB",  "color": "#c0392b", "fg": "#fff"},
     "firsttrade": {"display": "Firsttrade（美股）", "abbr": "FT",  "color": "#2c8af8", "fg": "#fff"},
     "yuanta":     {"display": "元大證券（台股）",   "abbr": "元",  "color": "#27ae60", "fg": "#fff"},
+    "sinopac":    {"display": "永豐證券（台股）",   "abbr": "永",  "color": "#003D82", "fg": "#fff"},
 }
 
 CATEGORY_ORDER = {"crypto": 0, "us_stock": 1, "tw_stock": 2}

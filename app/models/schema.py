@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS normalized_holdings (
     raw_payload_id  TEXT NOT NULL REFERENCES raw_payloads(id),
     platform_symbol TEXT NOT NULL,
     platform_asset_name TEXT,
-    asset_type      TEXT NOT NULL,      -- cash | stock | etf | crypto | stablecoin | unknown
+    asset_type      TEXT NOT NULL,      -- cash | stock | etf | crypto | stablecoin | margin_loan | collateral | futures | option | unknown
     quantity        REAL NOT NULL,
     price           REAL,
     value           REAL,
@@ -100,7 +100,8 @@ INSERT OR IGNORE INTO platforms (name, display_name) VALUES
     ('sui_wallet', 'SUI Wallet'),
     ('evm_wallet', 'EVM Wallet'),
     ('sol_wallet', 'Solana Wallet'),
-    ('ibkr', 'IBKR');
+    ('ibkr', 'IBKR'),
+    ('sinopac', '永豐證券');
 """
 
 SEED_ACCOUNTS = """

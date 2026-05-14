@@ -7,6 +7,7 @@ import { getTemplate } from '../../data/sourceTemplates'
 import ApiKeyForm from '../connectors/ApiKeyForm'
 import AddressForm from '../connectors/AddressForm'
 import IBKRForm from '../connectors/IBKRForm'
+import SinopacForm from '../connectors/SinopacForm'
 import EmailForm from '../connectors/EmailForm'
 import ManualForm from '../connectors/ManualForm'
 import type { ModalState } from '../../App'
@@ -281,6 +282,9 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
         )}
         {t.auth === 'ibkr' && (
           <IBKRForm credentials={credentials} setCredential={setCredential} />
+        )}
+        {t.auth === 'sinopac' && (
+          <SinopacForm credentials={credentials} setCredential={setCredential} />
         )}
         {t.auth === 'email' && <EmailForm template={t} />}
         {t.auth === 'manual' && <ManualForm />}

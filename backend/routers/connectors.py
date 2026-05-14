@@ -20,6 +20,7 @@ PLATFORM_REQUIRED_FIELDS = {
     "mexc":    ["api_key", "secret"],
     "bybit":   ["api_key", "secret"],
     "ibkr":    ["flex_token", "query_id"],
+    "sinopac": ["api_key", "secret_key"],
     # Alchemy API key is system-level (server ALCHEMY_API_KEY env), not per-user
     "evm_wallet": ["addresses"],
     "sol_wallet": ["addresses"],
