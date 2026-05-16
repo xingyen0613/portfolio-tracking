@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import PerformanceMetrics from '../components/tabs/PerformanceMetrics'
 import HoldingsTab from '../components/tabs/HoldingsTab'
 import AllocationTab from '../components/tabs/AllocationTab'
 import TrendTab from '../components/tabs/TrendTab'
@@ -35,10 +36,14 @@ export default function DashboardTab({ openModal }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       <section>
+        <PerformanceMetrics />
+      </section>
+
+      <section>
         <div className="section-head">
           <div>
-            <div className="section-title">Performance</div>
-            <div className="section-sub">Asset trend across categories</div>
+            <div className="section-title">Asset Trend</div>
+            <div className="section-sub">Historical value across categories</div>
           </div>
         </div>
         <TrendTab />

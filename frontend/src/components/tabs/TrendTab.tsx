@@ -8,7 +8,7 @@ import { api } from '../../api/client'
 
 // ── Portfolio constants ──────────────────────────────────────────────────────
 
-const P_COLORS = { total: '#58a6ff', crypto: '#d29922', us_stock: '#f85149', tw_stock: '#3fb950' } as const
+const P_COLORS = { total: '#7c6ef5', crypto: '#f0a23c', us_stock: '#ec5b7e', tw_stock: '#4ec9a8' } as const
 const P_LABELS = { total: '總資產', crypto: '幣圈', us_stock: '美股', tw_stock: '台股' } as const
 type PKey = keyof typeof P_COLORS
 const P_KEYS: PKey[] = ['total', 'crypto', 'us_stock', 'tw_stock']
@@ -31,8 +31,6 @@ const B_LABELS: Record<BTicker, string> = {
 
 // ── Time windows ─────────────────────────────────────────────────────────────
 
-const WINDOWS = ['1W', '1M', '3M', '6M', '1Y', '2Y', 'all']
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface HistoryData {
@@ -40,10 +38,6 @@ interface HistoryData {
   series: Record<PKey, number[]>
   latest: Record<PKey, number>
   metrics: Record<PKey, { total_return: number | null; sharpe: number | null; mdd: number | null }>
-}
-
-interface MetricsData {
-  [key: string]: { total_return: number | null; sharpe: number | null; mdd: number | null }
 }
 
 interface BenchmarkSeries { ticker: string; label: string; color: string; dates: string[]; closes: number[] }
@@ -105,8 +99,8 @@ function renderTooltip({
       position: 'absolute',
       left: flipLeft ? Math.max(0, tooltip.x - 224) : tooltip.x + 14,
       top:  Math.max(4, tooltip.y - 10),
-      background: '#1c2128',
-      border: '1px solid #30363d',
+      background: '#111114',
+      border: '1px solid #26262e',
       borderRadius: 7,
       padding: '9px 12px',
       fontSize: 11,
@@ -172,7 +166,6 @@ function renderTooltip({
 
 export default function TrendTab() {
   const [mode, setMode] = useState<'USD' | 'return'>('USD')
-  const [win, setWin]   = useState('3M')
   const [pVis, setPVis] = useState<Record<PKey, boolean>>(
     () => Object.fromEntries(P_KEYS.map(k => [k, true])) as Record<PKey, boolean>
   )
@@ -200,11 +193,6 @@ export default function TrendTab() {
   const { data: portData, isLoading } = useQuery<HistoryData>({
     queryKey: ['portfolio/history/all'],
     queryFn: () => api.get('/api/portfolio/history?window=all').then(r => r.data),
-  })
-
-  const { data: metricsData } = useQuery<MetricsData>({
-    queryKey: ['portfolio/metrics', win],
-    queryFn: () => api.get(`/api/portfolio/metrics?window=${win}`).then(r => r.data),
   })
 
   const { data: benchData } = useQuery<BenchmarkData>({
@@ -240,18 +228,18 @@ export default function TrendTab() {
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: '#0d1117' },
-        textColor: '#484f58',
+        background: { type: ColorType.Solid, color: '#0a0a0c' },
+        textColor: '#6b6b76',
         fontFamily: 'JetBrains Mono, monospace',
         fontSize: 10,
       },
-      grid:     { vertLines: { color: '#21262d' }, horzLines: { color: '#21262d' } },
+      grid:     { vertLines: { color: '#1d1d24' }, horzLines: { color: '#1d1d24' } },
       crosshair:{
-        vertLine: { color: '#30363d', labelBackgroundColor: '#1c2128' },
-        horzLine: { color: '#30363d', labelBackgroundColor: '#1c2128' },
+        vertLine: { color: '#26262e', labelBackgroundColor: '#111114' },
+        horzLine: { color: '#26262e', labelBackgroundColor: '#111114' },
       },
-      rightPriceScale: { borderColor: '#30363d' },
-      timeScale:       { borderColor: '#30363d', timeVisible: false },
+      rightPriceScale: { borderColor: '#26262e' },
+      timeScale:       { borderColor: '#26262e', timeVisible: false },
       handleScroll:    { mouseWheel: true, pressedMouseMove: true },
       handleScale:     { mouseWheel: true, pinch: true },
       width:  containerRef.current.clientWidth,
@@ -435,8 +423,6 @@ export default function TrendTab() {
     </div>
   )
 
-  const winLabel = win === 'all' ? '全部' : win
-
   return (
     <>
       {/* Controls: mode toggle + legend chips */}
@@ -491,56 +477,6 @@ export default function TrendTab() {
         })}
       </div>
 
-      {/* Window selector — controls stat card metrics below */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.4px' }}>收益計算區間</span>
-        <div style={{ display: 'flex', gap: 2 }}>
-          {WINDOWS.map(w => (
-            <div key={w} onClick={() => setWin(w)} style={{
-              padding: '4px 7px', fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
-              color: win === w ? 'var(--blue)' : 'var(--fg2)',
-              background: win === w ? 'var(--surf2)' : 'transparent',
-              border: win === w ? '1px solid var(--bdr)' : '1px solid transparent',
-              borderRadius: 4, cursor: 'pointer', userSelect: 'none',
-            }}>
-              {w === 'all' ? 'ALL' : w}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Stat cards — latest value + return for selected window */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-        {P_KEYS.map(key => {
-          const latest = portData?.latest[key]
-          const ret    = metricsData?.[key]?.total_return ?? null
-          return (
-            <div key={key} style={{
-              background: 'var(--surf)', border: '1px solid var(--bdr)',
-              borderTop: `2px solid ${P_COLORS[key]}`, borderRadius: 8, padding: '10px 12px',
-            }}>
-              <div style={{
-                fontSize: 10, color: 'var(--fg2)', textTransform: 'uppercase',
-                letterSpacing: '.5px', marginBottom: 5,
-                display: 'flex', alignItems: 'center', gap: 5,
-              }}>
-                <div style={{ width: 5, height: 5, borderRadius: '50%', background: P_COLORS[key] }} />
-                {P_LABELS[key]}
-              </div>
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 15, fontWeight: 500 }}>
-                {latest != null ? fmtUsd(latest) : '—'}
-              </div>
-              <div style={{
-                fontFamily: 'JetBrains Mono, monospace', fontSize: 11, marginTop: 3,
-                color: ret == null ? 'var(--fg2)' : ret >= 0 ? 'var(--green)' : 'var(--red)',
-              }}>
-                {fmtPct(ret)}
-                <span style={{ color: 'var(--fg3)', marginLeft: 4 }}>{winLabel}</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
     </>
   )
 }

@@ -14,7 +14,6 @@ interface HoldingsData{ summary: Summary; platforms: Platform[] }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CAT_COLORS = { crypto: '#d29922', us_stock: '#f85149', tw_stock: '#3fb950', total: '#58a6ff' }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -347,46 +346,10 @@ export default function HoldingsTab({ onAddSource }: HoldingsTabProps = {}) {
     )
   }
 
-  const summary   = data?.summary
   const platforms = data?.platforms ?? []
 
-  const statCards = [
-    { key: 'total',    label: '總資產', val: summary?.total_usd,    sub: summary ? `NT$${((summary.total_usd ?? 0) * 31.5).toLocaleString('en', { maximumFractionDigits: 0 })}` : undefined },
-    { key: 'crypto',   label: '幣圈',   val: summary?.crypto_usd },
-    { key: 'us_stock', label: '美股',   val: summary?.us_stock_usd },
-    { key: 'tw_stock', label: '台股',   val: summary?.tw_stock_usd },
-  ]
-
   return (
-    <>
-      {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-        {statCards.map(s => {
-          const color = CAT_COLORS[s.key as keyof typeof CAT_COLORS] ?? CAT_COLORS.total
-          return (
-            <div key={s.key} style={{
-              background: 'var(--surf)', border: '1px solid var(--bdr)',
-              borderTop: `2px solid ${color}`, borderRadius: 8, padding: '12px 14px',
-            }}>
-              <div style={{ fontSize: 10, color: 'var(--fg2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 5, height: 5, borderRadius: '50%', background: color }} />
-                {s.label}
-              </div>
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 17, fontWeight: 500, color }}>
-                {s.val != null ? fmtUsd(s.val) : '—'}
-              </div>
-              {s.sub && <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, marginTop: 3, color: 'var(--fg3)' }}>{s.sub}</div>}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Section label */}
-      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg3)', textTransform: 'uppercase', letterSpacing: '.6px' }}>
-        持倉明細
-      </div>
-
-      {/* Platform cards */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {platforms.map(p => (
         <PlatformCard
           key={p.name}
@@ -395,6 +358,6 @@ export default function HoldingsTab({ onAddSource }: HoldingsTabProps = {}) {
           onReconnect={onAddSource}
         />
       ))}
-    </>
+    </div>
   )
 }
