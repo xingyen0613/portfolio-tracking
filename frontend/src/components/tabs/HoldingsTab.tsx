@@ -124,6 +124,39 @@ function HoldingRowView({ row }: { row: HoldingRow }) {
   )
 }
 
+// ── Add source row ────────────────────────────────────────────────────────────
+
+function AddSourceRow({ onClick }: { onClick: () => void }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px',
+        border: '1.5px dashed var(--bdr)', borderRadius: 8, cursor: 'pointer',
+        background: hovered ? 'var(--surf2)' : 'transparent',
+        transition: 'background 120ms',
+      }}
+    >
+      <div style={{
+        width: 28, height: 28, borderRadius: 6, border: '1.5px dashed var(--bdr)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, color: 'var(--fg3)',
+      }}>
+        <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
+          <path d="M7 2v10M2 7h10" />
+        </svg>
+      </div>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg1)' }}>Add another source</div>
+        <div style={{ fontSize: 11, color: 'var(--fg3)', marginTop: 2 }}>Connect an exchange, wallet, broker, or add manual assets</div>
+      </div>
+    </div>
+  )
+}
+
 // ── Platform card ─────────────────────────────────────────────────────────────
 
 interface PlatformStatus {
@@ -152,7 +185,7 @@ function PlatformCard({
   connectors: Connector[]
   onReconnect?: () => void
 }) {
-  const [open, setOpen]       = useState(p.total_usd > 10_000)
+  const [open, setOpen]       = useState(false)
   const [hovered, setHovered] = useState(false)
   const status = platformStatus(connectors)
 
@@ -358,6 +391,9 @@ export default function HoldingsTab({ onAddSource }: HoldingsTabProps = {}) {
           onReconnect={onAddSource}
         />
       ))}
+      {onAddSource && (
+        <AddSourceRow onClick={onAddSource} />
+      )}
     </div>
   )
 }

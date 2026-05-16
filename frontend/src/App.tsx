@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from './auth/AuthContext'
 import LoginPage from './pages/LoginPage'
 import Sidebar from './components/Sidebar'
@@ -29,6 +29,14 @@ export default function App() {
     return isRoute(saved) ? saved : 'dashboard'
   })
   const [modal, setModal] = useState<ModalState | null>(null)
+  const prevTokenRef = useRef(token)
+
+  useEffect(() => {
+    if (prevTokenRef.current === null && token !== null) {
+      setRoute('dashboard')
+    }
+    prevTokenRef.current = token
+  }, [token])
 
   useEffect(() => {
     localStorage.setItem(ROUTE_KEY, route)
