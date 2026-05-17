@@ -11,7 +11,7 @@ const PATHS: Record<string, JSX.Element> = {
   chevron: <path d="M6 9l6 6 6-6" />,
   chevronR: <path d="M9 18l6-6-6-6" />,
   chevronL: <path d="M15 18l-6-6 6-6" />,
-  x: <path d="M18 6L6 18M6 6l18 18" />,
+  x: <path d="M18 6L6 18M6 6L18 18" />,
   check: <path d="M20 6L9 17l-5-5" />,
   refresh: <><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></>,
   search: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" /></>,
