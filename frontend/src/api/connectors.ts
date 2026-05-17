@@ -52,3 +52,27 @@ export async function refreshConnector(id: string): Promise<ConnectorCreateRespo
   })
   return r.data
 }
+
+export interface ImportHistoryResult {
+  import_id: string
+  written_count: number
+  skipped_count: number
+  date_from: string | null
+  date_to: string | null
+  invalid_rows: { row_num: number; reason: string }[]
+  skipped_dates: string[]
+}
+
+export async function importHistoricalData(
+  connectorId: string,
+  file: File,
+  currency: 'USD' | 'TWD',
+  conflictStrategy: 'skip' | 'override',
+): Promise<ImportHistoryResult> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('currency', currency)
+  form.append('conflict_strategy', conflictStrategy)
+  const r = await api.post(`/api/connectors/${connectorId}/historical-import`, form)
+  return r.data
+}

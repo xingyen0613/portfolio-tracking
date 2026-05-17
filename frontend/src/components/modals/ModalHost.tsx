@@ -1,6 +1,7 @@
 import type { ModalState } from '../../App'
 import AddSourceModal from './AddSourceModal'
 import ConnectSourceModal from './ConnectSourceModal'
+import ImportHistoryModal from './ImportHistoryModal'
 
 interface Props {
   modal: ModalState | null
@@ -31,6 +32,9 @@ export default function ModalHost({ modal, setModal }: Props) {
             Coming soon.
           </div>
         </div>
+      )}
+      {modal.kind === 'importHistory' && (
+        <ImportHistoryModal connector={modal.connector} close={close} />
       )}
     </div>
   )

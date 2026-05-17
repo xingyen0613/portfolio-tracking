@@ -15,6 +15,7 @@ export type ModalState =
   | { kind: 'addSource' }
   | { kind: 'connect'; templateId: string }
   | { kind: 'editSource'; connectorId: string }
+  | { kind: 'importHistory'; connector: import('./api/connectors').Connector }
 
 const ROUTE_KEY = 'pt_route'
 

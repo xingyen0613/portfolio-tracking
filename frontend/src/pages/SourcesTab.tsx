@@ -33,17 +33,21 @@ function formatRelative(iso: string | null): string {
   return `${day}d ago`
 }
 
+const WALLET_PLATFORMS = new Set(['evm_wallet', 'sol_wallet', 'sui_wallet'])
+
 function ConnectorRow({
   c,
   template,
   onRefresh,
   onRemove,
+  onImport,
   busy,
 }: {
   c: Connector
   template: SourceTemplate | undefined
   onRefresh: () => void
   onRemove: () => void
+  onImport: () => void
   busy: boolean
 }) {
   const status = statusOf(c)
@@ -93,6 +97,16 @@ function ConnectorRow({
       </div>
       <span className={`platform-status ${status.cls}`}>{status.label}</span>
       <div className="row-actions">
+        {!WALLET_PLATFORMS.has(c.platform_name) && (
+          <button
+            className="icon-btn"
+            title="Import history"
+            onClick={onImport}
+            disabled={busy}
+          >
+            <Icon name="upload" />
+          </button>
+        )}
         <button
           className="icon-btn"
           title="Refresh"
@@ -191,6 +205,7 @@ export default function SourcesTab({ openModal }: Props) {
               template={getTemplate(c.platform_name)}
               onRefresh={() => refreshMut.mutate(c.id)}
               onRemove={() => handleRemove(c)}
+              onImport={() => openModal({ kind: 'importHistory', connector: c })}
               busy={
                 (deleteMut.isPending && deleteMut.variables === c.id) ||
                 (refreshMut.isPending && refreshMut.variables === c.id)
