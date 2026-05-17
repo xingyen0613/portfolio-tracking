@@ -66,10 +66,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .app {
   display: grid;
   grid-template-columns: 232px 1fr;
-  min-height: 100vh;
+  height: 100%;
   background: var(--bg);
 }
-.main { display: flex; flex-direction: column; min-width: 0; }
+.main { display: flex; flex-direction: column; min-width: 0; height: 100%; overflow-y: auto; }
 .page {
   flex: 1;
   padding: 28px 32px 48px;
