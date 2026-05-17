@@ -9,7 +9,8 @@ import DashboardTab from './pages/DashboardTab'
 import SourcesTab from './pages/SourcesTab'
 import AlertsTab from './pages/AlertsTab'
 import SettingsTab from './pages/SettingsTab'
-import type { ImportHistoryResult } from './api/connectors'
+import { type ImportHistoryResult } from './api/connectors'
+import { IMPORT_HISTORY_MUTATION_KEY } from './components/modals/ImportHistoryModal'
 
 export type Route = 'dashboard' | 'sources' | 'alerts' | 'settings'
 
@@ -45,6 +46,19 @@ export default function App() {
     setTimeout(() => setImportToast(null), 6000)
   }, [qc])
 
+  // MutationCache subscription — fires even when ImportHistoryModal is unmounted
+  useEffect(() => {
+    return qc.getMutationCache().subscribe((event) => {
+      if (
+        event.type === 'updated' &&
+        event.mutation?.options.mutationKey?.[0] === IMPORT_HISTORY_MUTATION_KEY &&
+        event.mutation.state.status === 'success'
+      ) {
+        handleImportDone(event.mutation.state.data as ImportHistoryResult)
+      }
+    })
+  }, [qc, handleImportDone])
+
   useEffect(() => {
     if (prevTokenRef.current === null && token !== null) {
       setRoute('dashboard')
@@ -71,7 +85,7 @@ export default function App() {
           {route === 'settings' && <SettingsTab />}
         </div>
       </main>
-      <ModalHost modal={modal} setModal={setModal} onImportDone={handleImportDone} />
+      <ModalHost modal={modal} setModal={setModal} />
       {importToast && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9999,

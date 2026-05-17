@@ -1,5 +1,4 @@
 import type { ModalState } from '../../App'
-import type { ImportHistoryResult } from '../../api/connectors'
 import AddSourceModal from './AddSourceModal'
 import ConnectSourceModal from './ConnectSourceModal'
 import ImportHistoryModal from './ImportHistoryModal'
@@ -7,10 +6,9 @@ import ImportHistoryModal from './ImportHistoryModal'
 interface Props {
   modal: ModalState | null
   setModal: (m: ModalState | null) => void
-  onImportDone: (result: ImportHistoryResult) => void
 }
 
-export default function ModalHost({ modal, setModal, onImportDone }: Props) {
+export default function ModalHost({ modal, setModal }: Props) {
   if (!modal) return null
   const close = () => setModal(null)
   return (
@@ -36,7 +34,7 @@ export default function ModalHost({ modal, setModal, onImportDone }: Props) {
         </div>
       )}
       {modal.kind === 'importHistory' && (
-        <ImportHistoryModal connector={modal.connector} close={close} onImportDone={onImportDone} />
+        <ImportHistoryModal connector={modal.connector} close={close} />
       )}
     </div>
   )
