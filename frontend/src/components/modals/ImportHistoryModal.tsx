@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
 import { Icon } from '../Icon'
 import {
@@ -13,12 +13,12 @@ import { getTemplate } from '../../data/sourceTemplates'
 interface Props {
   connector: Connector
   close: () => void
+  onImportDone: (result: ImportHistoryResult) => void
 }
 
 type Phase = 'form' | 'checking' | 'conflict' | 'uploading' | 'result'
 
-export default function ImportHistoryModal({ connector, close }: Props) {
-  const qc = useQueryClient()
+export default function ImportHistoryModal({ connector, close, onImportDone }: Props) {
   const t = getTemplate(connector.platform_name)
   const abbr = t?.abbr ?? connector.platform_name.slice(0, 3).toUpperCase()
   const name = t?.name ?? connector.platform_name
@@ -90,9 +90,7 @@ export default function ImportHistoryModal({ connector, close }: Props) {
       setError(null)
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({
-        predicate: q => typeof q.queryKey[0] === 'string' && q.queryKey[0].startsWith('portfolio'),
-      })
+      onImportDone(data)
       setResult(data)
       setPhase('result')
     },
@@ -119,7 +117,12 @@ export default function ImportHistoryModal({ connector, close }: Props) {
             border: '1px solid rgba(240,162,60,0.35)',
             color: 'var(--c-crypto)', fontSize: 13, lineHeight: 1.55,
           }}>
-            {msg}
+            <div>{msg}</div>
+            {phase === 'checking' && (
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--fg-3)' }}>
+                Please don't close this window while checking.
+              </div>
+            )}
           </div>
         </div>
       </div>
