@@ -31,6 +31,7 @@ export default function App() {
   })
   const [modal, setModal] = useState<ModalState | null>(null)
   const prevTokenRef = useRef(token)
+  const mainRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     if (prevTokenRef.current === null && token !== null) {
@@ -41,7 +42,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem(ROUTE_KEY, route)
-    window.scrollTo(0, 0)
+    if (mainRef.current) mainRef.current.scrollTop = 0
   }, [route])
 
   if (!token) return <LoginPage />
@@ -49,7 +50,7 @@ export default function App() {
   return (
     <div className="app">
       <Sidebar route={route} setRoute={setRoute} />
-      <main className="main">
+      <main className="main" ref={mainRef}>
         <Topbar route={route} openModal={setModal} />
         <div className="page">
           {route === 'dashboard' && <DashboardTab openModal={setModal} />}

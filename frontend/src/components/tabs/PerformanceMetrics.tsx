@@ -62,7 +62,7 @@ export default function PerformanceMetrics() {
     <div>
       <div style={{
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-        marginBottom: 14, flexWrap: 'wrap', gap: 10,
+        margin: '8px 0 12px', flexWrap: 'wrap', gap: 10,
       }}>
         <div>
           <div className="section-title">Performance Metrics</div>
