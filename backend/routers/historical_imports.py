@@ -32,6 +32,17 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _get_account_id(conn, platform: str, account_key: str, user_id: str) -> int | None:
+    """Read-only lookup — does NOT create the account."""
+    row = conn.execute(
+        """SELECT a.id FROM accounts a
+           JOIN platforms p ON a.platform_id = p.id
+           WHERE p.name = %s AND a.account_key = %s AND a.user_id = %s""",
+        (platform, account_key, user_id),
+    ).fetchone()
+    return row["id"] if row else None
+
+
 def _ensure_account(conn, platform: str, account_key: str, label: str | None, user_id: str) -> int:
     """Ensure the account row exists and return its id."""
     conn.execute(
@@ -60,6 +71,7 @@ async def import_historical_data(
     file: UploadFile,
     currency: str = Form(...),
     conflict_strategy: str = Form("skip"),
+    dry_run: bool = Form(False),
     current_user: dict = Depends(get_current_user),
 ):
     """Import historical CSV data for a connector.
@@ -114,6 +126,26 @@ async def import_historical_data(
                 "invalid_rows": parse_result.invalid_rows,
             },
         )
+
+    # Dry-run: check conflicts without writing anything
+    if dry_run:
+        with get_conn() as conn:
+            account_id = _get_account_id(conn, platform, connector["account_key"], user_id)
+            conflicting: list[str] = []
+            if account_id is not None:
+                for row_data in parse_result.rows:
+                    existing = conn.execute(
+                        "SELECT 1 FROM account_snapshots WHERE account_id = %s AND snapshot_date = %s LIMIT 1",
+                        (account_id, row_data["date"]),
+                    ).fetchone()
+                    if existing:
+                        conflicting.append(row_data["date"])
+        return {
+            "dry_run": True,
+            "total_parsed": len(parse_result.rows),
+            "conflicting_dates": conflicting,
+            "invalid_rows": parse_result.invalid_rows,
+        }
 
     # Preload fx_rates series for TWD conversion (single query for all dates)
     fx_series = None

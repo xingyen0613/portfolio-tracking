@@ -53,6 +53,26 @@ export async function refreshConnector(id: string): Promise<ConnectorCreateRespo
   return r.data
 }
 
+export interface ImportPreviewResult {
+  dry_run: true
+  total_parsed: number
+  conflicting_dates: string[]
+  invalid_rows: { row_num: number; reason: string }[]
+}
+
+export async function previewHistoricalImport(
+  connectorId: string,
+  file: File,
+  currency: 'USD' | 'TWD',
+): Promise<ImportPreviewResult> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('currency', currency)
+  form.append('dry_run', 'true')
+  const r = await api.post(`/api/connectors/${connectorId}/historical-import`, form)
+  return r.data
+}
+
 export interface ImportHistoryResult {
   import_id: string
   written_count: number
