@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
 import { Icon } from '../Icon'
@@ -63,6 +63,32 @@ export default function ImportHistoryModal({ connector, close, onImportDone }: P
     }
   }
 
+  // Step 2: actual import (defined first so doImport can reference it)
+  const importMut = useMutation({
+    mutationFn: (strategy: 'skip' | 'override') =>
+      importHistoricalData(connector.id, file!, currency, strategy),
+    onMutate: () => {
+      setPhase('uploading')
+      setError(null)
+    },
+  })
+
+  // Keep latest onImportDone in a ref so the mutate() callback always calls the current version
+  const onImportDoneRef = useRef(onImportDone)
+  onImportDoneRef.current = onImportDone
+
+  // mutate() argument callbacks fire even after component unmount (unlike useMutation option callbacks)
+  const doImport = useCallback((strategy: 'skip' | 'override') => {
+    importMut.mutate(strategy, {
+      onSuccess: (data) => {
+        onImportDoneRef.current(data)
+        setResult(data)
+        setPhase('result')
+      },
+      onError: handleApiError,
+    })
+  }, [importMut]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Step 1: dry-run — detect conflicts
   const checkMut = useMutation({
     mutationFn: () => previewHistoricalImport(connector.id, file!, currency),
@@ -72,27 +98,11 @@ export default function ImportHistoryModal({ connector, close, onImportDone }: P
     },
     onSuccess: (data) => {
       if (data.conflicting_dates.length === 0) {
-        importMut.mutate('skip')
+        doImport('skip')
       } else {
         setConflictingDates(data.conflicting_dates)
         setPhase('conflict')
       }
-    },
-    onError: handleApiError,
-  })
-
-  // Step 2: actual import
-  const importMut = useMutation({
-    mutationFn: (strategy: 'skip' | 'override') =>
-      importHistoricalData(connector.id, file!, currency, strategy),
-    onMutate: () => {
-      setPhase('uploading')
-      setError(null)
-    },
-    onSuccess: (data) => {
-      onImportDone(data)
-      setResult(data)
-      setPhase('result')
     },
     onError: handleApiError,
   })
@@ -168,13 +178,13 @@ export default function ImportHistoryModal({ connector, close, onImportDone }: P
           <button className="btn btn-ghost" onClick={close}>Cancel</button>
           <button
             className="btn btn-ghost"
-            onClick={() => importMut.mutate('skip')}
+            onClick={() => doImport('skip')}
           >
             Skip duplicates
           </button>
           <button
             className="btn btn-primary"
-            onClick={() => importMut.mutate('override')}
+            onClick={() => doImport('override')}
           >
             Override existing
           </button>
