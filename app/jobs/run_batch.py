@@ -20,7 +20,6 @@ from dotenv import load_dotenv
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
 
 from config.db import get_conn
-from app.storage.sqlite import init_db
 from config.settings import ENABLED_PLATFORMS, ENV_PATH, PLATFORM_CATEGORY, WALLETS_ENV_PATH
 
 load_dotenv(ENV_PATH)
@@ -287,8 +286,6 @@ def run_batch(platforms: list[str], user_id: str,
 
     Returns batch_id.
     """
-    init_db()
-
     batch_id = str(uuid.uuid4())
     started_at = _now()
     print(f"\n[Batch {batch_id[:8]}] user={user_id[:8]} starting — {started_at}")

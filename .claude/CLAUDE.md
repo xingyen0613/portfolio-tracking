@@ -22,6 +22,22 @@
 - [資料處理 Pipeline 說明](../docs/data-pipeline.md) — 各平台斷點設計、儲存位置、定價來源
 - [元大 cum_cash 限制](../docs/yuanta-cumcash-known-limitations.md) — 月底 anchor step 成因與未來解法
 
+## 部署注意事項
+
+### DB Migration
+
+**新增或修改以下內容時，必須在 push/部署前先執行 migration：**
+- 新增 alembic migration 檔案（`alembic/versions/`）
+- 新增資料表、欄位、index
+- 新增 platform seed 資料（如 `009_seed_sinopac_platform.py`）
+
+執行方式（本機連 Supabase）：
+```bash
+uv run alembic upgrade head
+```
+
+**背景說明：** `run_batch` 不再自動跑 migration（已從 `init_db()` 移除）。DB 更新與程式碼部署解耦，需手動確保兩者同步。若忘記執行，Zeabur batch 在用到新欄位時才會 crash，而不是在啟動時提早報錯。
+
 ## 架構決策
 
 ### 美股 category（us_stock）資料來源
