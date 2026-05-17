@@ -41,6 +41,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem(ROUTE_KEY, route)
+    window.scrollTo(0, 0)
   }, [route])
 
   if (!token) return <LoginPage />
