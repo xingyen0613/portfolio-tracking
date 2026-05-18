@@ -11,7 +11,9 @@ aiosignal==1.4.0
 alembic==1.18.4
     # via portfolio-tracking
 annotated-doc==0.0.4
-    # via fastapi
+    # via
+    #   fastapi
+    #   typer
 annotated-types==0.7.0
     # via pydantic
 anyio==4.13.0
@@ -22,6 +24,8 @@ apscheduler==3.10.4
     # via portfolio-tracking
 attrs==26.1.0
     # via aiohttp
+base58==2.1.1
+    # via shioaji
 beautifulsoup4==4.14.3
     # via yfinance
 blinker==1.9.0
@@ -33,11 +37,13 @@ certifi==2026.2.25
     #   ccxt
     #   curl-cffi
     #   requests
+    #   sentry-sdk
 cffi==2.0.0
     # via
     #   cryptography
     #   curl-cffi
     #   pycares
+    #   pynacl
 charset-normalizer==3.4.7
     # via
     #   pdfminer-six
@@ -45,12 +51,14 @@ charset-normalizer==3.4.7
 click==8.3.2
     # via
     #   flask
+    #   typer
     #   uvicorn
 coincurve==21.0.0 ; python_full_version < '3.14'
     # via ccxt
 colorama==0.4.6 ; sys_platform == 'win32'
     # via
     #   click
+    #   loguru
     #   uvicorn
 cryptography==46.0.7
     # via
@@ -64,6 +72,8 @@ ecdsa==0.19.2
     # via python-jose
 fastapi==0.136.1
     # via portfolio-tracking
+filelock==3.29.0
+    # via shioaji
 flask==3.1.3
     # via portfolio-tracking
 frozendict==2.4.7
@@ -103,10 +113,16 @@ idna==3.11
     #   anyio
     #   requests
     #   yarl
+importlib-metadata==9.0.0
+    # via shioaji
 itsdangerous==2.2.0
     # via flask
 jinja2==3.1.6
     # via flask
+loguru==0.7.3
+    # via
+    #   pysolace
+    #   shioaji
 mako==1.3.12
     # via alembic
 markdown-it-py==4.0.0
@@ -119,6 +135,8 @@ markupsafe==3.0.3
     #   werkzeug
 mdurl==0.1.2
     # via markdown-it-py
+msgpack==1.1.2
+    # via pysolace
 multidict==6.7.1
     # via
     #   aiohttp
@@ -133,6 +151,8 @@ numpy==2.4.4
     #   yfinance
 oauthlib==3.3.1
     # via requests-oauthlib
+orjson==3.11.9
+    # via pysolace
 pandas==3.0.2
     # via
     #   portfolio-tracking
@@ -174,20 +194,27 @@ pycares==5.0.1
     # via aiodns
 pycparser==3.0 ; implementation_name != 'PyPy'
     # via cffi
-pydantic==2.12.5
+pydantic==2.12.3
     # via
     #   fastapi
     #   portfolio-tracking
-pydantic-core==2.41.5
+    #   shioaji
+pydantic-core==2.41.4
     # via pydantic
 pygments==2.20.0
     # via rich
+pynacl==1.6.2
+    # via shioaji
 pyparsing==3.3.2
     # via httplib2
 pypdf==6.9.2
     # via portfolio-tracking
 pypdfium2==5.7.0
     # via pdfplumber
+pyrsca==0.4.0
+    # via shioaji
+pysolace==0.9.53
+    # via shioaji
 python-dateutil==2.9.0.post0
     # via
     #   pandas
@@ -197,6 +224,8 @@ python-dotenv==1.2.2
     #   portfolio-tracking
     #   uvicorn
 python-jose==3.5.0
+    # via portfolio-tracking
+python-multipart==0.0.28
     # via portfolio-tracking
 pytz==2026.1.post1
     # via
@@ -209,15 +238,24 @@ requests==2.33.1
     #   ccxt
     #   google-api-core
     #   requests-oauthlib
+    #   shioaji
     #   yfinance
 requests-oauthlib==2.0.0
     # via google-auth-oauthlib
 rich==15.0.0
-    # via curl-cffi
+    # via
+    #   curl-cffi
+    #   typer
 rsa==4.9.1
     # via python-jose
+sentry-sdk==2.59.0
+    # via shioaji
 setuptools==82.0.1
     # via ccxt
+shellingham==1.5.4
+    # via typer
+shioaji==1.3.3
+    # via portfolio-tracking
 six==1.17.0
     # via
     #   apscheduler
@@ -229,6 +267,8 @@ sqlalchemy==2.0.49
     # via alembic
 starlette==1.0.0
     # via fastapi
+typer==0.25.1
+    # via pysolace
 typing-extensions==4.15.0
     # via
     #   aiosignal
@@ -239,6 +279,7 @@ typing-extensions==4.15.0
     #   fastapi
     #   pydantic
     #   pydantic-core
+    #   shioaji
     #   sqlalchemy
     #   starlette
     #   typing-inspection
@@ -258,6 +299,7 @@ urllib3==2.6.3
     # via
     #   plaid-python
     #   requests
+    #   sentry-sdk
 uvicorn==0.46.0
     # via portfolio-tracking
 uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
@@ -270,9 +312,15 @@ websockets==16.0
     #   yfinance
 werkzeug==3.1.8
     # via flask
+win32-setctime==1.2.0 ; sys_platform == 'win32'
+    # via loguru
+xxhash==3.7.0
+    # via shioaji
 yarl==1.23.0
     # via
     #   aiohttp
     #   ccxt
 yfinance==1.3.0
     # via portfolio-tracking
+zipp==3.23.1
+    # via importlib-metadata
