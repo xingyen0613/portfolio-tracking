@@ -8,7 +8,9 @@ from pydantic import BaseModel, Field
 
 from app.auth.deps import get_current_user
 from app.auth.encryption import decrypt, encrypt
+from app.jobs.rebuild_category_snapshots import rebuild_for_dates
 from config.db import get_conn
+from config.settings import PLATFORM_CATEGORY
 
 router = APIRouter()
 
@@ -217,6 +219,17 @@ def _resolve_account_ids(conn, platform: str, account_key: str, creds: dict, use
         ).fetchall()
         return [r["id"] for r in rows]
 
+    if platform == "sinopac":
+        # One connector maps to multiple accounts: {account_key} and {account_key}_*
+        rows = conn.execute(
+            """SELECT a.id FROM accounts a
+               JOIN platforms p ON a.platform_id = p.id
+               WHERE p.name='sinopac' AND a.user_id=%s
+                 AND (a.account_key = %s OR a.account_key LIKE %s)""",
+            (user_id, account_key, f"{account_key}_%"),
+        ).fetchall()
+        return [r["id"] for r in rows]
+
     if platform == "evm_wallet":
         # account_key = addr_lower[:10] || '_' || chain_short — match by prefix per addr
         prefixes = [f"{a.lower()[:10]}_%" for a in addrs if len(a) >= 10]
@@ -274,6 +287,16 @@ def delete_connector(connector_id: str, current_user: dict = Depends(get_current
                     "account_snapshots": 0}
 
         if account_ids:
+            # Collect affected dates + category before deleting account_snapshots.
+            affected_rows = conn.execute(
+                """SELECT DISTINCT acs.snapshot_date::text
+                   FROM account_snapshots acs
+                   WHERE acs.account_id = ANY(%s)""",
+                (account_ids,),
+            ).fetchall()
+            affected_dates = [r["snapshot_date"] for r in affected_rows]
+            affected_category = PLATFORM_CATEGORY.get(row["platform_name"])
+
             cascaded["normalized_holdings"] = conn.execute(
                 """DELETE FROM normalized_holdings
                    WHERE source_run_id IN (
@@ -297,6 +320,17 @@ def delete_connector(connector_id: str, current_user: dict = Depends(get_current
                 (account_ids,),
             ).rowcount
             conn.execute("DELETE FROM accounts WHERE id = ANY(%s)", (account_ids,))
+
+            # Clear stale category_snapshots, then rebuild from remaining data.
+            if affected_dates and affected_category:
+                conn.execute(
+                    """DELETE FROM category_snapshots
+                       WHERE user_id = %s
+                         AND category = %s
+                         AND snapshot_date::text = ANY(%s)""",
+                    (user_id, affected_category, affected_dates),
+                )
+                rebuild_for_dates(conn, user_id, affected_dates)
 
         conn.execute(
             "DELETE FROM user_connectors WHERE id=%s AND user_id=%s",
