@@ -85,6 +85,14 @@ class SinopacStockConnector(BaseConnector):
         except Exception as e:
             print(f"  ⚠ [sinopac/account_balance] skipped: {e}")
 
+        # 期貨保證金權益數（非交易時段可能失敗，容錯處理）
+        margin = None
+        if getattr(api, "futopt_account", None):
+            try:
+                margin = api.margin()
+            except Exception as e:
+                print(f"  ⚠ [sinopac/margin] skipped: {e}")
+
         return [
             {
                 "resource_type": "stock_position",
@@ -94,6 +102,11 @@ class SinopacStockConnector(BaseConnector):
             {
                 "resource_type": "cash_balance",
                 "payload": _serialize_position(balance) if balance else {},
+                "fetched_at": _now(),
+            },
+            {
+                "resource_type": "futopt_margin",
+                "payload": _serialize_position(margin) if margin else {},
                 "fetched_at": _now(),
             },
         ]
@@ -145,6 +158,21 @@ class SinopacStockConnector(BaseConnector):
                         "original_currency": "TWD",
                         "price_source": "platform",
                         "resource_type": "cash",
+                    })
+
+            elif rt == "futopt_margin":
+                equity = float(payload.get("equity") or 0)
+                if equity:
+                    holdings.append({
+                        "platform_symbol": "TWD",
+                        "platform_asset_name": "期貨權益 (TWD)",
+                        "asset_type": "cash",
+                        "quantity": equity,
+                        "price": 1.0,
+                        "value": equity,
+                        "original_currency": "TWD",
+                        "price_source": "platform",
+                        "resource_type": "tw_futures",
                     })
 
         return holdings

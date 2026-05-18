@@ -36,6 +36,7 @@ RESOURCE_TYPE_LABEL = {
     "futures_um":         "U本位永續",
     "futures_cm":         "幣本位永續",
     "futures":            "合約",
+    "tw_futures":         "期貨",
     "options":            "期權",
     "stock":              "持股",
     "cash":               "現金",
@@ -50,7 +51,7 @@ RESOURCE_TYPE_ORDER = {
     "earn_locked": 4, "earn_onchain": 5,
     "funding": 6,
     "margin_cross": 7,
-    "futures": 8, "futures_um": 8, "futures_cm": 9,
+    "futures": 8, "tw_futures": 8, "futures_um": 8, "futures_cm": 9,
     "options": 10,
 }
 
