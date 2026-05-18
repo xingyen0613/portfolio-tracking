@@ -35,7 +35,11 @@ def _get_shioaji_api(api_key: str, secret_key: str, simulation: bool = False):
 
     import shioaji as sj
     api = sj.Shioaji(simulation=simulation)
-    api.login(api_key=api_key, secret_key=secret_key)
+    api.login(api_key=api_key, secret_key=secret_key, subscribe_trade=False)
+    for acc in getattr(api, "accounts", []):
+        signed = getattr(acc, "signed", None)
+        acc_id = getattr(acc, "account_id", "?")
+        print(f"  [sinopac] account {acc_id} signed={signed}")
     _sessions[cache_key] = (api, time.time())
     return api
 
@@ -60,7 +64,9 @@ class SinopacStockConnector(BaseConnector):
         if not api_key or not secret_key:
             raise RuntimeError("SINOPAC_API_KEY and SINOPAC_SECRET_KEY must be set")
         simulation = os.getenv("SINOPAC_SIMULATION", "").lower() in ("1", "true")
+        print(f"  [sinopac] login start (simulation={simulation})")
         self._api = _get_shioaji_api(api_key, secret_key, simulation=simulation)
+        print(f"  [sinopac] login ok, stock_account={getattr(self._api, 'stock_account', None)}")
         if not getattr(self._api, "stock_account", None):
             raise RuntimeError("No stock_account on this Shioaji session — account may not be opened")
 
@@ -69,22 +75,20 @@ class SinopacStockConnector(BaseConnector):
         api = self._api
         stock_account = api.stock_account
 
-        # 整股
-        positions_common = api.list_positions(stock_account, unit=sj.constant.Unit.Common)
-        # 零股
-        positions_share = api.list_positions(stock_account, unit=sj.constant.Unit.Share)
-        # 交割款餘額
-        balance = api.account_balance()
+        # Unit.Share 回傳總股數（整張 + 零股合併），是唯一正確來源
+        positions = api.list_positions(stock_account, unit=sj.constant.Unit.Share)
+
+        # 交割款餘額（非交易時段時可能 406，容錯處理）
+        balance = None
+        try:
+            balance = api.account_balance()
+        except Exception as e:
+            print(f"  ⚠ [sinopac/account_balance] skipped: {e}")
 
         return [
             {
                 "resource_type": "stock_position",
-                "payload": {"positions": [_serialize_position(p) for p in positions_common]},
-                "fetched_at": _now(),
-            },
-            {
-                "resource_type": "stock_position_odd",
-                "payload": {"positions": [_serialize_position(p) for p in positions_share]},
+                "payload": {"positions": [_serialize_position(p) for p in positions]},
                 "fetched_at": _now(),
             },
             {
@@ -101,29 +105,26 @@ class SinopacStockConnector(BaseConnector):
             rt = item["resource_type"]
             payload = item["payload"]
 
-            if rt in ("stock_position", "stock_position_odd"):
+            if rt == "stock_position":
                 for pos in payload.get("positions", []):
                     cond = str(pos.get("cond", "")).lower()
-                    # Slice 1 只處理現股；融資融券 cond 待 Slice 2
+                    # 只處理現股；融資融券 cond 留待後續
                     if cond and "cash" not in cond and "netting" not in cond:
                         continue
 
+                    # Unit.Share 回傳的 quantity 已是總股數（整張 + 零股）
                     qty = float(pos.get("quantity") or 0)
                     last_price = float(pos.get("last_price") or 0)
                     direction = str(pos.get("direction", "")).lower()
-                    # 整股 quantity 單位是「張」(1000 股)，零股是「股」
-                    multiplier = 1000 if rt == "stock_position" else 1
-                    actual_qty = qty * multiplier
-                    value = actual_qty * last_price
                     if direction.endswith("sell"):
-                        actual_qty = -actual_qty
-                        value = -value
+                        qty = -qty
+                    value = qty * last_price
 
                     holdings.append({
                         "platform_symbol": pos.get("code"),
                         "platform_asset_name": pos.get("code"),
                         "asset_type": "stock",
-                        "quantity": actual_qty,
+                        "quantity": qty,
                         "price": last_price,
                         "value": value,
                         "original_currency": "TWD",

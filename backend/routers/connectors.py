@@ -165,6 +165,10 @@ def create_connector(body: ConnectorCreate, current_user: dict = Depends(get_cur
             (connector_id,),
         ).fetchone()
 
+    # run_batch swallows exceptions internally; fall back to last_error from DB
+    if fetch_status == "failed" and fetch_error is None and row and row["last_error"]:
+        fetch_error = row["last_error"]
+
     response = ConnectorCreateResponse(
         connector=_row_to_connector(row),
         fetch_status=fetch_status,

@@ -31,18 +31,21 @@ def rebuild_for_dates(conn, user_id: str, dates: list[str]) -> int:
     if not dates:
         return 0
 
+    from app.utils.fx import get_latest_fx_rate
+    fx_rate = get_latest_fx_rate()  # TWD per USD
+
     now = _now()
     written = 0
 
     for snapshot_date in dates:
         platform_values = conn.execute(
             """
-            SELECT p.name, SUM(acs.total_value) AS total_value
+            SELECT p.name, acs.currency, SUM(acs.total_value) AS total_value
             FROM account_snapshots acs
             JOIN accounts a ON acs.account_id = a.id
             JOIN platforms p ON a.platform_id = p.id
             WHERE acs.total_value IS NOT NULL
-              AND acs.currency = 'USD'
+              AND acs.currency IN ('USD', 'TWD')
               AND acs.user_id = %s
               AND acs.snapshot_date = (
                   SELECT MAX(acs2.snapshot_date)
@@ -52,7 +55,7 @@ def rebuild_for_dates(conn, user_id: str, dates: list[str]) -> int:
                     AND acs2.user_id = %s
                     AND acs2.snapshot_date <= %s
                     AND acs2.total_value IS NOT NULL
-                    AND acs2.currency = 'USD'
+                    AND acs2.currency = acs.currency
               )
               AND acs.id = (
                   SELECT id FROM account_snapshots
@@ -62,7 +65,7 @@ def rebuild_for_dates(conn, user_id: str, dates: list[str]) -> int:
                     AND user_id = acs.user_id
                   ORDER BY created_at DESC LIMIT 1
               )
-            GROUP BY p.name
+            GROUP BY p.name, acs.currency
             """,
             (user_id, user_id, snapshot_date),
         ).fetchall()
@@ -70,8 +73,12 @@ def rebuild_for_dates(conn, user_id: str, dates: list[str]) -> int:
         grouped: dict[str, float] = defaultdict(float)
         for row in platform_values:
             cat = PLATFORM_CATEGORY.get(row["name"])
-            if cat:
-                grouped[cat] += row["total_value"] or 0.0
+            if not cat:
+                continue
+            value = row["total_value"] or 0.0
+            if row["currency"] == "TWD":
+                value = value / fx_rate
+            grouped[cat] += value
 
         for category, total_value in grouped.items():
             conn.execute(

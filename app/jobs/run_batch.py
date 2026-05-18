@@ -189,6 +189,7 @@ def _ensure_exchange_or_ibkr_account(platform: str, account_key: str, label: str
 def _aggregate_categories(batch_id: str, user_id: str) -> None:
     """After all source runs finish, write category totals to category_snapshots."""
     from collections import defaultdict
+    from app.utils.fx import get_latest_fx_rate
 
     with get_conn() as conn:
         dates_rows = conn.execute("""
@@ -202,17 +203,18 @@ def _aggregate_categories(batch_id: str, user_id: str) -> None:
     if not dates:
         return
 
+    fx_rate = get_latest_fx_rate()  # TWD per USD
     now = _now()
     written = 0
     with get_conn() as conn:
         for snapshot_date in dates:
             platform_values = conn.execute("""
-                SELECT p.name, SUM(acs.total_value) AS total_value
+                SELECT p.name, acs.currency, SUM(acs.total_value) AS total_value
                 FROM account_snapshots acs
                 JOIN accounts a ON acs.account_id = a.id
                 JOIN platforms p ON a.platform_id = p.id
                 WHERE acs.total_value IS NOT NULL
-                  AND acs.currency = 'USD'
+                  AND acs.currency IN ('USD', 'TWD')
                   AND acs.user_id = %s
                   AND acs.snapshot_date = (
                       SELECT MAX(acs2.snapshot_date)
@@ -222,7 +224,7 @@ def _aggregate_categories(batch_id: str, user_id: str) -> None:
                         AND acs2.user_id = %s
                         AND acs2.snapshot_date <= %s
                         AND acs2.total_value IS NOT NULL
-                        AND acs2.currency = 'USD'
+                        AND acs2.currency = acs.currency
                   )
                   AND acs.id = (
                       SELECT id FROM account_snapshots
@@ -231,14 +233,19 @@ def _aggregate_categories(batch_id: str, user_id: str) -> None:
                         AND total_value IS NOT NULL
                       ORDER BY created_at DESC LIMIT 1
                   )
-                GROUP BY p.name
+                GROUP BY p.name, acs.currency
             """, (user_id, user_id, snapshot_date)).fetchall()
 
             grouped: dict[str, float] = defaultdict(float)
             for row in platform_values:
                 cat = PLATFORM_CATEGORY.get(row["name"])
-                if cat:
-                    grouped[cat] += row["total_value"] or 0.0
+                if not cat:
+                    continue
+                value = row["total_value"] or 0.0
+                # Convert TWD to USD
+                if row["currency"] == "TWD":
+                    value = value / fx_rate
+                grouped[cat] += value
 
             for category, total_value in grouped.items():
                 conn.execute(
