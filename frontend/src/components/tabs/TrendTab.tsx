@@ -59,10 +59,6 @@ function fmtUsd(v: number) {
   return `${sign}$${abs.toFixed(0)}`
 }
 
-function fmtPct(v: number | null) {
-  if (v == null) return '—'
-  return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`
-}
 
 // converts Lightweight Charts Time (string | number | BusinessDay) → 'YYYY-MM-DD'
 function lwcTimeToStr(t: unknown): string {

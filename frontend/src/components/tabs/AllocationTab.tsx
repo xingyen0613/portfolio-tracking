@@ -10,9 +10,6 @@ const P_COLORS: Record<string, string> = {
   us_stock: '#ec5b7e',
   tw_stock: '#4ec9a8',
 }
-const P_LABELS: Record<string, string> = {
-  total: '總資產', crypto: '幣圈', us_stock: '美股', tw_stock: '台股',
-}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
