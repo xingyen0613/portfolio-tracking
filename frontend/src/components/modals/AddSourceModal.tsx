@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Icon } from '../Icon'
 import {
   CATEGORY_LABEL,
@@ -6,6 +7,7 @@ import {
   type Category,
   type SourceTemplate,
 } from '../../data/sourceTemplates'
+import { listConnectors } from '../../api/connectors'
 import type { ModalState } from '../../App'
 
 interface Props {
@@ -19,7 +21,14 @@ export default function AddSourceModal({ close, setModal }: Props) {
   const [cat, setCat] = useState<'all' | Category>('all')
   const filtered = SOURCE_TEMPLATES.filter(t => cat === 'all' || t.category === cat)
 
+  const { data: connectors } = useQuery({ queryKey: ['connectors'], queryFn: listConnectors })
+  const existingPlatforms = new Set(connectors?.map(c => c.platform_name) ?? [])
+
+  const isDisabled = (t: SourceTemplate) =>
+    !t.implemented || (!!t.singleInstance && existingPlatforms.has(t.id))
+
   const handlePick = (t: SourceTemplate) => {
+    if (isDisabled(t)) return
     setModal({ kind: 'connect', templateId: t.id })
   }
 
@@ -51,28 +60,38 @@ export default function AddSourceModal({ close, setModal }: Props) {
           ))}
         </div>
         <div className="src-grid">
-          {filtered.map(t => (
-            <button
-              key={t.id}
-              className="src-card"
-              onClick={() => handlePick(t)}
-              style={{ opacity: t.implemented ? 1 : 0.7 }}
-            >
-              <div
-                className="platform-abbr"
-                style={{ background: t.color, color: t.textColor }}
+          {filtered.map(t => {
+            const alreadyConnected = !!t.singleInstance && existingPlatforms.has(t.id)
+            const disabled = !t.implemented || alreadyConnected
+            return (
+              <button
+                key={t.id}
+                className="src-card"
+                onClick={() => handlePick(t)}
+                disabled={disabled}
+                title={alreadyConnected ? '已連接，每個帳號只能新增一個此來源' : undefined}
+                style={{ opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
               >
-                {t.abbr}
-              </div>
-              <div style={{ flex: 1, textAlign: 'left' }}>
-                <div className="src-name">{t.name}</div>
-                <div className="src-desc">
-                  {t.implemented ? t.desc : (t.comingSoon ?? 'Coming soon')}
+                <div
+                  className="platform-abbr"
+                  style={{ background: t.color, color: t.textColor }}
+                >
+                  {t.abbr}
                 </div>
-              </div>
-              <Icon name="chevronR" />
-            </button>
-          ))}
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div className="src-name">{t.name}</div>
+                  <div className="src-desc">
+                    {alreadyConnected
+                      ? '已連接'
+                      : t.implemented
+                        ? t.desc
+                        : (t.comingSoon ?? 'Coming soon')}
+                  </div>
+                </div>
+                <Icon name="chevronR" />
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>

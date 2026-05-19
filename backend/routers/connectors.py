@@ -28,6 +28,8 @@ PLATFORM_REQUIRED_FIELDS = {
     "sol_wallet": ["addresses"],
     # SUI uses public RPC + Pyth, no API key needed
     "sui_wallet": ["addresses"],
+    # Gmail OAuth token + PDF password stored per-user; token obtained via migration script (Phase 1) or web OAuth (Phase 2)
+    "yuanta": ["gmail_token_json", "pdf_password"],
 }
 
 SUPPORTED_PLATFORMS = set(PLATFORM_REQUIRED_FIELDS.keys())
