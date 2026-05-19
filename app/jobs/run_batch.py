@@ -202,9 +202,12 @@ def _aggregate_categories(batch_id: str, user_id: str) -> None:
               AND acs.total_value IS NOT NULL
         """, (batch_id,)).fetchall()
 
-    dates = [row["snapshot_date"] for row in dates_rows]
-    if not dates:
-        return
+    dates = {str(row["snapshot_date"]) for row in dates_rows}
+    # Always refresh today's snapshot so platforms with stale data (e.g. yuanta
+    # monthly statements) get carry-forwarded into today's category aggregate.
+    today = datetime.now(timezone.utc).date().isoformat()
+    dates.add(today)
+    dates = sorted(dates)
 
     fx_rate = get_latest_fx_rate()  # TWD per USD
     now = _now()

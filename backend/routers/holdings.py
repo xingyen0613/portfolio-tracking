@@ -7,9 +7,7 @@ from app.auth.deps import get_current_user
 from app.dashboard.data import (
     get_holdings,
     get_latest_category_totals,
-    get_yuanta_holdings_detail,
 )
-from app.utils.fx import get_latest_fx_rate
 from config.settings import CATEGORY_LABEL
 
 router = APIRouter()
@@ -41,18 +39,26 @@ RESOURCE_TYPE_LABEL = {
     "stock":              "持股",
     "cash":               "現金",
     "wallet":             "持幣",
+    # yuanta DB-based sections
+    "yuanta_statement":      "台股持股",
+    "yuanta_collateral":     "擔保品",
+    "yuanta_futures_equity": "期貨權益",
+    "yuanta_margin":         "融資負債",
+    "yuanta_cash":           "現金",
 }
 
 # Display order — earlier entries appear first when sorting sections
 RESOURCE_TYPE_ORDER = {
-    "spot": 0, "wallet": 0, "stock": 0,
-    "cash": 1,
-    "savings": 2, "earn_flexible": 3, "earn_flexiblesaving": 3,
-    "earn_locked": 4, "earn_onchain": 5,
-    "funding": 6,
-    "margin_cross": 7,
-    "futures": 8, "tw_futures": 8, "futures_um": 8, "futures_cm": 9,
-    "options": 10,
+    "spot": 0, "wallet": 0, "stock": 0, "yuanta_statement": 0,
+    "yuanta_collateral": 1,
+    "cash": 2, "yuanta_cash": 2,
+    "savings": 3, "earn_flexible": 4, "earn_flexiblesaving": 4,
+    "earn_locked": 5, "earn_onchain": 6,
+    "funding": 7,
+    "margin_cross": 8,
+    "futures": 9, "tw_futures": 9, "futures_um": 9, "futures_cm": 10, "yuanta_futures_equity": 9,
+    "options": 11,
+    "yuanta_margin": 12,
 }
 
 PLATFORM_META: dict[str, dict] = {
@@ -237,127 +243,6 @@ def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str
                 "name":      platform_name,
                 "category":  category,
                 "total_usd": round(platform_total, 2),
-                "sections":  sections,
-            })
-
-    # ── Yuanta: enrich with pledged + margin from parsed.json ─────────────────
-    # Only show yuanta data to users who actually own a yuanta account in the DB
-    # (currently only SYSTEM_OWNER, since yuanta_insert_poc.py writes under that user).
-    # Without this guard, the JSON-based fallback would leak owner's data to any
-    # logged-in user.
-    from config.db import get_conn as _get_conn
-    with _get_conn() as _conn:
-        _row = _conn.execute(
-            """SELECT 1 FROM accounts a
-               JOIN platforms p ON a.platform_id = p.id
-               WHERE p.name='yuanta' AND a.user_id=%s LIMIT 1""",
-            (user_id,),
-        ).fetchone()
-    has_yuanta = _row is not None
-
-    yuanta_detail = get_yuanta_holdings_detail() if has_yuanta else {}
-    if yuanta_detail:
-        fx = get_latest_fx_rate()
-        net_asset_twd = float(yuanta_detail.get("net_asset") or 0)
-        net_asset_usd = round(net_asset_twd / fx, 2)
-
-        pledged_rows = []
-        for h in yuanta_detail.get("pledged", []) or []:
-            shares = h.get("shares_balance") or 0
-            if shares <= 0:
-                continue
-            pledged_rows.append({
-                "symbol":    h.get("symbol") or "—",
-                "name":      h.get("name", ""),
-                "quantity":  f"{int(shares):,} 股",
-                "price":     "—",
-                "value_usd": round(float(h.get("value_twd") or 0) / fx, 2),
-            })
-
-        margin_twd = float(yuanta_detail.get("margin_balance") or 0)
-        margin_usd = round(-margin_twd / fx, 2) if margin_twd else 0
-        margin_rows = [{
-            "symbol":    "借款",
-            "name":      "融資借款",
-            "quantity":  "—",
-            "price":     "—",
-            "value_usd": margin_usd,
-        }] if margin_twd else []
-
-        # Other assets (futures equity etc.) from yuanta summary
-        other_rows = []
-        for oa in yuanta_detail.get("other_assets", []) or []:
-            v = float(oa.get("value_twd") or 0)
-            if v == 0:
-                continue
-            other_rows.append({
-                "symbol":    oa.get("label", "—"),
-                "name":      oa.get("label", ""),
-                "quantity":  "—",
-                "price":     "—",
-                "value_usd": round(v / fx, 2),
-            })
-
-        existing_yuanta = next((p for p in platforms if p["name"] == "yuanta"), None)
-        if existing_yuanta is not None:
-            # Enrich the DB-derived yuanta entry with pledged + futures + margin sections
-            if pledged_rows:
-                existing_yuanta["sections"].append({
-                    "label":     "擔保品",
-                    "total_usd": round(sum(r["value_usd"] for r in pledged_rows), 2),
-                    "rows":      pledged_rows,
-                })
-            if other_rows:
-                existing_yuanta["sections"].append({
-                    "label":     "期貨權益",
-                    "total_usd": round(sum(r["value_usd"] for r in other_rows), 2),
-                    "rows":      other_rows,
-                })
-            if margin_rows:
-                existing_yuanta["sections"].append({
-                    "label":     "融資負債",
-                    "total_usd": margin_usd,
-                    "rows":      margin_rows,
-                })
-            # Use parsed.json's net_asset as the platform total (covers owned + pledged + other − margin)
-            existing_yuanta["total_usd"] = net_asset_usd
-        else:
-            # No DB rows — build the whole platform from JSON only
-            owned_rows = [
-                {
-                    "symbol":    h["symbol"],
-                    "name":      h.get("name", ""),
-                    "quantity":  f"{h['shares']:,} 股",
-                    "price":     "—",
-                    "value_usd": round((h["value_twd"] or 0) / fx, 2),
-                }
-                for h in yuanta_detail.get("owned", []) if h.get("shares", 0) > 0
-            ]
-            sections = []
-            if owned_rows:
-                sections.append({
-                    "label":     "自有持股",
-                    "total_usd": round(sum(r["value_usd"] for r in owned_rows), 2),
-                    "rows":      owned_rows,
-                })
-            if pledged_rows:
-                sections.append({
-                    "label":     "擔保品",
-                    "total_usd": round(sum(r["value_usd"] for r in pledged_rows), 2),
-                    "rows":      pledged_rows,
-                })
-            if margin_rows:
-                sections.append({
-                    "label":     "融資負債",
-                    "total_usd": margin_usd,
-                    "rows":      margin_rows,
-                })
-
-            platforms.append({
-                **PLATFORM_META["yuanta"],
-                "name":      "yuanta",
-                "category":  "tw_stock",
-                "total_usd": net_asset_usd,
                 "sections":  sections,
             })
 

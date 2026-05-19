@@ -21,8 +21,12 @@ export default function YuantaForm() {
         gmailAddress.trim() || undefined,
       )
       window.location.href = authorize_url
-    } catch {
-      setError('無法取得 Google 授權連結，請稍後再試。')
+    } catch (err: unknown) {
+      const detail =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : null
+      setError(detail ?? '無法取得 Google 授權連結，請稍後再試。')
       setLoading(false)
     }
   }

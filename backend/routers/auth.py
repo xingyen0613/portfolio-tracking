@@ -1,7 +1,11 @@
 import json
+import os
+import secrets
 import threading
 import uuid as _uuid
 from datetime import datetime, timedelta, timezone
+
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
@@ -102,10 +106,12 @@ def yuanta_gmail_authorize(
         )
 
     user_id = current_user["id"]
+    code_verifier = secrets.token_urlsafe(64)
     state = jwt.encode(
         {
             "user_id": user_id,
             "pdf_password": body.pdf_password,
+            "code_verifier": code_verifier,
             "nonce": str(_uuid.uuid4()),
             "exp": datetime.now(timezone.utc) + timedelta(minutes=_OAUTH_STATE_EXPIRE_MINUTES),
         },
@@ -114,6 +120,7 @@ def yuanta_gmail_authorize(
     )
 
     flow = _gmail_flow()
+    flow.code_verifier = code_verifier
     auth_kwargs: dict = dict(
         access_type="offline",
         include_granted_scopes="true",
@@ -143,12 +150,17 @@ def yuanta_gmail_callback(
         payload = jwt.decode(state, settings.JWT_SECRET, algorithms=["HS256"])
         user_id = payload["user_id"]
         pdf_password = payload["pdf_password"]
+        code_verifier = payload.get("code_verifier")
     except JWTError:
         return RedirectResponse(url=f"{frontend_url}/?oauth=yuanta_error&reason=invalid_state")
+
+    if not code_verifier:
+        return RedirectResponse(url=f"{frontend_url}/?oauth=yuanta_error&reason=stale_state_please_retry")
 
     # Exchange code for Gmail token
     try:
         flow = _gmail_flow(state=state)
+        flow.code_verifier = code_verifier
         flow.fetch_token(code=code)
         token_json = flow.credentials.to_json()
     except Exception:

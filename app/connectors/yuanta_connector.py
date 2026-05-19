@@ -253,8 +253,12 @@ class YuantaConnector(BaseConnector):
 
         # 5. Write to DB (multi-date)
         other_assets = _extract_other_assets(parsed_json)
+        collateral_value = Decimal(
+            str(parsed_json.get("summary", {}).get("collateral_total_value", 0) or 0)
+            .replace(",", "")
+        )
         n, end_cum_cash = _write_month_to_db(
-            month, daily_entries, prices_by_date, other_assets,
+            month, daily_entries, prices_by_date, other_assets, collateral_value,
             batch_id, source_run_id, raw_payload_id, account_id, user_id, start_cum_cash,
         )
         return n, end_cum_cash
@@ -356,6 +360,7 @@ def _write_month_to_db(
     daily_entries: list[dict],
     prices_by_date: dict[str, dict[str, str]],
     other_assets: dict[str, Decimal],
+    collateral_value: Decimal,
     batch_id: str,
     source_run_id: str,
     raw_payload_id: str,
@@ -418,8 +423,15 @@ def _write_month_to_db(
                      "yahoo", date_str, PARSER_VERSION, None, user_id, "yuanta_statement"),
                 )
 
-            # net_asset = market_value + other_assets + cum_cash − margin
-            net_asset = float(market_value + other_assets_total + cum_cash - margin)
+            # net_asset formula depends on whether collateral (pledged stocks) is present.
+            # With collateral: owned + collateral + futures - margin (cum_cash is the credit
+            # loan proceeds already captured as collateral value — don't double-count).
+            # Without collateral: owned + futures + cum_cash - margin.
+            has_collateral = collateral_value != 0
+            if has_collateral:
+                net_asset = float(market_value + collateral_value + other_assets_total - margin)
+            else:
+                net_asset = float(market_value + other_assets_total + cum_cash - margin)
 
             conn.execute(
                 """INSERT INTO account_snapshots
@@ -430,6 +442,61 @@ def _write_month_to_db(
                  date_str, net_asset, "TWD", now, user_id),
             )
             snapshots_written += 1
+
+            # Write other components so holdings page can show full breakdown:
+            # other_assets (期貨保證金 etc. — monthly constant from PDF summary)
+            if other_assets_total != 0:
+                conn.execute(
+                    """INSERT INTO normalized_holdings
+                       (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
+                        asset_type, quantity, price, value, original_currency,
+                        price_source, snapshot_date, parser_version, chain, user_id, resource_type)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (str(uuid.uuid4()), source_run_id, raw_payload_id,
+                     "期貨保證金", "期貨保證金",
+                     "tw_futures_equity", 0, None, float(other_assets_total), "TWD",
+                     "statement", date_str, PARSER_VERSION, None, user_id, "yuanta_futures_equity"),
+                )
+            if has_collateral:
+                # Write pledged stock aggregate value as "擔保品" section
+                conn.execute(
+                    """INSERT INTO normalized_holdings
+                       (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
+                        asset_type, quantity, price, value, original_currency,
+                        price_source, snapshot_date, parser_version, chain, user_id, resource_type)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (str(uuid.uuid4()), source_run_id, raw_payload_id,
+                     "擔保品", "擔保品",
+                     "tw_stock", 0, None, float(collateral_value), "TWD",
+                     "statement", date_str, PARSER_VERSION, None, user_id, "yuanta_collateral"),
+                )
+            else:
+                # No pledged stocks — cum_cash represents actual cash balance
+                if cum_cash != 0:
+                    conn.execute(
+                        """INSERT INTO normalized_holdings
+                           (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
+                            asset_type, quantity, price, value, original_currency,
+                            price_source, snapshot_date, parser_version, chain, user_id, resource_type)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (str(uuid.uuid4()), source_run_id, raw_payload_id,
+                         "現金", "現金",
+                         "cash", 0, None, float(cum_cash), "TWD",
+                         "statement", date_str, PARSER_VERSION, None, user_id, "yuanta_cash"),
+                    )
+            # margin debt (stored as negative value)
+            if margin != 0:
+                conn.execute(
+                    """INSERT INTO normalized_holdings
+                       (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
+                        asset_type, quantity, price, value, original_currency,
+                        price_source, snapshot_date, parser_version, chain, user_id, resource_type)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (str(uuid.uuid4()), source_run_id, raw_payload_id,
+                     "融資借款", "融資借款",
+                     "tw_margin", 0, None, float(-margin), "TWD",
+                     "statement", date_str, PARSER_VERSION, None, user_id, "yuanta_margin"),
+                )
 
     return snapshots_written, cum_cash
 
