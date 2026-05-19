@@ -87,6 +87,7 @@ def google_login(body: GoogleLoginRequest):
 
 class YuantaAuthorizeRequest(BaseModel):
     pdf_password: str
+    login_hint: str | None = None
 
 
 @router.post("/yuanta/gmail/authorize")
@@ -113,12 +114,15 @@ def yuanta_gmail_authorize(
     )
 
     flow = _gmail_flow()
-    auth_url, _ = flow.authorization_url(
+    auth_kwargs: dict = dict(
         access_type="offline",
         include_granted_scopes="true",
         state=state,
         prompt="consent",
     )
+    if body.login_hint:
+        auth_kwargs["login_hint"] = body.login_hint
+    auth_url, _ = flow.authorization_url(**auth_kwargs)
     return {"authorize_url": auth_url}
 
 

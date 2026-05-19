@@ -3,6 +3,7 @@ import { Icon } from '../Icon'
 import { initiateYuantaOAuth } from '../../api/connectors'
 
 export default function YuantaForm() {
+  const [gmailAddress, setGmailAddress] = useState('')
   const [pdfPassword, setPdfPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -15,7 +16,10 @@ export default function YuantaForm() {
     setError(null)
     setLoading(true)
     try {
-      const { authorize_url } = await initiateYuantaOAuth(pdfPassword.trim())
+      const { authorize_url } = await initiateYuantaOAuth(
+        pdfPassword.trim(),
+        gmailAddress.trim() || undefined,
+      )
       window.location.href = authorize_url
     } catch {
       setError('無法取得 Google 授權連結，請稍後再試。')
@@ -25,6 +29,21 @@ export default function YuantaForm() {
 
   return (
     <>
+      <div className="field">
+        <label className="field-label">收取對帳單的 Gmail 信箱</label>
+        <input
+          className="input"
+          type="email"
+          placeholder="example@gmail.com"
+          value={gmailAddress}
+          onChange={e => setGmailAddress(e.target.value)}
+          disabled={loading}
+        />
+        <div className="field-hint">
+          元大對帳單寄送的目標 Gmail。可以與登入本系統的 Google 帳號不同。
+        </div>
+      </div>
+
       <div className="field">
         <label className="field-label">PDF 解密密碼</label>
         <input
@@ -63,7 +82,7 @@ export default function YuantaForm() {
         >
           <Icon name="info" /> 授權後將發生什麼
         </div>
-        點下方按鈕後會跳到 Google 授權頁面，授權後系統會自動讀取你 Gmail 中的元大對帳單（僅讀取，不會傳送任何 email）。
+        點下方按鈕後會跳到 Google 授權頁面，請選擇上方填寫的 Gmail 帳號完成授權。授權後系統會自動讀取該 Gmail 中的元大對帳單（僅讀取，不會傳送任何 email）。
       </div>
 
       {error && (
