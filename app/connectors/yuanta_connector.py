@@ -24,7 +24,7 @@ import re
 import sys
 import tempfile
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -183,7 +183,14 @@ class YuantaConnector(BaseConnector):
             ).fetchall()
         existing = {r["m"] for r in rows}
 
-        msgs = _gmail_search(self._gmail_service, _SENDER, _SUBJECT_KW)
+        # First connect: limit Gmail search to last 6 months to avoid processing years of PDFs.
+        # Subsequent runs: no date filter — picks up any missed months since last sync.
+        after = None
+        if not existing:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=183)
+            after = cutoff.strftime("%Y/%m/%d")
+
+        msgs = _gmail_search(self._gmail_service, _SENDER, _SUBJECT_KW, after=after)
         gmail_months: set[str] = set()
         for msg in msgs:
             m = _MONTH_RE.search(msg.get("subject", ""))
