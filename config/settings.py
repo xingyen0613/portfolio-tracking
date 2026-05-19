@@ -60,6 +60,12 @@ SYSTEM_OWNER_ID = "00000000-0000-0000-0000-000000000001"
 
 # Auth
 GOOGLE_CLIENT_ID: str = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET: str = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 JWT_SECRET: str = os.environ.get("JWT_SECRET", "dev-secret-change-in-prod")
 JWT_EXPIRE_DAYS: int = 30
 OWNER_GOOGLE_EMAIL: str = os.environ.get("OWNER_GOOGLE_EMAIL", "")
+GMAIL_REDIRECT_URI: str = os.environ.get(
+    "GMAIL_REDIRECT_URI",
+    "http://localhost:8000/api/auth/yuanta/gmail/callback",
+)
+FRONTEND_URL: str = os.environ.get("FRONTEND_URL", "http://localhost:5173")

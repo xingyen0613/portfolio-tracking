@@ -8,6 +8,7 @@ import ApiKeyForm from '../connectors/ApiKeyForm'
 import AddressForm from '../connectors/AddressForm'
 import IBKRForm from '../connectors/IBKRForm'
 import SinopacForm from '../connectors/SinopacForm'
+import YuantaForm from '../connectors/YuantaForm'
 import EmailForm from '../connectors/EmailForm'
 import ManualForm from '../connectors/ManualForm'
 import type { ModalState } from '../../App'
@@ -260,19 +261,21 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
       </div>
 
       <div className="modal-body">
-        <div className="field">
-          <label className="field-label">Connection name</label>
-          <input
-            className="input"
-            placeholder={`${t.name} — Main`}
-            value={accountLabel}
-            onChange={e => setAccountLabel(e.target.value)}
-            disabled={!canSubmit}
-          />
-          <div className="field-hint">
-            Helps you tell multiple {t.name} accounts apart. Must be unique within {t.name}.
+        {t.auth !== 'yuanta' && (
+          <div className="field">
+            <label className="field-label">Connection name</label>
+            <input
+              className="input"
+              placeholder={`${t.name} — Main`}
+              value={accountLabel}
+              onChange={e => setAccountLabel(e.target.value)}
+              disabled={!canSubmit}
+            />
+            <div className="field-hint">
+              Helps you tell multiple {t.name} accounts apart. Must be unique within {t.name}.
+            </div>
           </div>
-        </div>
+        )}
 
         {t.auth === 'apikey' && (
           <ApiKeyForm credentials={credentials} setCredential={setCredential} template={t} />
@@ -286,6 +289,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
         {t.auth === 'sinopac' && (
           <SinopacForm credentials={credentials} setCredential={setCredential} />
         )}
+        {t.auth === 'yuanta' && <YuantaForm />}
         {t.auth === 'email' && <EmailForm template={t} />}
         {t.auth === 'manual' && <ManualForm />}
 
@@ -319,18 +323,20 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
         )}
       </div>
 
-      <div className="modal-foot">
-        <button className="btn btn-ghost" onClick={close} disabled={mut.isPending}>
-          Cancel
-        </button>
-        <button
-          className="btn btn-primary"
-          onClick={handleSubmit}
-          disabled={mut.isPending || !canSubmit}
-        >
-          {mut.isPending ? 'Connecting…' : canSubmit ? 'Connect & sync' : 'Coming soon'}
-        </button>
-      </div>
+      {t.auth !== 'yuanta' && (
+        <div className="modal-foot">
+          <button className="btn btn-ghost" onClick={close} disabled={mut.isPending}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleSubmit}
+            disabled={mut.isPending || !canSubmit}
+          >
+            {mut.isPending ? 'Connecting…' : canSubmit ? 'Connect & sync' : 'Coming soon'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

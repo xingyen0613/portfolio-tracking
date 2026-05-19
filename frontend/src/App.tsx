@@ -35,6 +35,7 @@ export default function App() {
   })
   const [modal, setModal] = useState<ModalState | null>(null)
   const [importToast, setImportToast] = useState<ImportHistoryResult | null>(null)
+  const [oauthToast, setOauthToast] = useState<{ ok: boolean; msg: string } | null>(null)
   const prevTokenRef = useRef(token)
   const mainRef = useRef<HTMLElement>(null)
 
@@ -66,6 +67,23 @@ export default function App() {
     prevTokenRef.current = token
   }, [token])
 
+  // Detect OAuth callback (e.g. ?oauth=yuanta_success after Gmail redirect)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const oauth = params.get('oauth')
+    if (!oauth) return
+    window.history.replaceState({}, '', window.location.pathname)
+    if (oauth === 'yuanta_success') {
+      qc.invalidateQueries({ queryKey: ['connectors'] })
+      setOauthToast({ ok: true, msg: '元大證券已連接，首次同步在背景執行中。' })
+      setTimeout(() => setOauthToast(null), 6000)
+    } else if (oauth.startsWith('yuanta_error')) {
+      const reason = params.get('reason') ?? 'unknown'
+      setOauthToast({ ok: false, msg: `元大 Gmail 授權失敗：${reason}` })
+      setTimeout(() => setOauthToast(null), 8000)
+    }
+  }, [qc])
+
   useEffect(() => {
     localStorage.setItem(ROUTE_KEY, route)
     if (mainRef.current) mainRef.current.scrollTop = 0
@@ -86,6 +104,34 @@ export default function App() {
         </div>
       </main>
       <ModalHost modal={modal} setModal={setModal} />
+      {oauthToast && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+          background: 'var(--surf-1)',
+          border: `1px solid ${oauthToast.ok ? 'rgba(46,184,138,0.4)' : 'rgba(236,91,126,0.4)'}`,
+          borderRadius: 12, padding: '14px 16px',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
+          display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 240, maxWidth: 340,
+        }}>
+          <div style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: oauthToast.ok ? 'var(--c-pos)' : 'var(--c-neg)',
+            flexShrink: 0, marginTop: 5,
+          }} />
+          <div style={{ flex: 1, fontSize: 13, color: 'var(--fg)', lineHeight: 1.5 }}>
+            {oauthToast.msg}
+          </div>
+          <button
+            onClick={() => setOauthToast(null)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--fg-3)', fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
       {importToast && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9999,

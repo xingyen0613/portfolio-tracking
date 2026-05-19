@@ -4,7 +4,7 @@
  * is just a visual placeholder.
  */
 
-export type AuthMethod = 'apikey' | 'address' | 'ibkr' | 'sinopac' | 'email' | 'manual'
+export type AuthMethod = 'apikey' | 'address' | 'ibkr' | 'sinopac' | 'yuanta' | 'email' | 'manual'
 export type Category = 'crypto' | 'us' | 'tw' | 'other'
 
 export interface SourceTemplate {
@@ -32,7 +32,7 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
   { id: 'sui_wallet', name: 'SUI Wallet',      desc: 'SUI wallet (read-only)',    category: 'crypto', auth: 'address', abbr: 'SUI',  color: '#6fbcf0', textColor: '#000', implemented: true },
   { id: 'ibkr',     name: 'Interactive Brokers', desc: 'US broker · Flex Web',    category: 'us',     auth: 'ibkr',    abbr: 'IBKR', color: '#cc0000', textColor: '#fff', implemented: true },
   { id: 'schwab',   name: 'Charles Schwab',    desc: 'US broker',                 category: 'us',     auth: 'manual',  abbr: 'SCHW', color: '#00a0df', textColor: '#fff', implemented: false, comingSoon: 'Coming soon' },
-  { id: 'yuanta',   name: '元大證券',           desc: 'Taiwan broker · Gmail PDF', category: 'tw',     auth: 'email',   abbr: 'YT',   color: '#004b99', textColor: '#fff', implemented: false, comingSoon: 'Owner-only for now', singleInstance: true },
+  { id: 'yuanta',   name: '元大證券',           desc: 'Taiwan broker · Gmail PDF', category: 'tw',     auth: 'yuanta',  abbr: 'YT',   color: '#004b99', textColor: '#fff', implemented: true, singleInstance: true },
   { id: 'sinopac',  name: '永豐證券',           desc: 'Taiwan broker · Shioaji API', category: 'tw',   auth: 'sinopac', abbr: '永',   color: '#003D82', textColor: '#fff', implemented: true },
   { id: 'fubon',    name: '富邦證券',           desc: 'Taiwan broker · Gmail PDF', category: 'tw',     auth: 'email',   abbr: 'FB',   color: '#0a5e3e', textColor: '#fff', implemented: false, comingSoon: 'Coming soon' },
   { id: 'manual',   name: 'Manual Entry',      desc: 'Real estate, cash, custom', category: 'other',  auth: 'manual',  abbr: '+',    color: '#3a3a44', textColor: '#fff', implemented: false, comingSoon: 'Coming in v2' },

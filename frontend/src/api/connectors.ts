@@ -96,3 +96,8 @@ export async function importHistoricalData(
   const r = await api.post(`/api/connectors/${connectorId}/historical-import`, form)
   return r.data
 }
+
+export async function initiateYuantaOAuth(pdfPassword: string): Promise<{ authorize_url: string }> {
+  const r = await api.post('/api/auth/yuanta/gmail/authorize', { pdf_password: pdfPassword })
+  return r.data
+}
