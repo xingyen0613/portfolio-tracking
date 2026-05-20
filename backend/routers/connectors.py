@@ -324,15 +324,25 @@ def delete_connector(connector_id: str, current_user: dict = Depends(get_current
             conn.execute("DELETE FROM accounts WHERE id = ANY(%s)", (account_ids,))
 
             # Clear stale category_snapshots, then rebuild from remaining data.
-            if affected_dates and affected_category:
-                conn.execute(
-                    """DELETE FROM category_snapshots
-                       WHERE user_id = %s
-                         AND category = %s
-                         AND snapshot_date::text = ANY(%s)""",
-                    (user_id, affected_category, affected_dates),
-                )
-                rebuild_for_dates(conn, user_id, affected_dates)
+            # Use ALL existing category_snapshot dates (not just account_snapshot dates)
+            # so that fill-forward values from the deleted connector are also rebuilt.
+            if affected_category:
+                all_cat_rows = conn.execute(
+                    """SELECT DISTINCT snapshot_date::text as d
+                       FROM category_snapshots
+                       WHERE user_id = %s AND category = %s""",
+                    (user_id, affected_category),
+                ).fetchall()
+                all_dates = list(set(affected_dates) | {r["d"] for r in all_cat_rows})
+                if all_dates:
+                    conn.execute(
+                        """DELETE FROM category_snapshots
+                           WHERE user_id = %s
+                             AND category = %s
+                             AND snapshot_date::text = ANY(%s)""",
+                        (user_id, affected_category, all_dates),
+                    )
+                    rebuild_for_dates(conn, user_id, all_dates)
 
         conn.execute(
             "DELETE FROM user_connectors WHERE id=%s AND user_id=%s",
