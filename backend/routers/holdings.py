@@ -42,7 +42,9 @@ RESOURCE_TYPE_LABEL = {
     # yuanta DB-based sections
     "yuanta_statement":      "台股持股",
     "yuanta_collateral":     "擔保品",
+    "yuanta_sub_brokerage":  "複委託",
     "yuanta_futures_equity": "期貨權益",
+    "yuanta_other":          "其他資產",
     "yuanta_margin":         "融資負債",
     "yuanta_cash":           "現金",
 }
@@ -51,12 +53,14 @@ RESOURCE_TYPE_LABEL = {
 RESOURCE_TYPE_ORDER = {
     "spot": 0, "wallet": 0, "stock": 0, "yuanta_statement": 0,
     "yuanta_collateral": 1,
+    "yuanta_sub_brokerage": 1,
     "cash": 2, "yuanta_cash": 2,
     "savings": 3, "earn_flexible": 4, "earn_flexiblesaving": 4,
     "earn_locked": 5, "earn_onchain": 6,
     "funding": 7,
     "margin_cross": 8,
     "futures": 9, "tw_futures": 9, "futures_um": 9, "futures_cm": 10, "yuanta_futures_equity": 9,
+    "yuanta_other": 10,
     "options": 11,
     "yuanta_margin": 12,
 }

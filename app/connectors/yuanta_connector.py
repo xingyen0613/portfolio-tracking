@@ -259,9 +259,15 @@ class YuantaConnector(BaseConnector):
             str(parsed_json.get("summary", {}).get("collateral_total_value", 0) or 0)
             .replace(",", "")
         )
+        official_raw = parsed_json.get("summary", {}).get("net_asset")
+        official_net_asset = (
+            Decimal(str(official_raw).replace(",", ""))
+            if official_raw not in (None, "")
+            else None
+        )
         n, end_cum_cash = _write_month_to_db(
             month, daily_entries, prices_by_date, other_assets,
-            pledged_stocks, collateral_value,
+            pledged_stocks, collateral_value, official_net_asset,
             batch_id, source_run_id, raw_payload_id, account_id, user_id, start_cum_cash,
         )
         return n, end_cum_cash
@@ -362,9 +368,10 @@ def _write_month_to_db(
     month: str,
     daily_entries: list[dict],
     prices_by_date: dict[str, dict[str, str]],
-    other_assets: dict[str, Decimal],
+    other_assets: dict[str, tuple[Decimal, str, str]],
     pledged_stocks: list[dict],
     collateral_value: Decimal,
+    official_net_asset: Decimal | None,
     batch_id: str,
     source_run_id: str,
     raw_payload_id: str,
@@ -377,9 +384,12 @@ def _write_month_to_db(
     from yuanta_net_asset_poc import _sum_daily_cashflow, resolve_symbol
 
     cum_cash = start_cum_cash
-    other_assets_total = sum(other_assets.values(), Decimal(0))
+    other_assets_total = sum((v[0] for v in other_assets.values()), Decimal(0))
     snapshots_written = 0
     now = _now()
+    has_collateral = bool(pledged_stocks) or collateral_value != 0
+    last_priced_date: str | None = None
+    last_priced_net_asset: Decimal | None = None
 
     with get_conn() as conn:
         for entry in daily_entries:
@@ -432,7 +442,6 @@ def _write_month_to_db(
 
             # net_asset formula: with collateral don't add cum_cash (loan proceeds
             # are already captured in collateral value — double-counting otherwise).
-            has_collateral = bool(pledged_stocks) or collateral_value != 0
             if has_collateral:
                 if pledged_stocks:
                     # Compute daily collateral value from per-stock prices
@@ -484,10 +493,15 @@ def _write_month_to_db(
                  date_str, net_asset, "TWD", now, user_id),
             )
             snapshots_written += 1
+            last_priced_date = date_str
+            last_priced_net_asset = Decimal(str(net_asset))
 
-            # Write other components so holdings page can show full breakdown:
-            # other_assets (期貨保證金 etc. — monthly constant from PDF summary)
-            if other_assets_total != 0:
+            # Write other components so holdings page can show full breakdown.
+            # Each non-stock category (期貨權益 / 海外有價證券 / ...) becomes its own
+            # row, classified via _classify_other_asset.
+            for label, (value, asset_type, resource_type) in other_assets.items():
+                if value == 0:
+                    continue
                 conn.execute(
                     """INSERT INTO normalized_holdings
                        (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
@@ -495,9 +509,9 @@ def _write_month_to_db(
                         price_source, snapshot_date, parser_version, chain, user_id, resource_type)
                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                     (str(uuid.uuid4()), source_run_id, raw_payload_id,
-                     "期貨保證金", "期貨保證金",
-                     "tw_futures_equity", 0, None, float(other_assets_total), "TWD",
-                     "statement", date_str, PARSER_VERSION, None, user_id, "yuanta_futures_equity"),
+                     label, label,
+                     asset_type, 0, None, float(value), "TWD",
+                     "statement", date_str, PARSER_VERSION, None, user_id, resource_type),
                 )
             if not has_collateral:
                 # No pledged stocks — cum_cash represents actual cash balance
@@ -527,6 +541,50 @@ def _write_month_to_db(
                      "statement", date_str, PARSER_VERSION, None, user_id, "yuanta_margin"),
                 )
 
+        # Month-end anchor: align last priced day's net_asset with the PDF's
+        # official net_asset. Only applies when there's no collateral path
+        # (collateral path already excludes cum_cash from net_asset). The gap
+        # represents internal transfers that yuanta's transactions table doesn't
+        # record (e.g. sub-brokerage funding, external transfers), which would
+        # otherwise inflate cum_cash forever as it carries across months.
+        if (
+            not has_collateral
+            and official_net_asset is not None
+            and last_priced_date is not None
+            and last_priced_net_asset is not None
+        ):
+            correction = official_net_asset - last_priced_net_asset
+            if correction != 0:
+                # Adjust the final snapshot
+                conn.execute(
+                    """UPDATE account_snapshots
+                       SET total_value = %s
+                       WHERE account_id=%s AND user_id=%s AND snapshot_date=%s AND batch_id=%s""",
+                    (float(official_net_asset), account_id, user_id, last_priced_date, batch_id),
+                )
+                # Adjust the cash row on that day (insert if absent, else update)
+                upd = conn.execute(
+                    """UPDATE normalized_holdings
+                       SET value = value + %s
+                       WHERE source_run_id=%s AND user_id=%s AND snapshot_date=%s
+                         AND resource_type='yuanta_cash'""",
+                    (float(correction), source_run_id, user_id, last_priced_date),
+                )
+                if upd.rowcount == 0:
+                    # No cash row existed (cum_cash was 0 before anchor) — insert one
+                    conn.execute(
+                        """INSERT INTO normalized_holdings
+                           (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
+                            asset_type, quantity, price, value, original_currency,
+                            price_source, snapshot_date, parser_version, chain, user_id, resource_type)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (str(uuid.uuid4()), source_run_id, raw_payload_id,
+                         "現金", "現金",
+                         "cash", 0, None, float(correction), "TWD",
+                         "statement", last_priced_date, PARSER_VERSION, None, user_id, "yuanta_cash"),
+                    )
+                cum_cash += correction
+
     return snapshots_written, cum_cash
 
 
@@ -534,10 +592,31 @@ def _write_month_to_db(
 # Pure helpers
 # ---------------------------------------------------------------------------
 
-def _extract_other_assets(parsed_json: dict) -> dict[str, Decimal]:
-    """Extract non-stock categories from parsed_json (no filesystem)."""
+# label keyword → (asset_type, resource_type) — matched in order, first hit wins.
+# Keep this list ordered: more specific keywords before fallback ("其他").
+_OTHER_ASSET_MAPPING: list[tuple[str, str, str]] = [
+    ("期貨",       "tw_futures_equity", "yuanta_futures_equity"),
+    ("海外有價證券", "tw_stock",          "yuanta_sub_brokerage"),
+]
+_OTHER_ASSET_FALLBACK = ("tw_stock", "yuanta_other")
+
+
+def _classify_other_asset(label: str) -> tuple[str, str]:
+    """Map a yuanta asset_category label → (asset_type, resource_type)."""
+    for keyword, asset_type, resource_type in _OTHER_ASSET_MAPPING:
+        if keyword in label:
+            return asset_type, resource_type
+    return _OTHER_ASSET_FALLBACK
+
+
+def _extract_other_assets(parsed_json: dict) -> dict[str, tuple[Decimal, str, str]]:
+    """Extract non-stock categories from parsed_json (no filesystem).
+
+    Returns: {label: (value, asset_type, resource_type)} so each category is
+    written as its own normalized_holdings row with the correct classification.
+    """
     cats = parsed_json.get("summary", {}).get("asset_categories") or []
-    result: dict[str, Decimal] = {}
+    result: dict[str, tuple[Decimal, str, str]] = {}
     for c in cats:
         cat = c.get("category", "")
         if any(x in cat for x in ["上市", "上櫃", "興櫃", "擔保品", "不限用途"]):
@@ -548,7 +627,8 @@ def _extract_other_assets(parsed_json: dict) -> dict[str, Decimal]:
             continue
         if value != 0:
             label = cat.split("(")[0].strip() or cat
-            result[label] = value
+            asset_type, resource_type = _classify_other_asset(label)
+            result[label] = (value, asset_type, resource_type)
     return result
 
 
