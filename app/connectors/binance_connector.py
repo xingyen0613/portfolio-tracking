@@ -1,13 +1,8 @@
-import os
 from datetime import datetime, timezone
 
 import ccxt
-from dotenv import load_dotenv
 
 from app.connectors.base import BaseConnector
-from config.settings import ENV_PATH
-
-load_dotenv(ENV_PATH)
 
 STABLECOINS = {"USDT", "USDC", "BUSD", "DAI", "TUSD", "FDUSD"}
 FIAT = {"USD", "EUR", "GBP", "TWD"}
@@ -31,8 +26,8 @@ class BinanceConnector(BaseConnector):
 
     def authenticate(self) -> None:
         self._exchange = ccxt.binance({
-            "apiKey": self._credentials.get("api_key") or os.environ["BINANCE_API_KEY"],
-            "secret": self._credentials.get("secret") or os.environ["BINANCE_API_SECRET"],
+            "apiKey": self._credentials["api_key"],
+            "secret": self._credentials["secret"],
             "options": {"defaultType": "spot"},
         })
 

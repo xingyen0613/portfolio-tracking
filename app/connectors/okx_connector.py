@@ -1,13 +1,8 @@
-import os
 from datetime import datetime, timezone
 
 import ccxt
-from dotenv import load_dotenv
 
 from app.connectors.base import BaseConnector
-from config.settings import ENV_PATH
-
-load_dotenv(ENV_PATH)
 
 STABLECOINS = {"USDT", "USDC", "DAI", "TUSD", "FDUSD", "USDE"}
 FIAT = {"USD", "EUR", "GBP", "TWD"}
@@ -31,9 +26,9 @@ class OKXConnector(BaseConnector):
 
     def authenticate(self) -> None:
         self._exchange = ccxt.okx({
-            "apiKey": self._credentials.get("api_key") or os.environ["OKX_API_KEY"],
-            "secret": self._credentials.get("secret") or os.environ["OKX_API_SECRET"],
-            "password": self._credentials.get("passphrase") or os.environ["OKX_PASSPHRASE"],
+            "apiKey": self._credentials["api_key"],
+            "secret": self._credentials["secret"],
+            "password": self._credentials["passphrase"],
         })
 
     def fetch_raw(self) -> list[dict]:

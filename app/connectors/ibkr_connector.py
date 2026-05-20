@@ -1,6 +1,5 @@
 """IBKR Flex Web Service connector."""
 
-import os
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -22,10 +21,10 @@ class IBKRConnector(BaseConnector):
     use_pricer = False  # IBKR provides mark prices directly
 
     def authenticate(self) -> None:
-        self.token = self._credentials.get("flex_token") or os.getenv("IBKR_FLEX_TOKEN")
-        self.query_id = self._credentials.get("query_id") or os.getenv("IBKR_FLEX_QUERY_ID")
+        self.token = self._credentials.get("flex_token")
+        self.query_id = self._credentials.get("query_id")
         if not self.token or not self.query_id:
-            raise RuntimeError("IBKR_FLEX_TOKEN and IBKR_FLEX_QUERY_ID must be set")
+            raise RuntimeError("flex_token and query_id are required in connector credentials")
 
     def fetch_raw(self) -> list[dict]:
         ref_code, _ = self._send_request()
