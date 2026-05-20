@@ -28,6 +28,10 @@ WINDOW_DAYS: dict[str, int | None] = {
 
 def _build_pivot(df: pd.DataFrame) -> pd.DataFrame:
     """Pivot category_snapshots → date-indexed wide DataFrame with forward fill."""
+    if df.empty:
+        today = pd.Timestamp.utcnow().normalize()
+        pivot = pd.DataFrame(index=[today], columns=CATEGORIES + ["total"], data=0.0)
+        return pivot
     pivot = df.pivot_table(
         index="snapshot_date", columns="category", values="value_usd", aggfunc="sum"
     )
