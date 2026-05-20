@@ -89,3 +89,5 @@ uv run alembic upgrade head
   - evm_wallet：1:N by `addr[:10] || '_' || chain_short`（從 decrypted credentials.addresses 解出）
 
 # 每次有新的開發進度完成，或是修正、優化後，且等用戶確認ok後，要更新相關文黨。包括但不限於@readme.md, @plan.md, etc.
+
+# xingyen0613是我的主帳號，xingyen02是測試帳號，開發功能與測試時已測試帳號xingyen02為主。

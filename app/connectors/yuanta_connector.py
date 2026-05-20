@@ -246,8 +246,10 @@ class YuantaConnector(BaseConnector):
             parsed_json, shares_series, anchor_holdings, anchor_margin
         )
 
-        # 4. Fetch prices from Yahoo Finance
+        # 4. Fetch prices from Yahoo Finance (owned + pledged stocks)
         symbols = _collect_symbols(daily_entries)
+        pledged_stocks = _extract_pledged_stocks(parsed_json)
+        symbols = sorted(set(symbols) | {ps["symbol"] for ps in pledged_stocks})
         price_doc = _fetch_prices(month, symbols)
         prices_by_date: dict[str, dict[str, str]] = price_doc.get("prices", {})
 
@@ -258,7 +260,8 @@ class YuantaConnector(BaseConnector):
             .replace(",", "")
         )
         n, end_cum_cash = _write_month_to_db(
-            month, daily_entries, prices_by_date, other_assets, collateral_value,
+            month, daily_entries, prices_by_date, other_assets,
+            pledged_stocks, collateral_value,
             batch_id, source_run_id, raw_payload_id, account_id, user_id, start_cum_cash,
         )
         return n, end_cum_cash
@@ -360,6 +363,7 @@ def _write_month_to_db(
     daily_entries: list[dict],
     prices_by_date: dict[str, dict[str, str]],
     other_assets: dict[str, Decimal],
+    pledged_stocks: list[dict],
     collateral_value: Decimal,
     batch_id: str,
     source_run_id: str,
@@ -397,12 +401,15 @@ def _write_month_to_db(
                 )
                 continue
 
-            # Trading day: write per-stock holdings
+            # Trading day: write per-stock holdings (exclude pledged stocks — written separately as yuanta_collateral)
+            pledged_symbols = {ps["symbol"] for ps in pledged_stocks}
             market_value = Decimal(0)
             for h in entry.get("holdings", []):
                 sym = resolve_symbol(h)
                 shares = int(h.get("shares", 0))
                 if not sym or shares <= 0:
+                    continue
+                if sym in pledged_symbols:
                     continue
                 price_str = day_prices.get(sym)
                 if price_str is None:
@@ -423,13 +430,48 @@ def _write_month_to_db(
                      "yahoo", date_str, PARSER_VERSION, None, user_id, "yuanta_statement"),
                 )
 
-            # net_asset formula depends on whether collateral (pledged stocks) is present.
-            # With collateral: owned + collateral + futures - margin (cum_cash is the credit
-            # loan proceeds already captured as collateral value — don't double-count).
-            # Without collateral: owned + futures + cum_cash - margin.
-            has_collateral = collateral_value != 0
+            # net_asset formula: with collateral don't add cum_cash (loan proceeds
+            # are already captured in collateral value — double-counting otherwise).
+            has_collateral = bool(pledged_stocks) or collateral_value != 0
             if has_collateral:
-                net_asset = float(market_value + collateral_value + other_assets_total - margin)
+                if pledged_stocks:
+                    # Compute daily collateral value from per-stock prices
+                    collateral_today = Decimal(0)
+                    for ps in pledged_stocks:
+                        price_str = day_prices.get(ps["symbol"])
+                        if price_str is None:
+                            continue
+                        price = float(price_str.replace(",", ""))
+                        shares = ps["shares"]
+                        value = shares * price
+                        collateral_today += Decimal(str(value))
+                        conn.execute(
+                            """INSERT INTO normalized_holdings
+                               (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
+                                asset_type, quantity, price, value, original_currency,
+                                price_source, snapshot_date, parser_version, chain, user_id, resource_type)
+                               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                            (str(uuid.uuid4()), source_run_id, raw_payload_id,
+                             ps["symbol"], ps["name"],
+                             "tw_stock", shares, price, value, "TWD",
+                             "yahoo", date_str, PARSER_VERSION, None, user_id, "yuanta_collateral"),
+                        )
+                    effective_collateral = collateral_today if collateral_today > 0 else collateral_value
+                else:
+                    # No individual stock data — write aggregate row as fallback
+                    effective_collateral = collateral_value
+                    conn.execute(
+                        """INSERT INTO normalized_holdings
+                           (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
+                            asset_type, quantity, price, value, original_currency,
+                            price_source, snapshot_date, parser_version, chain, user_id, resource_type)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (str(uuid.uuid4()), source_run_id, raw_payload_id,
+                         "擔保品", "擔保品",
+                         "tw_stock", 0, None, float(collateral_value), "TWD",
+                         "statement", date_str, PARSER_VERSION, None, user_id, "yuanta_collateral"),
+                    )
+                net_asset = float(market_value + effective_collateral + other_assets_total - margin)
             else:
                 net_asset = float(market_value + other_assets_total + cum_cash - margin)
 
@@ -457,20 +499,7 @@ def _write_month_to_db(
                      "tw_futures_equity", 0, None, float(other_assets_total), "TWD",
                      "statement", date_str, PARSER_VERSION, None, user_id, "yuanta_futures_equity"),
                 )
-            if has_collateral:
-                # Write pledged stock aggregate value as "擔保品" section
-                conn.execute(
-                    """INSERT INTO normalized_holdings
-                       (id, source_run_id, raw_payload_id, platform_symbol, platform_asset_name,
-                        asset_type, quantity, price, value, original_currency,
-                        price_source, snapshot_date, parser_version, chain, user_id, resource_type)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                    (str(uuid.uuid4()), source_run_id, raw_payload_id,
-                     "擔保品", "擔保品",
-                     "tw_stock", 0, None, float(collateral_value), "TWD",
-                     "statement", date_str, PARSER_VERSION, None, user_id, "yuanta_collateral"),
-                )
-            else:
+            if not has_collateral:
                 # No pledged stocks — cum_cash represents actual cash balance
                 if cum_cash != 0:
                     conn.execute(
@@ -520,6 +549,19 @@ def _extract_other_assets(parsed_json: dict) -> dict[str, Decimal]:
         if value != 0:
             label = cat.split("(")[0].strip() or cat
             result[label] = value
+    return result
+
+
+def _extract_pledged_stocks(parsed_json: dict) -> list[dict]:
+    """Resolve pledged (collateral) stocks to {symbol, name, shares} dicts."""
+    from yuanta_net_asset_poc import resolve_name_to_symbol
+    result = []
+    for h in parsed_json.get("holdings_pledged", []):
+        name = h.get("name", "")
+        sym = h.get("symbol") or (resolve_name_to_symbol(name) if name else None)
+        shares = int(h.get("shares_balance") or 0)
+        if sym and shares > 0:
+            result.append({"symbol": sym, "name": name, "shares": shares})
     return result
 
 
