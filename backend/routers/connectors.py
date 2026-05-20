@@ -187,7 +187,7 @@ def create_connector(body: ConnectorCreate, current_user: dict = Depends(get_cur
     return response
 
 
-EXCHANGE_LIKE_PLATFORMS = {"binance", "okx", "mexc", "bybit", "ibkr"}
+EXCHANGE_LIKE_PLATFORMS = {"binance", "okx", "mexc", "bybit", "ibkr", "yuanta"}
 
 
 def _resolve_account_ids(conn, platform: str, account_key: str, creds: dict, user_id: str) -> list[int]:
