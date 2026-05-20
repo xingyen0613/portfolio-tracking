@@ -127,21 +127,12 @@ def portfolio_allocation_drilldown(
 
 # ── /api/portfolio/snapshot ───────────────────────────────────────────────────
 
-# Cache breakdown DataFrames for the lifetime of the server process.
-# These are historical snapshots — they only grow when a new batch run completes,
-# which requires a server restart anyway.
-_breakdown_cache: dict[str, "pd.DataFrame"] = {}
-
 def _get_breakdown(category: str, user_id: str) -> "pd.DataFrame":
-    cache_key = f"{user_id}:{category}"
-    if cache_key not in _breakdown_cache:
-        fetcher = {
-            "crypto":   lambda: get_crypto_symbol_breakdown(user_id),
-            "us_stock": lambda: get_us_stock_symbol_breakdown(user_id),
-            "tw_stock": lambda: get_tw_stock_symbol_breakdown(user_id),
-        }[category]
-        _breakdown_cache[cache_key] = fetcher()
-    return _breakdown_cache[cache_key]
+    return {
+        "crypto":   lambda: get_crypto_symbol_breakdown(user_id),
+        "us_stock": lambda: get_us_stock_symbol_breakdown(user_id),
+        "tw_stock": lambda: get_tw_stock_symbol_breakdown(user_id),
+    }[category]()
 
 
 @router.get("/snapshot")

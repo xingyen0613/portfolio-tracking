@@ -3,21 +3,16 @@ Data access layer for the dashboard.
 Reads from PostgreSQL and returns aggregated DataFrames.
 """
 
-import json
 import warnings
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pandas as pd
 
 from app.utils.fx import get_fx_rates_series, get_latest_fx_rate, lookup_rate
 from config.db import get_conn
-from config.settings import PLATFORM_CATEGORY, ROOT_DIR, TWD_PER_USD
+from config.settings import PLATFORM_CATEGORY
 
 warnings.filterwarnings("ignore", "pandas only supports SQLAlchemy")
-
-_YUANTA_DERIVED = ROOT_DIR / "data" / "derived" / "yuanta_poc"
-_YUANTA_RAW = ROOT_DIR / "data" / "raw" / "yuanta_poc"
 
 
 def get_latest_snapshot_date(user_id: str) -> str | None:
@@ -268,50 +263,54 @@ def get_us_stock_symbol_breakdown(user_id: str) -> pd.DataFrame:
 
 def get_tw_stock_symbol_breakdown(user_id: str) -> pd.DataFrame:
     """
-    Return per-date per-stock breakdown for tw_stock (yuanta).
-    Source: daily_net_asset.json holdings_value (TWD per symbol).
-    Only includes trading days where holdings_value is non-empty.
-
-    Multi-tenancy guard: data is only returned for users who actually own a
-    yuanta account in the DB (currently only SYSTEM_OWNER). Returns an empty
-    DataFrame for any other user, since this data file is shared across the
-    deployment but the source PDFs are owner-specific.
+    Per-date per-stock breakdown for tw_stock platforms (yuanta, sinopac).
+    Reads from normalized_holdings. Values are in TWD and converted to USD.
+    yuanta uses asset_type='tw_stock'; sinopac uses asset_type='stock'.
+    """
+    sql = """
+        SELECT
+            nh.snapshot_date,
+            nh.platform_symbol AS symbol,
+            SUM(nh.value) AS value_twd
+        FROM normalized_holdings nh
+        JOIN source_runs sr ON nh.source_run_id = sr.id
+        JOIN accounts a     ON sr.account_id = a.id
+        JOIN platforms p    ON a.platform_id = p.id
+        WHERE p.name IN ('yuanta', 'sinopac')
+          AND nh.asset_type IN ('tw_stock', 'stock')
+          AND nh.value IS NOT NULL
+          AND nh.value > 0
+          AND nh.user_id = %s
+          AND sr.status = 'success'
+          AND sr.id = (
+              SELECT sr2.id FROM source_runs sr2
+              WHERE sr2.account_id = a.id
+                AND sr2.status = 'success'
+                AND EXISTS (
+                    SELECT 1 FROM normalized_holdings nh2
+                    WHERE nh2.source_run_id = sr2.id
+                      AND nh2.snapshot_date = nh.snapshot_date
+                )
+              ORDER BY sr2.started_at DESC LIMIT 1
+          )
+        GROUP BY nh.snapshot_date, nh.platform_symbol
+        ORDER BY nh.snapshot_date, value_twd DESC
     """
     with get_conn() as conn:
-        row = conn.execute(
-            """SELECT 1 FROM accounts a
-               JOIN platforms p ON a.platform_id = p.id
-               WHERE p.name='yuanta' AND a.user_id=%s LIMIT 1""",
-            (user_id,),
-        ).fetchone()
-    if not row:
+        df = pd.read_sql_query(sql, conn.raw, params=(user_id,))
+    if df.empty:
         return pd.DataFrame(columns=["snapshot_date", "symbol", "value_usd"])
+
+    df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
+    df["value_twd"] = pd.to_numeric(df["value_twd"], errors="coerce")
 
     rates = get_fx_rates_series()
-    rows = []
-    for na_file in sorted(_YUANTA_DERIVED.glob("*/daily_net_asset.json")):
-        with open(na_file, encoding="utf-8") as f:
-            data = json.load(f)
-        for entry in data.get("daily", []):
-            hv = entry.get("holdings_value")
-            if not hv:
-                continue
-            date_str = entry["date"]
-            rate = lookup_rate(date_str, rates)
-            for symbol, value_str in hv.items():
-                rows.append({
-                    "snapshot_date": date_str,
-                    "symbol": symbol,
-                    "value_usd": float(value_str) / rate,
-                })
-
-    if not rows:
-        return pd.DataFrame(columns=["snapshot_date", "symbol", "value_usd"])
-
-    df = pd.DataFrame(rows)
-    df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
-    df["value_usd"] = pd.to_numeric(df["value_usd"], errors="coerce")
-    return df.sort_values(["snapshot_date", "value_usd"], ascending=[True, False])
+    df["value_usd"] = df.apply(
+        lambda r: r["value_twd"] / lookup_rate(r["snapshot_date"], rates), axis=1
+    )
+    return df[["snapshot_date", "symbol", "value_usd"]].sort_values(
+        ["snapshot_date", "value_usd"], ascending=[True, False]
+    )
 
 
 def get_tw_stock_platform_daily(user_id: str) -> pd.DataFrame:
@@ -406,96 +405,6 @@ def get_latest_category_totals(user_id: str) -> pd.DataFrame:
     )
     return df
 
-
-def get_yuanta_holdings_detail() -> dict:
-    """
-    Return latest detailed holdings for yuanta from JSON files.
-    Combines parsed.json (owned/pledged classification) with
-    daily_net_asset.json (latest trading day values).
-    Returns empty dict if no data available.
-    """
-    months = sorted(
-        [p.parent.name for p in _YUANTA_DERIVED.glob("*/daily_net_asset.json")],
-        reverse=True,
-    )
-    if not months:
-        return {}
-
-    latest_month = months[0]
-
-    with open(_YUANTA_DERIVED / latest_month / "daily_net_asset.json", encoding="utf-8") as f:
-        na_data = json.load(f)
-    latest_entry = next(
-        (e for e in reversed(na_data["daily"]) if e.get("net_asset") is not None),
-        None,
-    )
-    if not latest_entry:
-        return {}
-
-    holdings_value = {k: float(v) for k, v in (latest_entry.get("holdings_value") or {}).items()}
-
-    cache_path = _YUANTA_DERIVED / "name_to_symbol_cache.json"
-    name_to_sym: dict[str, str] = {}
-    if cache_path.exists():
-        with open(cache_path, encoding="utf-8") as f:
-            name_to_sym = json.load(f)
-
-    owned: list[dict] = []
-    pledged: list[dict] = []
-    parsed_path = _YUANTA_RAW / latest_month / "parsed.json"
-    parsed: dict = {}
-    if parsed_path.exists():
-        with open(parsed_path, encoding="utf-8") as f:
-            parsed = json.load(f)
-
-        for h in parsed.get("holdings_owned", []):
-            sym = h.get("symbol")
-            owned.append({
-                "symbol": sym or "—",
-                "name": h.get("name", ""),
-                "shares": int(h.get("shares_collateral_free") or 0),
-                "value_twd": holdings_value.get(sym) if sym else None,
-            })
-
-        for h in parsed.get("holdings_pledged", []):
-            name = h.get("name", "")
-            sym = h.get("symbol") or name_to_sym.get(name)
-            pledged.append({
-                "symbol": sym or "—",
-                "name": name,
-                "shares_balance": int(h.get("shares_balance") or 0),
-                "shares_used": int(h.get("shares_used") or 0),
-                "shares_remaining": int(h.get("shares_remaining") or 0),
-                "value_twd": holdings_value.get(sym) if sym else None,
-            })
-
-    owned.sort(key=lambda x: x["value_twd"] or 0, reverse=True)
-    pledged.sort(key=lambda x: x["value_twd"] or 0, reverse=True)
-
-    # other_assets: futures equity etc. from latest_entry (already extracted by net_asset script)
-    other_assets_raw = latest_entry.get("other_assets") or {}
-    other_assets: list[dict] = []
-    for label, value in other_assets_raw.items():
-        try:
-            v = float(value)
-        except (TypeError, ValueError):
-            continue
-        if v == 0:
-            continue
-        other_assets.append({"label": label, "value_twd": v})
-
-    summary = parsed.get("summary", {})
-    return {
-        "date": latest_entry["date"],
-        "month": latest_month,
-        "market_value": float(latest_entry.get("market_value") or 0),
-        "margin_balance": float(latest_entry.get("margin_balance") or 0),
-        "net_asset": float(latest_entry.get("net_asset") or 0),
-        "margin_maintenance_pct": summary.get("margin_maintenance_pct"),
-        "owned": owned,
-        "pledged": pledged,
-        "other_assets": other_assets,
-    }
 
 
 def get_yuanta_latest(user_id: str) -> dict:
