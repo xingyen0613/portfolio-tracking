@@ -19,7 +19,7 @@
 | SUI Wallet | Token 餘額 | Sui 公鏈 RPC + Pyth oracle | USD |
 | IBKR | 美股持倉 + 現金（含負值保證金） | Flex Web Service API | USD |
 | Firsttrade | 美股持倉 | 手動輸入（connector 待實作） | USD |
-| 元大證券 | 台股每日淨資產（持股市值 - 融資餘額） | 月對帳單 PDF 解析 | TWD |
+| 元大證券 | 台股每日淨資產（持股市值 + 擔保品 + 複委託 + 期貨權益 - 融資餘額） | 月對帳單 PDF 解析 | TWD |
 
 ## EVM 多鏈錢包 Pipeline
 

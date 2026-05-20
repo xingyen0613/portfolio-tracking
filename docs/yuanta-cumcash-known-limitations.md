@@ -14,44 +14,61 @@
 
 ## 現行 net_asset 計算
 
+依「有無擔保品（融資抵押）」分兩條路徑。`app/connectors/yuanta_connector.py:_write_month_to_db` 與 `scripts/yuanta_net_asset_poc.py` 都實作同一套邏輯。
+
+### Path A：有擔保品（has_collateral=True）
+
+```
+net_asset = market_value + collateral + other_assets − margin_balance
+```
+
+**不加 cum_cash**：借款已反映在擔保品市值，加 cum_cash 會雙重計算。也**不做 anchor**。
+
+### Path B：無擔保品（has_collateral=False）
+
 ```
 net_asset = market_value + other_assets + cum_cash − margin_balance
 ```
 
+需做月底 anchor 校準（見下），否則 cum_cash 會累積偏離。
+
 | 項目 | 來源 |
 |---|---|
-| `market_value` | daily_holdings.json：自有 + 擔保品 × 每日價 |
-| `other_assets` | parsed.json `summary.asset_categories`（期貨等）|
-| `cum_cash` | transactions + margin_transactions 的 `net_cashflow` 累積 |
+| `market_value` | 自有股 + 擔保品（如有） × 每日價 |
+| `other_assets` | parsed.json `summary.asset_categories` 非股票/非擔保品的項目，依 label 分類：期貨權益、複委託（海外有價證券）、其他 |
+| `cum_cash` | transactions + margin_transactions 的 `net_cashflow` 累積，跨月承接 |
 | `margin_balance` | parsed.json 月底借款餘額 |
 
-`scripts/yuanta_net_asset_poc.py` 處理三種雙重計算：
+處理三種雙重計算：
 - `repay_via_sell`：賣股款直接還融資（扣，避免雙重）
 - `advance_settlement_out`：T+0 提前結算（扣，跟 sell tx 重複）
 - `advance_settlement_in`：歸帳事件（不動，已被 out 抵銷）
 
-## 月底 anchor correction
+## 月底 anchor correction（Path B only）
 
 每月最後交易日校正：
 ```
 correction = yuanta_official_net_asset − pre_anchor_net_asset
-        = − cum_cash（結構上必然成立）
 ```
 
-於是 cum_cash 月底永遠歸 0。
+把 correction 加進該日 `account_snapshots.total_value`、`yuanta_cash` row 的 value，並讓 `cum_cash += correction` 後傳遞給下月當起點。
+
+對於沒有外部出入金的帳戶，correction 結構上會把 cum_cash 拉到 0；有出入金的帳戶則 correction 反映「沒被 PDF 記錄的轉帳金額」。
 
 ## 已知限制
 
-對帳單沒出入金紀錄，所以 anchor 把 cum_cash 一刀切歸 0，等於假設「月底沒留現金、沒外部轉帳」。
+對帳單沒出入金紀錄，也不記載「自有股票 → 複委託 / 期貨子帳戶」的內部轉帳，所以 anchor 把 cum_cash 強制拉到對齊 official，等於假設「月底以外的所有未記載金流」都發生在月底那一刻。
 
 四種實際情境的處理：
 
 | pre-anchor cum_cash | 真實原因 | 目前處理 | 影響 |
 |---|---|---|---|
-| **正 (+)** | 賣股 > 買股，款項離開 yuanta 視野（提現 / 漏抓 / 移轉到期貨等）| anchor 強制歸 0 | 月底 step down |
-| **正 (+) 留在 yuanta 集保** | 賣股款放著沒花 | anchor 仍歸 0 | 真實現金被忽略 |
-| **負 (−)** | 買股 > 賣股，需要外部現金支撐（入金或原有現金）| anchor 強制歸 0 | 月底 step up（默認補上）|
-| **負 (−) 漏抓 asset** | parser 漏掉某 asset_category | anchor 歸 0 | 真實 net_asset 被低估 |
+| **正 (+)** | 賣股 > 買股，款項離開 yuanta 視野（提現 / 漏抓 / 轉到複委託 / 轉到期貨等）| anchor 抵掉 | 月底 step down |
+| **正 (+) 留在 yuanta 集保** | 賣股款放著沒花 | anchor 仍抵掉 | 真實現金被忽略 |
+| **負 (−)** | 買股 > 賣股，需要外部現金支撐（入金或原有現金）| anchor 補上 | 月底 step up（默認補上）|
+| **負 (−) 漏抓 asset** | parser 漏掉某 asset_category | anchor 補上 | 真實 net_asset 被低估 |
+
+**典型範例（複委託情境）**：用戶在元大有自有股 + 複委託海外 ETF。每月把賣股款轉到複委託買美股，PDF transactions 只記股票交易（cum_cash 上升），但複委託買入是「海外有價證券」asset_category 的存量變化，沒進 transactions。月底 anchor 把多累積的 cum_cash 抵掉，曲線會出現 step down。
 
 ## Chart 上的觀察
 
@@ -96,7 +113,7 @@ trend 線在月底可能出現 step：
 
 ## 相關檔案
 
-- `scripts/yuanta_net_asset_poc.py`：cum_cash 計算與 anchor
-- `scripts/yuanta_insert_poc.py`：寫進 account_snapshots
-- `app/dashboard/data.py:get_yuanta_holdings_detail`：holdings 詳情
-- `backend/routers/holdings.py`：四個 yuanta sections（自有/擔保品/期貨/融資）
+- `app/connectors/yuanta_connector.py:_write_month_to_db`：production connector，含 cum_cash 累積與月底 anchor 校準
+- `scripts/yuanta_net_asset_poc.py`：等價的 PoC 實作，用於離線驗證
+- `scripts/yuanta_backfill_from_db.py`：從 raw_payloads 重跑歷史月份（connector 邏輯改動時用）
+- `backend/routers/holdings.py`：yuanta sections — 自有股 / 擔保品 / **複委託** / 期貨權益 / 其他資產 / 現金 / 融資
