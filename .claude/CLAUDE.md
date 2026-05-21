@@ -58,6 +58,12 @@ uv run alembic upgrade head
 - 所有寫入 `accounts / source_runs / account_snapshots / normalized_holdings / category_snapshots / batches` 都要帶 user_id
 - `run_batch(platforms, user_id, connector_ids=None)` 一律 per-user 跑
 
+### 永豐證券（Sinopac / Shioaji）Connector
+- 使用 `shioaji` SDK，以 `api_key + secret_key` 登入；**CA 不需要**（CA 只有下單才需要，查帳不需）
+- 期貨選擇權帳戶整合在 `SinopacStockConnector` 內（非獨立 class），透過 `api.futopt_account is None` 判斷是否有期貨帳戶
+- Login session 共用，整個 batch 只 login 一次（`_get_shioaji_api` 以 api_key 為 key cache）
+- `SINOPAC_SIMULATION` env flag 可切換 simulation / production 模式（Zeabur 上不設則預設 production）
+
 ### Yuanta net_asset 計算
 - 公式：`market_value + other_assets + cum_cash − margin_balance`
   - `market_value`：自有 + 擔保品 × 每日股價

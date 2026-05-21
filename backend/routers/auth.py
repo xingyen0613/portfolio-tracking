@@ -139,7 +139,7 @@ def yuanta_gmail_callback(
     state: str | None = None,
     error: str | None = None,
 ):
-    frontend_url = settings.FRONTEND_URL
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
 
     if error or not code or not state:
         reason = error or "missing_params"
