@@ -27,6 +27,7 @@ dist/
 com.portfolio.dashboard.plist
 thinking.md
 thinking_organized.md
+docs/testing.md
 
 # Playwright MCP debug artifacts (snapshots, screenshots)
 .playwright-mcp/
