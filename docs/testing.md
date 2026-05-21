@@ -19,6 +19,10 @@
 POST /api/admin/run-batch
 ```
 
+**環境 URL：**
+- Zeabur（Production）：`https://allin-pt.zeabur.app`
+- 本地開發：`http://localhost:8000`
+
 **權限**：需要主帳號（SYSTEM_OWNER_ID）的 JWT token。
 
 ---
@@ -49,11 +53,28 @@ EOF
 
 ---
 
+### 重要：這不是 Dry Run
+
+**所有測試都是真實執行，會實際寫入 DB。** 每次觸發都會：
+
+1. 打指定平台的外部 API（IBKR / 交易所 / 鏈上 RPC）
+2. 寫入 `account_snapshots`（今天的資產快照，重複執行會覆蓋當日資料）
+3. 寫入 `source_runs`（本次執行紀錄）
+4. 寫入 `batches`（batch 紀錄，有唯一 batch_id）
+5. 更新 `category_snapshots`（各類別總資產聚合）
+6. 更新 `user_connectors.last_sync_at`（connector 健康狀態）
+
+**重複執行安全嗎？** 是。所有寫入都是冪等的（`ON CONFLICT DO UPDATE`），同一天跑多次只會覆蓋當日資料，不會重複累加。
+
+---
+
 ### 常用測試組合
 
 **快速驗證（~15 秒）— 部署後首選**
+
+測試內容：IBKR Flex Web Service 連線 → 拉持倉 + 現金 → 寫入今日 account_snapshots
 ```bash
-curl -s -X POST https://<zeabur-url>/api/admin/run-batch \
+curl -s -X POST https://allin-pt.zeabur.app/api/admin/run-batch \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -63,21 +84,31 @@ curl -s -X POST https://<zeabur-url>/api/admin/run-batch \
   }' | python3 -m json.tool
 ```
 
-**測試特定平台（改動 sinopac 後）**
+**測試特定平台（改動某個 connector 後）**
+
+測試內容：只跑指定平台，驗證 connector 邏輯改動是否正常
 ```bash
+# 改動 sinopac 後
 -d '{"platforms": ["sinopac"], "skip_benchmarks": true}'
+
+# 改動 yuanta 後
+-d '{"platforms": ["yuanta"], "skip_benchmarks": true}'
 ```
 
 **測試所有加密貨幣交易所**
+
+測試內容：binance / okx / mexc / bybit 各自 auth + 拉 spot balance → 寫入 account_snapshots
 ```bash
 -d '{"platforms": ["binance", "okx", "mexc", "bybit"], "skip_benchmarks": true}'
 ```
 
 **全量跑（同 scheduler，約 10-15 分鐘）**
+
+測試內容：完整模擬每日排程，含所有平台 + 基準價格更新
 ```bash
 -d '{}'
 ```
-> ⚠️ 全量跑時間較長，建議只在確認各平台都正常時使用。HTTP 連線可能因 timeout 中斷，但 batch 仍會在後端繼續執行。
+> ⚠️ 全量跑時間較長，建議只在確認各平台都正常時使用。HTTP 連線可能因 timeout 中斷，但 batch 仍會在後端繼續執行，可查 DB 確認最終結果。
 
 ---
 
