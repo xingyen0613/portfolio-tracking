@@ -5,7 +5,8 @@ Usage:
     python -m app.jobs.scheduler
 
 Schedule:
-    UTC 15:30 every day (= Taiwan time 23:30)
+    UTC 15:30 every day (= Taiwan time 23:30) — all platforms except yuanta
+    UTC 15:30 on the 10th of each month       — yuanta only (Gmail PDF query)
 
 Multi-user ready: iterates over all distinct user_ids with active connectors.
 Currently only SYSTEM_OWNER_ID has connectors; new users are picked up automatically
@@ -43,6 +44,26 @@ def _active_user_ids() -> list[str]:
             "SELECT DISTINCT user_id FROM user_connectors WHERE status = 'active'"
         ).fetchall()
     return [row["user_id"] for row in rows]
+
+
+def run_monthly_yuanta() -> None:
+    log.info("Monthly yuanta batch triggered.")
+
+    from app.jobs.run_batch import run_batch
+
+    user_ids = _active_user_ids()
+    if not user_ids:
+        log.warning("No active user connectors found — skipping yuanta batch.")
+        return
+
+    log.info("Running yuanta batch for %d user(s): %s", len(user_ids), user_ids)
+    for user_id in user_ids:
+        try:
+            run_batch(["yuanta"], user_id)
+        except Exception as e:
+            log.error("Yuanta batch failed for user %s: %s", user_id, e)
+
+    log.info("Monthly yuanta batch complete.")
 
 
 def run_daily_batch() -> None:
@@ -83,13 +104,16 @@ def main() -> None:
     trigger = CronTrigger(hour=15, minute=30, timezone="UTC")
     scheduler.add_job(run_daily_batch, trigger, id="daily_batch", replace_existing=True)
 
+    monthly_trigger = CronTrigger(day=10, hour=15, minute=30, timezone="UTC")
+    scheduler.add_job(run_monthly_yuanta, monthly_trigger, id="monthly_yuanta", replace_existing=True)
+
     # TEST ONLY: run once 30 seconds after startup — remove after verification
     if os.environ.get("SCHEDULER_STARTUP_TEST") == "1":
         run_at = datetime.now(tz.utc) + timedelta(seconds=30)
         scheduler.add_job(run_daily_batch, DateTrigger(run_date=run_at), id="startup_test")
         log.info("STARTUP TEST enabled — batch will run at %s", run_at.isoformat())
 
-    log.info("Scheduler started. Daily batch fires at UTC 15:30 (Taiwan 23:30).")
+    log.info("Scheduler started. Daily batch: UTC 15:30 daily. Yuanta batch: UTC 15:30 on the 10th.")
 
     def _shutdown(signum, frame):
         log.info("Shutdown signal received, stopping scheduler.")
