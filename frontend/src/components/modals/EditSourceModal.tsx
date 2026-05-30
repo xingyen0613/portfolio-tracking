@@ -13,7 +13,7 @@ import ApiKeyForm from '../connectors/ApiKeyForm'
 import AddressForm from '../connectors/AddressForm'
 import IBKRForm from '../connectors/IBKRForm'
 import SinopacForm from '../connectors/SinopacForm'
-import YuantaForm from '../connectors/YuantaForm'
+import MaskedInput from '../MaskedInput'
 
 interface Props {
   connectorId: string
@@ -57,6 +57,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
     mutationFn: (payload: ConnectorUpdatePayload) => updateConnector(connectorId, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['connectors'] })
+      qc.invalidateQueries({ queryKey: ['connector-credentials', connectorId] })
       close()
     },
     onError: (err: unknown) => {
@@ -75,38 +76,6 @@ export default function EditSourceModal({ connectorId, close }: Props) {
         <div className="modal-head">
           <div className="modal-title">Loading…</div>
           <button className="modal-close" onClick={close}><Icon name="x" /></button>
-        </div>
-      </div>
-    )
-  }
-
-  // Yuanta: show pre-filled form once credentials loaded
-  if (t.auth === 'yuanta') {
-    const yuantaReady = credentialsReady
-    return (
-      <div className="modal">
-        <div className="modal-head">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="platform-abbr" style={{ background: t.color, color: t.textColor }}>
-              {t.abbr}
-            </div>
-            <div>
-              <div className="modal-title">重新授權 {t.name}</div>
-              <div className="modal-sub">{t.desc}</div>
-            </div>
-          </div>
-          <button className="modal-close" onClick={close}><Icon name="x" /></button>
-        </div>
-        <div className="modal-body">
-          {!yuantaReady ? (
-            <div style={{ color: 'var(--fg-3)', textAlign: 'center', padding: 24 }}>Loading…</div>
-          ) : (
-            <YuantaForm
-              key={connectorId}
-              initialGmailAddress={(credentials.gmail_address as string) ?? ''}
-              initialPdfPassword={(credentials.pdf_password as string) ?? ''}
-            />
-          )}
         </div>
       </div>
     )
@@ -179,6 +148,31 @@ export default function EditSourceModal({ connectorId, close }: Props) {
             )}
             {t.auth === 'sinopac' && (
               <SinopacForm key={connectorId} credentials={credentials} setCredential={setCredential} />
+            )}
+            {t.auth === 'yuanta' && (
+              <>
+                <div className="field">
+                  <label className="field-label">收取對帳單的 Gmail 信箱</label>
+                  <input
+                    className="input"
+                    type="email"
+                    placeholder="example@gmail.com"
+                    value={(credentials.gmail_address as string) ?? ''}
+                    onChange={e => setCredential('gmail_address', e.target.value)}
+                    disabled={mut.isPending}
+                  />
+                </div>
+                <div className="field">
+                  <label className="field-label">PDF 解密密碼</label>
+                  <MaskedInput
+                    className="input mono"
+                    placeholder="通常為身分證字號"
+                    value={(credentials.pdf_password as string) ?? ''}
+                    onChange={v => setCredential('pdf_password', v)}
+                    disabled={mut.isPending}
+                  />
+                </div>
+              </>
             )}
 
             {error && (
