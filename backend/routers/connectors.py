@@ -187,7 +187,10 @@ def create_connector(body: ConnectorCreate, current_user: dict = Depends(get_cur
     return response
 
 
-SENSITIVE_FIELDS = {"secret", "secret_key", "passphrase", "flex_token", "pdf_password", "gmail_token_json"}
+# Only mask the OAuth token — it's system-managed JSON the user never entered.
+# All user-entered credentials (api_key, secret, passphrase, flex_token, pdf_password, etc.)
+# are returned as plaintext so the frontend can pre-fill the edit form.
+SENSITIVE_FIELDS = {"gmail_token_json"}
 
 
 class ConnectorUpdate(BaseModel):
