@@ -270,8 +270,8 @@ def update_connector(
         updated = conn.execute(
             """SELECT id, platform_name, account_key, label, status,
                       last_sync_at, last_error, last_error_at, created_at
-               FROM user_connectors WHERE id=%s""",
-            (connector_id,),
+               FROM user_connectors WHERE id=%s AND user_id=%s""",
+            (connector_id, user_id),
         ).fetchone()
 
     return _row_to_connector(updated)
