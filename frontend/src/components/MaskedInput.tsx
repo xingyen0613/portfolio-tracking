@@ -26,7 +26,7 @@ export default function MaskedInput({ className, placeholder, value, onChange, d
       <button
         type="button"
         onClick={() => setVisible(v => !v)}
-        disabled={disabled}
+        disabled={disabled || !value}
         title={visible ? 'Hide' : 'Show'}
         style={{
           position: 'absolute',
@@ -35,12 +35,13 @@ export default function MaskedInput({ className, placeholder, value, onChange, d
           transform: 'translateY(-50%)',
           background: 'none',
           border: 'none',
-          cursor: 'pointer',
-          color: 'var(--fg-3)',
+          cursor: value ? 'pointer' : 'default',
+          color: value ? 'var(--fg-3)' : 'var(--fg-4, #444)',
           padding: 4,
           display: 'flex',
           alignItems: 'center',
           lineHeight: 0,
+          opacity: value ? 1 : 0.35,
         }}
       >
         <Icon name={visible ? 'eyeOff' : 'eye'} />
