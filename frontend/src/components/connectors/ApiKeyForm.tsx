@@ -1,4 +1,5 @@
 import { Icon } from '../Icon'
+import MaskedInput from '../MaskedInput'
 import type { SourceTemplate } from '../../data/sourceTemplates'
 
 interface Props {
@@ -13,32 +14,30 @@ export default function ApiKeyForm({ credentials, setCredential, template }: Pro
     <>
       <div className="field">
         <label className="field-label">API Key</label>
-        <input
+        <MaskedInput
           className="input mono"
           placeholder="Paste read-only API key"
           value={(credentials.api_key as string) ?? ''}
-          onChange={e => setCredential('api_key', e.target.value)}
+          onChange={v => setCredential('api_key', v)}
         />
       </div>
       <div className="field">
         <label className="field-label">API Secret</label>
-        <input
+        <MaskedInput
           className="input mono"
-          type="password"
           placeholder="••••••••••••••••"
           value={(credentials.secret as string) ?? ''}
-          onChange={e => setCredential('secret', e.target.value)}
+          onChange={v => setCredential('secret', v)}
         />
       </div>
       {showPassphrase && (
         <div className="field">
           <label className="field-label">Passphrase</label>
-          <input
+          <MaskedInput
             className="input mono"
-            type="password"
             placeholder="••••••••"
             value={(credentials.passphrase as string) ?? ''}
-            onChange={e => setCredential('passphrase', e.target.value)}
+            onChange={v => setCredential('passphrase', v)}
           />
         </div>
       )}

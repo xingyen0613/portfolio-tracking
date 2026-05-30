@@ -1,4 +1,5 @@
 import { Icon } from '../Icon'
+import MaskedInput from '../MaskedInput'
 
 interface Props {
   credentials: Record<string, unknown>
@@ -10,11 +11,11 @@ export default function SinopacForm({ credentials, setCredential }: Props) {
     <>
       <div className="field">
         <label className="field-label">API Key</label>
-        <input
+        <MaskedInput
           className="input mono"
           placeholder="Paste your Shioaji API key"
           value={(credentials.api_key as string) ?? ''}
-          onChange={e => setCredential('api_key', e.target.value)}
+          onChange={v => setCredential('api_key', v)}
         />
         <div className="field-hint">
           永豐 e-leader → 我的設定 → API 設定 → 新增 API Key（記得勾「正式環境」權限）。
@@ -22,12 +23,11 @@ export default function SinopacForm({ credentials, setCredential }: Props) {
       </div>
       <div className="field">
         <label className="field-label">Secret Key</label>
-        <input
+        <MaskedInput
           className="input mono"
-          type="password"
           placeholder="••••••••••••••••"
           value={(credentials.secret_key as string) ?? ''}
-          onChange={e => setCredential('secret_key', e.target.value)}
+          onChange={v => setCredential('secret_key', v)}
         />
         <div className="field-hint">
           API Key 申請後一併產生。建立後請立刻複製，永豐網站不會再次顯示。
