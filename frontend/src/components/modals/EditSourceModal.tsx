@@ -30,7 +30,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
   const { data: existingCreds, isLoading: credsLoading } = useQuery({
     queryKey: ['connector-credentials', connectorId],
     queryFn: () => getConnectorCredentials(connectorId),
-    enabled: !!connector && t?.auth !== 'yuanta',
+    enabled: !!connector && t?.auth !== 'manual' && t?.auth !== 'email',
   })
 
   const [accountLabel, setAccountLabel] = useState('')
@@ -80,8 +80,9 @@ export default function EditSourceModal({ connectorId, close }: Props) {
     )
   }
 
-  // Yuanta uses its own OAuth re-auth flow
+  // Yuanta: show pre-filled form once credentials loaded
   if (t.auth === 'yuanta') {
+    const yuantaReady = credentialsReady
     return (
       <div className="modal">
         <div className="modal-head">
@@ -97,7 +98,15 @@ export default function EditSourceModal({ connectorId, close }: Props) {
           <button className="modal-close" onClick={close}><Icon name="x" /></button>
         </div>
         <div className="modal-body">
-          <YuantaForm />
+          {!yuantaReady ? (
+            <div style={{ color: 'var(--fg-3)', textAlign: 'center', padding: 24 }}>Loading…</div>
+          ) : (
+            <YuantaForm
+              key={connectorId}
+              initialGmailAddress={(credentials.gmail_address as string) ?? ''}
+              initialPdfPassword={(credentials.pdf_password as string) ?? ''}
+            />
+          )}
         </div>
       </div>
     )
@@ -112,7 +121,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
     mut.mutate({ account_label: accountLabel.trim(), credentials })
   }
 
-  const needsCredsLoad = t.auth !== 'manual' && t.auth !== 'email' && t.auth !== 'yuanta'
+  const needsCredsLoad = t.auth !== 'manual' && t.auth !== 'email'
   const isLoading = needsCredsLoad && (credsLoading || !credentialsReady)
 
   return (
@@ -156,7 +165,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
                 marginBottom: 4,
               }}
             >
-              Secret fields are not pre-filled. Leave them blank to keep the current value.
+              All fields are pre-filled. Leave any field blank to keep the current value.
             </div>
 
             {t.auth === 'apikey' && (

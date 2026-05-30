@@ -1,10 +1,16 @@
 import { useState } from 'react'
 import { Icon } from '../Icon'
+import MaskedInput from '../MaskedInput'
 import { initiateYuantaOAuth } from '../../api/connectors'
 
-export default function YuantaForm() {
-  const [gmailAddress, setGmailAddress] = useState('')
-  const [pdfPassword, setPdfPassword] = useState('')
+interface Props {
+  initialGmailAddress?: string
+  initialPdfPassword?: string
+}
+
+export default function YuantaForm({ initialGmailAddress = '', initialPdfPassword = '' }: Props) {
+  const [gmailAddress, setGmailAddress] = useState(initialGmailAddress)
+  const [pdfPassword, setPdfPassword] = useState(initialPdfPassword)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -50,12 +56,11 @@ export default function YuantaForm() {
 
       <div className="field">
         <label className="field-label">PDF 解密密碼</label>
-        <input
+        <MaskedInput
           className="input mono"
-          type="password"
           placeholder="通常為身分證字號"
           value={pdfPassword}
-          onChange={e => setPdfPassword(e.target.value)}
+          onChange={setPdfPassword}
           disabled={loading}
         />
         <div className="field-hint">
