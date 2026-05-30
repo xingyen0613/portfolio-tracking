@@ -1,6 +1,7 @@
 import type { ModalState } from '../../App'
 import AddSourceModal from './AddSourceModal'
 import ConnectSourceModal from './ConnectSourceModal'
+import EditSourceModal from './EditSourceModal'
 import ImportHistoryModal from './ImportHistoryModal'
 
 interface Props {
@@ -23,15 +24,7 @@ export default function ModalHost({ modal, setModal }: Props) {
         <ConnectSourceModal templateId={modal.templateId} close={close} setModal={setModal} />
       )}
       {modal.kind === 'editSource' && (
-        <div className="modal" style={{ padding: 20 }}>
-          <div className="modal-head">
-            <div className="modal-title">Edit source</div>
-            <button className="modal-close" onClick={close}>×</button>
-          </div>
-          <div className="modal-body" style={{ color: 'var(--fg-3)' }}>
-            Coming soon.
-          </div>
-        </div>
+        <EditSourceModal connectorId={modal.connectorId} close={close} />
       )}
       {modal.kind === 'importHistory' && (
         <ImportHistoryModal connector={modal.connector} close={close} />

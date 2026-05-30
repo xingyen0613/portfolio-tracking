@@ -41,6 +41,7 @@ function ConnectorRow({
   onRefresh,
   onRemove,
   onImport,
+  onEdit,
   busy,
 }: {
   c: Connector
@@ -48,6 +49,7 @@ function ConnectorRow({
   onRefresh: () => void
   onRemove: () => void
   onImport: () => void
+  onEdit: () => void
   busy: boolean
 }) {
   const status = statusOf(c)
@@ -107,6 +109,14 @@ function ConnectorRow({
             <Icon name="upload" />
           </button>
         )}
+        <button
+          className="icon-btn"
+          title="Edit"
+          onClick={onEdit}
+          disabled={busy}
+        >
+          <Icon name="edit" />
+        </button>
         <button
           className="icon-btn"
           title="Refresh"
@@ -206,6 +216,7 @@ export default function SourcesTab({ openModal }: Props) {
               onRefresh={() => refreshMut.mutate(c.id)}
               onRemove={() => handleRemove(c)}
               onImport={() => openModal({ kind: 'importHistory', connector: c })}
+              onEdit={() => openModal({ kind: 'editSource', connectorId: c.id })}
               busy={
                 (deleteMut.isPending && deleteMut.variables === c.id) ||
                 (refreshMut.isPending && refreshMut.variables === c.id)

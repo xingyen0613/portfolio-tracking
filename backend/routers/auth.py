@@ -111,6 +111,7 @@ def yuanta_gmail_authorize(
         {
             "user_id": user_id,
             "pdf_password": body.pdf_password,
+            "gmail_address": body.login_hint or "",
             "code_verifier": code_verifier,
             "nonce": str(_uuid.uuid4()),
             "exp": datetime.now(timezone.utc) + timedelta(minutes=_OAUTH_STATE_EXPIRE_MINUTES),
@@ -150,6 +151,7 @@ def yuanta_gmail_callback(
         payload = jwt.decode(state, settings.JWT_SECRET, algorithms=["HS256"])
         user_id = payload["user_id"]
         pdf_password = payload["pdf_password"]
+        gmail_address = payload.get("gmail_address", "")
         code_verifier = payload.get("code_verifier")
     except JWTError:
         return RedirectResponse(url=f"{frontend_url}/?oauth=yuanta_error&reason=invalid_state")
@@ -168,7 +170,7 @@ def yuanta_gmail_callback(
 
     # Upsert connector
     try:
-        credentials = {"gmail_token_json": token_json, "pdf_password": pdf_password}
+        credentials = {"gmail_token_json": token_json, "pdf_password": pdf_password, "gmail_address": gmail_address}
         encrypted = encrypt(json.dumps(credentials))
 
         with get_conn() as conn:

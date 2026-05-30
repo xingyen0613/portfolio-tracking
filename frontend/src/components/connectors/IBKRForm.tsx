@@ -1,4 +1,5 @@
 import { Icon } from '../Icon'
+import MaskedInput from '../MaskedInput'
 
 interface Props {
   credentials: Record<string, unknown>
@@ -10,11 +11,11 @@ export default function IBKRForm({ credentials, setCredential }: Props) {
     <>
       <div className="field">
         <label className="field-label">Flex Query Token</label>
-        <input
+        <MaskedInput
           className="input mono"
           placeholder="Paste your Flex token"
           value={(credentials.flex_token as string) ?? ''}
-          onChange={e => setCredential('flex_token', e.target.value)}
+          onChange={v => setCredential('flex_token', v)}
         />
         <div className="field-hint">
           IBKR → Settings → Account Settings → Flex Web Service → Generate token.
