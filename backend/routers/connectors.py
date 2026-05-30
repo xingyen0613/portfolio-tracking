@@ -187,6 +187,93 @@ def create_connector(body: ConnectorCreate, current_user: dict = Depends(get_cur
     return response
 
 
+SENSITIVE_FIELDS = {"secret", "secret_key", "passphrase", "flex_token", "pdf_password", "gmail_token_json"}
+
+
+class ConnectorUpdate(BaseModel):
+    account_label: str | None = None
+    credentials: dict | None = None
+
+
+@router.get("/{connector_id}/credentials")
+def get_connector_credentials(connector_id: str, current_user: dict = Depends(get_current_user)):
+    """Return decrypted credentials for a connector, with sensitive fields masked as empty string."""
+    user_id = current_user["id"]
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT platform_name, credentials_json FROM user_connectors WHERE id=%s AND user_id=%s",
+            (connector_id, user_id),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Connector not found")
+
+    creds: dict = {}
+    if row["credentials_json"]:
+        try:
+            creds = json.loads(decrypt(row["credentials_json"]))
+        except Exception:
+            pass
+
+    masked = {k: ("" if k in SENSITIVE_FIELDS else v) for k, v in creds.items()}
+    return masked
+
+
+@router.patch("/{connector_id}", response_model=ConnectorOut)
+def update_connector(
+    connector_id: str,
+    body: ConnectorUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update connector label and/or credentials. Empty string credential values are ignored (keep existing)."""
+    user_id = current_user["id"]
+
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT platform_name, account_key, label, credentials_json FROM user_connectors WHERE id=%s AND user_id=%s",
+            (connector_id, user_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Connector not found")
+
+        updates: list[str] = []
+        params: list = []
+
+        if body.account_label is not None and body.account_label.strip():
+            updates.append("label=%s")
+            params.append(body.account_label.strip())
+
+        if body.credentials is not None:
+            existing_creds: dict = {}
+            if row["credentials_json"]:
+                try:
+                    existing_creds = json.loads(decrypt(row["credentials_json"]))
+                except Exception:
+                    pass
+            merged = {**existing_creds}
+            for k, v in body.credentials.items():
+                # Skip empty strings (keep existing); allow non-empty values including lists
+                if v != "" and v != [] and v is not None:
+                    merged[k] = v
+            updates.append("credentials_json=%s")
+            params.append(encrypt(json.dumps(merged)))
+
+        if updates:
+            params.extend([connector_id, user_id])
+            conn.execute(
+                f"UPDATE user_connectors SET {', '.join(updates)} WHERE id=%s AND user_id=%s",
+                params,
+            )
+
+        updated = conn.execute(
+            """SELECT id, platform_name, account_key, label, status,
+                      last_sync_at, last_error, last_error_at, created_at
+               FROM user_connectors WHERE id=%s""",
+            (connector_id,),
+        ).fetchone()
+
+    return _row_to_connector(updated)
+
+
 EXCHANGE_LIKE_PLATFORMS = {"binance", "okx", "mexc", "bybit", "ibkr", "yuanta"}
 
 

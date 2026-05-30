@@ -46,6 +46,24 @@ export async function deleteConnector(id: string): Promise<void> {
   await api.delete(`/api/connectors/${id}`)
 }
 
+export async function getConnectorCredentials(id: string): Promise<Record<string, unknown>> {
+  const r = await api.get(`/api/connectors/${id}/credentials`)
+  return r.data
+}
+
+export interface ConnectorUpdatePayload {
+  account_label?: string
+  credentials?: Record<string, unknown>
+}
+
+export async function updateConnector(
+  id: string,
+  payload: ConnectorUpdatePayload,
+): Promise<Connector> {
+  const r = await api.patch(`/api/connectors/${id}`, payload)
+  return r.data
+}
+
 export async function refreshConnector(id: string): Promise<ConnectorCreateResponse> {
   const r = await api.post(`/api/connectors/${id}/refresh`, undefined, {
     timeout: SYNC_TIMEOUT_MS,
