@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.utils.fx import ensure_updated
-from backend.routers import admin, auth, benchmarks, connectors, historical_imports, holdings, portfolio
+from backend.routers import admin, auth, benchmarks, connectors, historical_imports, holdings, internal, portfolio
 
 _default_origins = "http://localhost:5173,http://127.0.0.1:5173"
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", _default_origins).split(",")
@@ -33,6 +33,7 @@ app.include_router(holdings.router, prefix="/api/holdings")
 app.include_router(connectors.router, prefix="/api/connectors")
 app.include_router(historical_imports.router, prefix="/api/connectors")
 app.include_router(admin.router, prefix="/api/admin")
+app.include_router(internal.router, prefix="/api/internal")
 
 
 @app.get("/health")
