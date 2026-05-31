@@ -11,6 +11,7 @@ import SinopacForm from '../connectors/SinopacForm'
 import YuantaForm from '../connectors/YuantaForm'
 import EmailForm from '../connectors/EmailForm'
 import ManualForm from '../connectors/ManualForm'
+import GetApiModal from './GetApiModal'
 import type { ModalState } from '../../App'
 
 interface Props {
@@ -27,6 +28,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
   const [credentials, setCredentials] = useState<Record<string, unknown>>({})
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
+  const [showGetApi, setShowGetApi] = useState(false)
   const [success, setSuccess] = useState<
     | { fetchStatus: 'success' | 'partial' | 'pending' }
     | null
@@ -102,6 +104,10 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
         </div>
       </div>
     )
+  }
+
+  if (showGetApi && t.getApiConfig) {
+    return <GetApiModal platformName={t.name} config={t.getApiConfig} onBack={() => setShowGetApi(false)} />
   }
 
   const canSubmit = t.implemented
@@ -293,6 +299,22 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
         {t.auth === 'email' && <EmailForm template={t} />}
         {t.auth === 'manual' && <ManualForm />}
 
+        {t.getApiConfig?.apiWarning && (
+          <div
+            style={{
+              padding: 10,
+              borderRadius: 8,
+              background: 'rgba(240,162,60,0.08)',
+              border: '1px solid rgba(240,162,60,0.3)',
+              color: 'var(--c-crypto)',
+              fontSize: 12,
+              lineHeight: 1.55,
+            }}
+          >
+            ⚠ {t.getApiConfig.apiWarning}
+          </div>
+        )}
+
         {error && (
           <div
             style={{
@@ -324,17 +346,31 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
       </div>
 
       {t.auth !== 'yuanta' && (
-        <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={close} disabled={mut.isPending}>
-            Cancel
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleSubmit}
-            disabled={mut.isPending || !canSubmit}
-          >
-            {mut.isPending ? 'Connecting…' : canSubmit ? 'Connect & sync' : 'Coming soon'}
-          </button>
+        <div
+          className="modal-foot"
+          style={{ justifyContent: t.getApiConfig ? 'space-between' : 'flex-end' }}
+        >
+          {t.getApiConfig && (
+            <button
+              className="btn btn-outline"
+              onClick={() => setShowGetApi(true)}
+              disabled={mut.isPending}
+            >
+              取得 API
+            </button>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={close} disabled={mut.isPending}>
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleSubmit}
+              disabled={mut.isPending || !canSubmit}
+            >
+              {mut.isPending ? 'Connecting…' : canSubmit ? 'Connect & sync' : 'Coming soon'}
+            </button>
+          </div>
         </div>
       )}
     </div>
