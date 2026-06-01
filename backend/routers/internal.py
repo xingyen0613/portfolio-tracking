@@ -53,12 +53,15 @@ def trigger_batch(
 
     results = []
 
+    batch_ids: list[str] = []
+
     if body.job == "daily":
         platforms = [p for p in ENABLED_PLATFORMS if p in _DAILY_PLATFORMS]
         log.info("Daily batch triggered for %d user(s)", len(user_ids))
         for user_id in user_ids:
             try:
                 batch_id = run_batch(platforms, user_id)
+                batch_ids.append(batch_id)
                 results.append({"user_id": user_id, "batch_id": batch_id, "status": "ok"})
             except Exception as e:
                 log.error("Daily batch failed for user %s: %s", user_id, e)
@@ -73,9 +76,16 @@ def trigger_batch(
         for user_id in user_ids:
             try:
                 batch_id = run_batch(["yuanta"], user_id)
+                batch_ids.append(batch_id)
                 results.append({"user_id": user_id, "batch_id": batch_id, "status": "ok"})
             except Exception as e:
                 log.error("Yuanta batch failed for user %s: %s", user_id, e)
                 results.append({"user_id": user_id, "status": f"error: {e}"})
+
+    try:
+        from app.services.notifier import send_batch_summary
+        send_batch_summary(body.job, batch_ids)
+    except Exception as e:
+        log.warning("notifier failed: %s", e)
 
     return {"status": "done", "job": body.job, "results": results}
