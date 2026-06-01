@@ -96,6 +96,7 @@ def send_batch_summary(job_type: str, batch_ids: list[str]) -> None:
         "daily": "Daily Batch",
         "monthly_yuanta": "Monthly Yuanta Batch",
         "admin": "Admin Batch",
+        "smoke": "Smoke Test",
     }
     job_label = job_labels.get(job_type, job_type)
     ts = (datetime.now(timezone.utc) + timedelta(hours=8)).strftime("%m/%d %H:%M") + " UTC+8"

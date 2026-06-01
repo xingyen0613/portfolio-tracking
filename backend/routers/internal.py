@@ -19,7 +19,7 @@ _DAILY_PLATFORMS = {"binance", "okx", "mexc", "bybit", "sol_wallet", "ibkr", "ev
 
 
 class TriggerRequest(BaseModel):
-    job: Literal["daily", "monthly_yuanta"]
+    job: Literal["daily", "monthly_yuanta", "smoke"]
 
 
 def _active_user_ids() -> list[str]:
@@ -81,6 +81,17 @@ def trigger_batch(
             except Exception as e:
                 log.error("Yuanta batch failed for user %s: %s", user_id, e)
                 results.append({"user_id": user_id, "status": f"error: {e}"})
+
+    elif body.job == "smoke":
+        from config.settings import SYSTEM_OWNER_ID
+        log.info("Smoke test triggered for system owner")
+        try:
+            batch_id = run_batch(["binance"], SYSTEM_OWNER_ID)
+            batch_ids.append(batch_id)
+            results.append({"user_id": SYSTEM_OWNER_ID, "batch_id": batch_id, "status": "ok"})
+        except Exception as e:
+            log.error("Smoke test failed: %s", e)
+            results.append({"user_id": SYSTEM_OWNER_ID, "status": f"error: {e}"})
 
     try:
         from app.services.notifier import send_batch_summary
