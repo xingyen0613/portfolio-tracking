@@ -53,9 +53,11 @@ def admin_run_batch(
     target_users = [body.user_id] if body.user_id else _active_user_ids()
 
     results: list[BatchResult] = []
+    batch_ids: list[str] = []
     for uid in target_users:
         try:
             batch_id = run_batch(target_platforms, uid)
+            batch_ids.append(batch_id)
             with get_conn() as conn:
                 row = conn.execute(
                     "SELECT status FROM batches WHERE id = %s", (batch_id,)
@@ -73,5 +75,12 @@ def admin_run_batch(
             benchmarks_updated = True
         except Exception:
             benchmarks_updated = False
+
+    try:
+        from app.services.notifier import send_batch_summary
+        send_batch_summary("admin", batch_ids)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("notifier failed: %s", e)
 
     return AdminRunBatchResponse(batches=results, benchmarks_updated=benchmarks_updated)
