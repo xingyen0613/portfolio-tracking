@@ -73,7 +73,6 @@ jobs:
           SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE }} \
             --region ${{ env.REGION }} --format "value(status.url)")
           SECRET=$(printf '%s' "$SCHEDULER_SECRET" | tr -d $'\t\r\n ')
-          echo "Secret length: ${#SECRET}"
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SERVICE_URL/api/internal/trigger-batch" \
             -H "Content-Type: application/json" \
             -H "X-Scheduler-Secret: $SECRET" \
