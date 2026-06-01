@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
+import { useCurrency } from '../../context/CurrencyContext'
 
 const P_COLORS = {
   total:    '#7c6ef5',
@@ -30,14 +31,6 @@ interface MetricsData {
   [key: string]: { total_return: number | null; sharpe: number | null; mdd: number | null }
 }
 
-function fmtUsd(v: number) {
-  const abs = Math.abs(v)
-  const sign = v < 0 ? '-' : ''
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`
-  if (abs >= 1_000)     return `${sign}$${(abs / 1_000).toFixed(1)}k`
-  return `${sign}$${abs.toFixed(0)}`
-}
-
 function fmtPct(v: number | null) {
   if (v == null) return '—'
   return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`
@@ -45,6 +38,7 @@ function fmtPct(v: number | null) {
 
 export default function PerformanceMetrics() {
   const [win, setWin] = useState('YTD')
+  const { fmt } = useCurrency()
 
   const { data: portData } = useQuery<HistoryData>({
     queryKey: ['portfolio/history/all'],
@@ -111,7 +105,7 @@ export default function PerformanceMetrics() {
                 fontWeight: 700, letterSpacing: '-0.02em',
                 color, marginBottom: 14,
               }}>
-                {balance != null ? fmtUsd(balance) : '—'}
+                {balance != null ? fmt(balance) : '—'}
               </div>
               {[
                 { label: `Return (${winLabel})`, value: fmtPct(ret),   color: ret == null ? 'var(--fg-2)' : ret >= 0 ? 'var(--c-pos)' : 'var(--c-neg)' },

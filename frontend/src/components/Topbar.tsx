@@ -1,12 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
-import { api } from '../api/client'
+import { useCurrency } from '../context/CurrencyContext'
 import { Icon } from './Icon'
 import type { Route, ModalState } from '../App'
-
-interface MetaData {
-  last_updated: string | null
-  usd_twd_rate: number
-}
 
 const TITLES: Record<Route, string> = {
   dashboard: 'Dashboard',
@@ -21,11 +15,7 @@ interface Props {
 }
 
 export default function Topbar({ route, openModal }: Props) {
-  const { data: meta } = useQuery<MetaData>({
-    queryKey: ['portfolio/meta'],
-    queryFn: () => api.get('/api/portfolio/meta').then(r => r.data),
-    staleTime: 5 * 60 * 1000,
-  })
+  const { currency, toggle, rate, lastUpdated } = useCurrency()
 
   return (
     <div className="topbar">
@@ -33,13 +23,36 @@ export default function Topbar({ route, openModal }: Props) {
         <div className="topbar-title">{TITLES[route]}</div>
       </div>
       <div className="topbar-meta">
-        {meta?.last_updated && <span>Updated {meta.last_updated}</span>}
+        {lastUpdated && <span>Updated {lastUpdated}</span>}
         <div className="live-badge">
           <div className="live-dot"></div>
           LIVE
         </div>
+
+        {/* Currency toggle */}
+        <div style={{
+          display: 'flex', background: 'var(--surf-2)', border: '1px solid var(--bdr)',
+          borderRadius: 6, overflow: 'hidden',
+        }}>
+          {(['USD', 'TWD'] as const).map(c => (
+            <div
+              key={c}
+              onClick={() => c !== currency && toggle()}
+              style={{
+                padding: '3px 9px', fontSize: 11, cursor: c !== currency ? 'pointer' : 'default',
+                fontFamily: 'JetBrains Mono, monospace', fontWeight: currency === c ? 600 : 400,
+                color: currency === c ? 'var(--accent)' : 'var(--fg-3)',
+                background: currency === c ? 'var(--surf)' : 'transparent',
+                userSelect: 'none',
+              }}
+            >
+              {c}
+            </div>
+          ))}
+        </div>
+
         <span className="topbar-rate mono">
-          1 USD = {meta?.usd_twd_rate?.toFixed(2) ?? '--'} TWD
+          1 USD = {rate?.toFixed(2) ?? '--'} TWD
         </span>
         <button className="icon-btn" title="Refresh">
           <Icon name="refresh" />

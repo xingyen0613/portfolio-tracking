@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from './auth/AuthContext'
+import { CurrencyProvider } from './context/CurrencyContext'
 import LoginPage from './pages/LoginPage'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
@@ -92,6 +93,7 @@ export default function App() {
   if (!token) return <LoginPage />
 
   return (
+    <CurrencyProvider>
     <div className="app">
       <Sidebar route={route} setRoute={setRoute} />
       <main className="main" ref={mainRef}>
@@ -168,5 +170,6 @@ export default function App() {
         </div>
       )}
     </div>
+    </CurrencyProvider>
   )
 }

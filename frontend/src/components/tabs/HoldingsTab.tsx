@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
 import { listConnectors, type Connector } from '../../api/connectors'
+import { useCurrency } from '../../context/CurrencyContext'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -17,17 +18,6 @@ interface HoldingsData{ summary: Summary; platforms: Platform[] }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtUsd(v: number) {
-  if (!isFinite(v)) return '—'
-  const abs = Math.abs(v)
-  const sign = v < 0 ? '-' : ''
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`
-  if (abs >= 1_000)     return `${sign}$${(abs / 1_000).toFixed(1)}k`
-  return `${sign}$${abs.toFixed(0)}`
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function fmtAddr(addr: string): string {
   if (addr.length <= 14) return addr
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
@@ -36,6 +26,7 @@ function fmtAddr(addr: string): string {
 // ── Address badge row (for wallet platforms) ──────────────────────────────────
 
 function AddressBadge({ account, totalUsd }: { account: Account; totalUsd: number }) {
+  const { fmt } = useCurrency()
   // Wallet accounts have an on-chain address → render as monospaced address + chain.
   // Non-wallet accounts (multiple connectors on the same exchange) have no
   // address → render the user-given label instead.
@@ -71,7 +62,7 @@ function AddressBadge({ account, totalUsd }: { account: Account; totalUsd: numbe
         marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace',
         fontSize: 11, color: 'var(--fg3)',
       }}>
-        {fmtUsd(totalUsd)}
+        {fmt(totalUsd)}
       </span>
     </div>
   )
@@ -92,6 +83,7 @@ function Chevron({ open }: { open: boolean }) {
 
 function HoldingRowView({ row }: { row: HoldingRow }) {
   const [hovered, setHovered] = useState(false)
+  const { fmt } = useCurrency()
   const bg = hovered ? 'var(--surf2)' : undefined
 
   return (
@@ -118,7 +110,7 @@ function HoldingRowView({ row }: { row: HoldingRow }) {
         fontFamily: 'JetBrains Mono, monospace', borderBottom: '1px solid var(--bdr2)',
         color: row.value_usd < 0 ? 'var(--red)' : 'var(--fg1)', background: bg,
       }}>
-        {fmtUsd(row.value_usd)}
+        {fmt(row.value_usd)}
       </td>
     </tr>
   )
@@ -188,6 +180,7 @@ function PlatformCard({
   const [open, setOpen]       = useState(false)
   const [hovered, setHovered] = useState(false)
   const status = platformStatus(connectors)
+  const { fmt } = useCurrency()
 
   return (
     <div style={{ background: 'var(--surf)', border: '1px solid var(--bdr)', borderRadius: 8, overflow: 'hidden' }}>
@@ -222,7 +215,7 @@ function PlatformCard({
           fontFamily: 'JetBrains Mono, monospace', fontSize: 13,
           color: p.total_usd < 0 ? 'var(--red)' : 'var(--fg1)',
         }}>
-          {fmtUsd(p.total_usd)}
+          {fmt(p.total_usd)}
         </div>
         <Chevron open={open} />
       </div>
@@ -290,7 +283,7 @@ function PlatformCard({
                             }}>
                               {sec.label}
                               <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', color: 'var(--fg2)' }}>
-                                {fmtUsd(sec.total_usd)}
+                                {fmt(sec.total_usd)}
                               </span>
                             </div>
                           </td>
@@ -331,7 +324,7 @@ function PlatformCard({
                       }}>
                         {sec.label}
                         <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', color: 'var(--fg2)' }}>
-                          {fmtUsd(sec.total_usd)}
+                          {fmt(sec.total_usd)}
                         </span>
                       </div>
                     </td>

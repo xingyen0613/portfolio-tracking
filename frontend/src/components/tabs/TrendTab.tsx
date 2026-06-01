@@ -5,6 +5,7 @@ import {
 } from 'lightweight-charts'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
+import { useCurrency } from '../../context/CurrencyContext'
 
 // ── Portfolio constants ──────────────────────────────────────────────────────
 
@@ -51,14 +52,6 @@ const CAT_KEYS: PKey[] = ['us_stock', 'crypto', 'tw_stock']
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
-function fmtUsd(v: number) {
-  const abs = Math.abs(v)
-  const sign = v < 0 ? '-' : ''
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`
-  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}k`
-  return `${sign}$${abs.toFixed(0)}`
-}
-
 
 // converts Lightweight Charts Time (string | number | BusinessDay) → 'YYYY-MM-DD'
 function lwcTimeToStr(t: unknown): string {
@@ -78,13 +71,14 @@ const USD_FORMAT = { type: 'price' as const, precision: 0, minMove: 1 }
 // ── Tooltip renderer ──────────────────────────────────────────────────────────
 
 function renderTooltip({
-  tooltip, portData, containerRef, snap, snapshotFetching,
+  tooltip, portData, containerRef, snap, snapshotFetching, fmt,
 }: {
   tooltip:          { x: number; y: number; idx: number }
   portData:         HistoryData
   containerRef:     React.RefObject<HTMLDivElement | null>
   snap:             SnapshotData | null
   snapshotFetching: boolean
+  fmt:              (usd: number) => string
 }) {
   const containerW = containerRef.current?.clientWidth ?? 600
   const flipLeft   = tooltip.x > containerW * 0.65
@@ -110,7 +104,7 @@ function renderTooltip({
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: P_COLORS.total, flexShrink: 0 }} />
         <span style={{ color: 'var(--fg2)', flex: 1 }}>總資產</span>
-        <span style={{ color: 'var(--fg1)' }}>{fmtUsd(portData.series.total?.[tooltip.idx] ?? 0)}</span>
+        <span style={{ color: 'var(--fg1)' }}>{fmt(portData.series.total?.[tooltip.idx] ?? 0)}</span>
       </div>
 
       <div style={{ borderTop: '1px solid #30363d', marginBottom: 8 }} />
@@ -132,7 +126,7 @@ function renderTooltip({
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: P_COLORS[key], flexShrink: 0 }} />
               <span style={{ color: 'var(--fg2)', flex: 1 }}>{P_LABELS[key]}</span>
-              <span style={{ color: 'var(--fg1)' }}>{fmtUsd(catVal)}</span>
+              <span style={{ color: 'var(--fg1)' }}>{fmt(catVal)}</span>
             </div>
             {snap && topItems.length === 0 && (
               <div style={{ paddingLeft: 13, color: 'var(--fg3)', fontSize: 10 }}>無明細資料</div>
@@ -162,6 +156,7 @@ function renderTooltip({
 
 export default function TrendTab() {
   const [mode, setMode] = useState<'USD' | 'return'>('USD')
+  const { currency, convert, fmt } = useCurrency()
   const [pVis, setPVis] = useState<Record<PKey, boolean>>(
     () => Object.fromEntries(P_KEYS.map(k => [k, true])) as Record<PKey, boolean>
   )
@@ -301,7 +296,7 @@ export default function TrendTab() {
       const base = raw[0] || 1
       const values = mode === 'return'
         ? raw.map(v => ((v - base) / base) * 100)
-        : raw
+        : raw.map(v => convert(v))
 
       series.setData(
         portData.dates
@@ -315,7 +310,7 @@ export default function TrendTab() {
     })
 
     chartRef.current?.timeScale().fitContent()
-  }, [portData, mode, pVis])
+  }, [portData, mode, pVis, convert])
 
   // ── Update benchmark series ───────────────────────────────────────────────────
 
@@ -433,7 +428,7 @@ export default function TrendTab() {
               color: mode === m ? 'var(--fg1)' : 'var(--fg2)',
               background: mode === m ? 'var(--surf2)' : 'transparent', userSelect: 'none',
             }}>
-              {m === 'USD' ? 'USD' : '報酬率 %'}
+              {m === 'USD' ? currency : '報酬率 %'}
             </div>
           ))}
         </div>
@@ -469,7 +464,7 @@ export default function TrendTab() {
         {tooltip && portData && renderTooltip({
           tooltip, portData, containerRef,
           snap: snapshotData?.date === portData.dates[tooltip.idx] ? snapshotData : null,
-          snapshotFetching,
+          snapshotFetching, fmt,
         })}
       </div>
 
