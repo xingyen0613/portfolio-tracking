@@ -67,12 +67,15 @@ jobs:
           fi
 
       - name: Smoke test (binance connector + Telegram notification)
+        env:
+          SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
         run: |
           SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE }} \
             --region ${{ env.REGION }} --format "value(status.url)")
+          SECRET=$(echo "$SCHEDULER_SECRET" | tr -d '"'\'' \t\r\n')
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SERVICE_URL/api/internal/trigger-batch" \
             -H "Content-Type: application/json" \
-            -H "X-Scheduler-Secret: ${{ secrets.SCHEDULER_SECRET }}" \
+            -H "X-Scheduler-Secret: $SECRET" \
             -d '{"job": "smoke"}')
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -1)
