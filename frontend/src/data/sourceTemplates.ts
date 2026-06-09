@@ -28,6 +28,7 @@ export interface SourceTemplate {
   comingSoon?: string
   singleInstance?: boolean  // if true, disable add button when user already has this connector
   getApiConfig?: GetApiConfig
+  logoUrl?: string  // if set, renders as <img> instead of colored abbr badge
 }
 
 export const SOURCE_TEMPLATES: SourceTemplate[] = [
@@ -70,6 +71,17 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
       noAccountUrl: 'https://www.bybit.com/invite?ref=WPYNEE&medium=referral&utm_campaign=evergreen',
       hasAccountTooltip: 'API權限請只開啟讀取(唯讀)權限並開啟所有範圍，其餘權限，如：交易，提款等等功能，請勿開啟',
       noAccountTooltip: '註冊 Bybit 賬戶，解鎖 Bybit 推薦計畫專屬獎勵！更有高達 6,135 USDT 獎勵等您領取',
+    },
+  },
+  {
+    id: 'pionex', name: '派網 Pionex', desc: 'Crypto exchange', category: 'crypto', auth: 'apikey',
+    abbr: 'PIX', color: '#f15a28', textColor: '#fff', implemented: true,
+    logoUrl: '/logos/pionex.png',
+    getApiConfig: {
+      hasAccountUrl: 'https://www.pionex.com/zh-TW/my-account/api',
+      noAccountUrl: 'https://www.pionex.com/zh-TW/signUp?r=0X3pTSpQsA2',
+      hasAccountTooltip: 'API 權限請只勾選讀取(唯讀)相關權限，請勿勾選交易或提款等功能',
+      noAccountTooltip: '走此連結註冊可獲得合約交易15%手續費及現貨10%手續費反饋',
     },
   },
   { id: 'coinbase', name: 'Coinbase',          desc: 'Crypto exchange',           category: 'crypto', auth: 'apikey',  abbr: 'CB',   color: '#0052ff', textColor: '#fff', implemented: false, comingSoon: 'Coming soon' },

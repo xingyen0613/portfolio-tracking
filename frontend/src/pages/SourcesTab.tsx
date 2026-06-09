@@ -67,12 +67,21 @@ function ConnectorRow({
 
   return (
     <div className="row-item">
-      <div
-        className="platform-abbr"
-        style={{ background: color, color: textColor }}
-      >
-        {abbr}
-      </div>
+      {template?.logoUrl ? (
+        <img
+          src={template.logoUrl}
+          alt={name}
+          className="platform-abbr"
+          style={{ objectFit: 'cover', padding: 0 }}
+        />
+      ) : (
+        <div
+          className="platform-abbr"
+          style={{ background: color, color: textColor }}
+        >
+          {abbr}
+        </div>
+      )}
       <div className="row-main">
         <div className="row-name">
           {name}
@@ -153,7 +162,12 @@ export default function SourcesTab({ openModal }: Props) {
 
   const refreshMut = useMutation({
     mutationFn: (id: string) => refreshConnector(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['connectors'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['connectors'] })
+      qc.invalidateQueries({ queryKey: ['holdings'] })
+      qc.invalidateQueries({ queryKey: ['portfolio/history'] })
+      qc.invalidateQueries({ queryKey: ['portfolio/allocation'] })
+    },
   })
 
   const handleRemove = (c: Connector) => {

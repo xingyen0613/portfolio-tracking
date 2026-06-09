@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
 import { listConnectors, type Connector } from '../../api/connectors'
 import { useCurrency } from '../../context/CurrencyContext'
+import { getTemplate } from '../../data/sourceTemplates'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -197,13 +198,21 @@ function PlatformCard({
           transition: 'background 120ms',
         }}
       >
-        <div style={{
-          width: 26, height: 26, borderRadius: 5, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0,
-          background: p.color, color: p.fg,
-        }}>
-          {p.abbr}
-        </div>
+        {getTemplate(p.name)?.logoUrl ? (
+          <img
+            src={getTemplate(p.name)!.logoUrl}
+            alt={p.display}
+            style={{ width: 26, height: 26, borderRadius: 5, flexShrink: 0, objectFit: 'cover' }}
+          />
+        ) : (
+          <div style={{
+            width: 26, height: 26, borderRadius: 5, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0,
+            background: p.color, color: p.fg,
+          }}>
+            {p.abbr}
+          </div>
+        )}
         <div style={{ fontSize: 13, fontWeight: 600 }}>{p.display}</div>
         <div style={{ flex: 1 }} />
         {status && (
