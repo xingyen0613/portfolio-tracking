@@ -21,6 +21,7 @@ PLATFORM_REQUIRED_FIELDS = {
     "okx":     ["api_key", "secret", "passphrase"],
     "mexc":    ["api_key", "secret"],
     "bybit":   ["api_key", "secret"],
+    "pionex":  ["api_key", "secret"],
     "ibkr":    ["flex_token", "query_id"],
     "sinopac": ["api_key", "secret_key"],
     # Alchemy API key is system-level (server ALCHEMY_API_KEY env), not per-user
@@ -277,7 +278,7 @@ def update_connector(
     return _row_to_connector(updated)
 
 
-EXCHANGE_LIKE_PLATFORMS = {"binance", "okx", "mexc", "bybit", "ibkr", "yuanta"}
+EXCHANGE_LIKE_PLATFORMS = {"binance", "okx", "mexc", "bybit", "pionex", "ibkr", "yuanta"}
 
 
 def _resolve_account_ids(conn, platform: str, account_key: str, creds: dict, user_id: str) -> list[int]:

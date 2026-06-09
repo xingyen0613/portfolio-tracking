@@ -72,12 +72,21 @@ export default function AddSourceModal({ close, setModal }: Props) {
                 title={alreadyConnected ? '已連接，每個帳號只能新增一個此來源' : undefined}
                 style={{ opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
               >
-                <div
-                  className="platform-abbr"
-                  style={{ background: t.color, color: t.textColor }}
-                >
-                  {t.abbr}
-                </div>
+                {t.logoUrl ? (
+                  <img
+                    src={t.logoUrl}
+                    alt={t.name}
+                    className="platform-abbr"
+                    style={{ objectFit: 'cover', padding: 0 }}
+                  />
+                ) : (
+                  <div
+                    className="platform-abbr"
+                    style={{ background: t.color, color: t.textColor }}
+                  >
+                    {t.abbr}
+                  </div>
+                )}
                 <div style={{ flex: 1, textAlign: 'left' }}>
                   <div className="src-name">{t.name}</div>
                   <div className="src-desc">

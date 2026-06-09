@@ -91,6 +91,9 @@ def _instantiate_connectors(platform: str, credentials: dict, account_key: str) 
     if platform == "bybit":
         from app.connectors.bybit_connector import BybitConnector
         return [BybitConnector(credentials, account_key=account_key)]
+    if platform == "pionex":
+        from app.connectors.pionex_connector import PionexConnector
+        return [PionexConnector(credentials, account_key=account_key)]
     if platform == "ibkr":
         from app.connectors.ibkr_connector import IBKRConnector
         return [IBKRConnector(credentials, account_key=account_key)]
@@ -329,7 +332,7 @@ def run_batch(platforms: list[str], user_id: str,
 
             # Ensure accounts row exists for this connector
             try:
-                if platform in ("binance", "okx", "mexc", "bybit", "ibkr", "sinopac", "yuanta"):
+                if platform in ("binance", "okx", "mexc", "bybit", "pionex", "ibkr", "sinopac", "yuanta"):
                     _ensure_exchange_or_ibkr_account(platform, account_key, label, user_id)
                 elif platform == "sol_wallet":
                     addresses = creds.get("addresses") or [
@@ -437,7 +440,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     platforms = [args.platform] if args.platform else ENABLED_PLATFORMS
-    implemented = {"binance", "okx", "mexc", "bybit", "sui_wallet", "sol_wallet", "ibkr", "evm_wallet", "sinopac", "yuanta"}
+    implemented = {"binance", "okx", "mexc", "bybit", "pionex", "sui_wallet", "sol_wallet", "ibkr", "evm_wallet", "sinopac", "yuanta"}
     platforms = [p for p in platforms if p in implemented]
 
     if not platforms:

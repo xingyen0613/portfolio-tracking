@@ -70,6 +70,7 @@ PLATFORM_META: dict[str, dict] = {
     "okx":        {"display": "OKX",               "abbr": "OK",  "color": "#1a1a1a", "fg": "#fff"},
     "mexc":       {"display": "MEXC",              "abbr": "MX",  "color": "#0C94E4", "fg": "#fff"},
     "bybit":      {"display": "Bybit",             "abbr": "BY",  "color": "#F7A600", "fg": "#000"},
+    "pionex":     {"display": "派網 Pionex",        "abbr": "PI",  "color": "#f15a28", "fg": "#fff"},
     "sui_wallet": {"display": "SUI Wallet",        "abbr": "SUI", "color": "#6fbcf0", "fg": "#000"},
     "sol_wallet": {"display": "Solana Wallet",     "abbr": "SOL", "color": "#9945FF", "fg": "#fff"},
     "evm_wallet": {"display": "EVM Wallet",        "abbr": "EVM", "color": "#627eea", "fg": "#fff"},
