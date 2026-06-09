@@ -45,7 +45,7 @@ jobs:
             --image "$IMAGE" \
             --region ${{ env.REGION }} \
             --platform managed \
-            --timeout 900 \
+            --timeout 1800 \
             --memory 1Gi \
             --cpu 1 \
             --min-instances 0 \
