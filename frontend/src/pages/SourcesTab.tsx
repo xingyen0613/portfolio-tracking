@@ -52,7 +52,9 @@ function ConnectorRow({
   onEdit: () => void
   busy: boolean
 }) {
-  const status = statusOf(c)
+  const status = busy
+    ? { label: 'Fetching', cls: 'status-fetching' }
+    : statusOf(c)
   const abbr = template?.abbr ?? c.platform_name.slice(0, 3).toUpperCase()
   const name = template?.name ?? c.platform_name
   const color = template?.color ?? '#3a3a44'
@@ -127,7 +129,7 @@ function ConnectorRow({
           <Icon name="edit" />
         </button>
         <button
-          className="icon-btn"
+          className={`icon-btn${busy ? ' btn-spinning' : ''}`}
           title="Refresh"
           onClick={onRefresh}
           disabled={busy}

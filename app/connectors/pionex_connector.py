@@ -96,7 +96,7 @@ class PionexConnector(BaseConnector):
                 "fetch_error": str(e),
             })
 
-        # Active bot positions
+        # Active bot positions (spot_grid, futures_grid, smart_copy)
         try:
             bot_orders = self._fetch_bot_orders()
             items.append({
@@ -107,6 +107,22 @@ class PionexConnector(BaseConnector):
         except Exception as e:
             items.append({
                 "resource_type": "bot",
+                "payload": {"error": str(e)},
+                "fetched_at": _now(),
+                "fetch_error": str(e),
+            })
+
+        # Full wallet: trading_bot (smart_rebalance), staking, lending, pionex_card
+        try:
+            data = self._get("/api/v1/wallet/balancesFull")
+            items.append({
+                "resource_type": "wallet_full",
+                "payload": data,
+                "fetched_at": _now(),
+            })
+        except Exception as e:
+            items.append({
+                "resource_type": "wallet_full",
                 "payload": {"error": str(e)},
                 "fetched_at": _now(),
                 "fetch_error": str(e),
@@ -177,5 +193,36 @@ class PionexConnector(BaseConnector):
                             val = float(data.get(field, 0))
                             coin = base if "base" in field.lower() else quote
                             _add(coin, val, f"Bot {order_type}", resource_type)
+
+            elif resource_type == "wallet_full" and payload.get("result"):
+                for section in payload.get("data", {}).get("botAccount", {}).get("detail", []):
+                    sec_type = section.get("type", "")
+                    sec_list = section.get("list") or []
+
+                    if sec_type == "trading_bot":
+                        for bot in sec_list:
+                            if bot.get("buOrderType") != "smart_rebalance":
+                                continue
+                            symbol = bot.get("investmentToken", "")
+                            invested = float(bot.get("investmentAmount") or 0)
+                            profit = float(bot.get("profit") or 0)
+                            qty = invested + profit
+                            title = bot.get("title", f"Bot {symbol}")
+                            _add(symbol, qty, title, resource_type)
+
+                    elif sec_type in ("staking", "lending"):
+                        for pos in sec_list:
+                            symbol = pos.get("investmentToken", "")
+                            invested = float(pos.get("investmentAmount") or 0)
+                            profit = float(pos.get("profit") or 0)
+                            qty = invested + profit
+                            title = pos.get("title", symbol)
+                            _add(symbol, qty, title, resource_type)
+
+                    elif sec_type == "pionex_card":
+                        for pos in sec_list:
+                            symbol = pos.get("investmentToken", "")
+                            qty = float(pos.get("investmentAmount") or 0)
+                            _add(symbol, qty, "Pionex Card", resource_type)
 
         return holdings
