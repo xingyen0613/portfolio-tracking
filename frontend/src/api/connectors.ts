@@ -43,7 +43,7 @@ export async function createConnector(
 }
 
 export async function deleteConnector(id: string): Promise<void> {
-  await api.delete(`/api/connectors/${id}`)
+  await api.delete(`/api/connectors/${id}`, { timeout: SYNC_TIMEOUT_MS })
 }
 
 export async function getConnectorCredentials(id: string): Promise<Record<string, unknown>> {

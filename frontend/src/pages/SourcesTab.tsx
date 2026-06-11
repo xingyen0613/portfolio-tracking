@@ -164,6 +164,10 @@ export default function SourcesTab({ openModal }: Props) {
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteConnector(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['connectors'] }),
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      alert(`Failed to delete connector: ${msg}`)
+    },
   })
 
   const refreshMut = useMutation({
