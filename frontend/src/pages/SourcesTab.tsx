@@ -43,6 +43,7 @@ function ConnectorRow({
   onImport,
   onEdit,
   busy,
+  deleting,
 }: {
   c: Connector
   template: SourceTemplate | undefined
@@ -51,10 +52,13 @@ function ConnectorRow({
   onImport: () => void
   onEdit: () => void
   busy: boolean
+  deleting: boolean
 }) {
-  const status = busy
-    ? { label: 'Fetching', cls: 'status-fetching' }
-    : statusOf(c)
+  const status = deleting
+    ? { label: 'Removing', cls: 'status-fetching' }
+    : busy
+      ? { label: 'Fetching', cls: 'status-fetching' }
+      : statusOf(c)
   const abbr = template?.abbr ?? c.platform_name.slice(0, 3).toUpperCase()
   const name = template?.name ?? c.platform_name
   const color = template?.color ?? '#3a3a44'
@@ -115,7 +119,7 @@ function ConnectorRow({
             className="icon-btn"
             title="Import history"
             onClick={onImport}
-            disabled={busy}
+            disabled={busy || deleting}
           >
             <Icon name="upload" />
           </button>
@@ -124,7 +128,7 @@ function ConnectorRow({
           className="icon-btn"
           title="Edit"
           onClick={onEdit}
-          disabled={busy}
+          disabled={busy || deleting}
         >
           <Icon name="edit" />
         </button>
@@ -132,7 +136,7 @@ function ConnectorRow({
           className={`icon-btn${busy ? ' btn-spinning' : ''}`}
           title="Refresh"
           onClick={onRefresh}
-          disabled={busy}
+          disabled={busy || deleting}
         >
           <Icon name="refresh" />
         </button>
@@ -140,7 +144,7 @@ function ConnectorRow({
           className="icon-btn"
           title="Remove"
           onClick={onRemove}
-          disabled={busy}
+          disabled={busy || deleting}
         >
           <Icon name="trash" />
         </button>
@@ -233,10 +237,8 @@ export default function SourcesTab({ openModal }: Props) {
               onRemove={() => handleRemove(c)}
               onImport={() => openModal({ kind: 'importHistory', connector: c })}
               onEdit={() => openModal({ kind: 'editSource', connectorId: c.id })}
-              busy={
-                (deleteMut.isPending && deleteMut.variables === c.id) ||
-                (refreshMut.isPending && refreshMut.variables === c.id)
-              }
+              deleting={deleteMut.isPending && deleteMut.variables === c.id}
+              busy={refreshMut.isPending && refreshMut.variables === c.id}
             />
           ))}
         </div>
