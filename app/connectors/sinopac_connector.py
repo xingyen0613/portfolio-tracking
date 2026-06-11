@@ -76,7 +76,19 @@ class SinopacStockConnector(BaseConnector):
         stock_account = api.stock_account
 
         # Unit.Share 回傳總股數（整張 + 零股合併），是唯一正確來源
-        positions = api.list_positions(stock_account, unit=sj.constant.Unit.Share)
+        # Shioaji MQTT broker 偶有暫時性錯誤，retry 最多 2 次
+        last_exc = None
+        for attempt in range(3):
+            try:
+                positions = api.list_positions(stock_account, unit=sj.constant.Unit.Share)
+                break
+            except Exception as e:
+                last_exc = e
+                if attempt < 2:
+                    print(f"  ⚠ [sinopac/list_positions] attempt {attempt + 1} failed, retrying: {e}")
+                    time.sleep(10)
+        else:
+            raise last_exc
 
         # 交割款餘額（非交易時段時可能 406，容錯處理）
         balance = None
