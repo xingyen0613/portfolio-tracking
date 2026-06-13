@@ -32,3 +32,14 @@ docs/testing.md
 # Playwright MCP debug artifacts (snapshots, screenshots)
 .playwright-mcp/
 /*.png
+
+# Cloudflare wrangler 本地快取
+.wrangler/
+
+# SDK / runtime logs
+shioaji.log
+
+# 個人筆記與測試資料，不進版控
+how-to-get-api.md
+sinopac-form.md
+test_import.csv
