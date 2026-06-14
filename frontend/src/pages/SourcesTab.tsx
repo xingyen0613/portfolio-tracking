@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Icon } from '../components/Icon'
 import {
   type Connector,
   deleteConnector,
+  getConnectorCredentials,
+  initiateYuantaOAuth,
   listConnectors,
   refreshConnector,
 } from '../api/connectors'
@@ -11,6 +14,7 @@ import type { ModalState } from '../App'
 
 interface Props {
   openModal: (m: ModalState) => void
+  yuantaFetchingUntil?: number | null
 }
 
 function statusOf(c: Connector): { label: string; cls: string } {
@@ -42,8 +46,10 @@ function ConnectorRow({
   onRemove,
   onImport,
   onEdit,
+  onReauthorize,
   busy,
   deleting,
+  reauthorizing,
 }: {
   c: Connector
   template: SourceTemplate | undefined
@@ -51,8 +57,10 @@ function ConnectorRow({
   onRemove: () => void
   onImport: () => void
   onEdit: () => void
+  onReauthorize?: () => void
   busy: boolean
   deleting: boolean
+  reauthorizing?: boolean
 }) {
   const status = deleting
     ? { label: 'Removing', cls: 'status-fetching' }
@@ -124,6 +132,16 @@ function ConnectorRow({
             <Icon name="upload" />
           </button>
         )}
+        {onReauthorize && (
+          <button
+            className={`icon-btn${reauthorizing ? ' btn-spinning' : ''}`}
+            title="重新授權 Gmail"
+            onClick={onReauthorize}
+            disabled={busy || deleting || reauthorizing}
+          >
+            <Icon name="key" />
+          </button>
+        )}
         <button
           className="icon-btn"
           title="Edit"
@@ -153,8 +171,24 @@ function ConnectorRow({
   )
 }
 
-export default function SourcesTab({ openModal }: Props) {
+export default function SourcesTab({ openModal, yuantaFetchingUntil }: Props) {
   const qc = useQueryClient()
+  const [reauthorizingId, setReauthorizingId] = useState<string | null>(null)
+  const isYuantaFetching = !!yuantaFetchingUntil && Date.now() < yuantaFetchingUntil
+
+  const handleReauthorize = async (c: Connector) => {
+    setReauthorizingId(c.id)
+    try {
+      const creds = await getConnectorCredentials(c.id)
+      const pdfPassword = (creds.pdf_password as string) ?? ''
+      const gmailAddress = (creds.gmail_address as string) || undefined
+      const { authorize_url } = await initiateYuantaOAuth(pdfPassword, gmailAddress)
+      window.location.href = authorize_url
+    } catch {
+      alert('無法取得授權連結，請稍後再試。')
+      setReauthorizingId(null)
+    }
+  }
 
   const { data: connectors, isLoading, error } = useQuery({
     queryKey: ['connectors'],
@@ -241,8 +275,10 @@ export default function SourcesTab({ openModal }: Props) {
               onRemove={() => handleRemove(c)}
               onImport={() => openModal({ kind: 'importHistory', connector: c })}
               onEdit={() => openModal({ kind: 'editSource', connectorId: c.id })}
+              onReauthorize={c.platform_name === 'yuanta' ? () => handleReauthorize(c) : undefined}
               deleting={deleteMut.isPending && deleteMut.variables === c.id}
-              busy={refreshMut.isPending && refreshMut.variables === c.id}
+              busy={(refreshMut.isPending && refreshMut.variables === c.id) || (isYuantaFetching && c.platform_name === 'yuanta')}
+              reauthorizing={reauthorizingId === c.id}
             />
           ))}
         </div>

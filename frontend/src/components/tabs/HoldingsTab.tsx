@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
-import { listConnectors, type Connector } from '../../api/connectors'
+import { getConnectorCredentials, initiateYuantaOAuth, listConnectors, type Connector } from '../../api/connectors'
 import { useCurrency } from '../../context/CurrencyContext'
 import { getTemplate } from '../../data/sourceTemplates'
 
@@ -373,6 +373,21 @@ export default function HoldingsTab({ onAddSource }: HoldingsTabProps = {}) {
     connectorsByPlatform[c.platform_name].push(c)
   }
 
+  const handleYuantaReauth = async () => {
+    const yuantaConnector = connectors.find(c => c.platform_name === 'yuanta')
+    if (!yuantaConnector) { onAddSource?.(); return }
+    try {
+      const creds = await getConnectorCredentials(yuantaConnector.id)
+      const { authorize_url } = await initiateYuantaOAuth(
+        (creds.pdf_password as string) ?? '',
+        (creds.gmail_address as string) || undefined,
+      )
+      window.location.href = authorize_url
+    } catch {
+      onAddSource?.()
+    }
+  }
+
   if (isLoading) {
     return (
       <div style={{ color: 'var(--fg3)', fontSize: 11, padding: 24, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -390,7 +405,7 @@ export default function HoldingsTab({ onAddSource }: HoldingsTabProps = {}) {
           key={p.name}
           p={p}
           connectors={connectorsByPlatform[p.name] ?? []}
-          onReconnect={onAddSource}
+          onReconnect={p.name === 'yuanta' ? handleYuantaReauth : onAddSource}
         />
       ))}
       {onAddSource && (

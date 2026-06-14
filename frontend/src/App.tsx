@@ -37,6 +37,7 @@ export default function App() {
   const [modal, setModal] = useState<ModalState | null>(null)
   const [importToast, setImportToast] = useState<ImportHistoryResult | null>(null)
   const [oauthToast, setOauthToast] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [yuantaFetchingUntil, setYuantaFetchingUntil] = useState<number | null>(null)
   const prevTokenRef = useRef(token)
   const mainRef = useRef<HTMLElement>(null)
 
@@ -78,6 +79,16 @@ export default function App() {
       qc.invalidateQueries({ queryKey: ['connectors'] })
       setOauthToast({ ok: true, msg: '元大證券已連接，首次同步在背景執行中。' })
       setTimeout(() => setOauthToast(null), 6000)
+      // Show Fetching state in SourcesTab for 90s while background batch runs
+      const until = Date.now() + 90000
+      setYuantaFetchingUntil(until)
+      const interval = setInterval(() => {
+        qc.invalidateQueries({ queryKey: ['connectors'] })
+      }, 5000)
+      setTimeout(() => {
+        clearInterval(interval)
+        setYuantaFetchingUntil(null)
+      }, 90000)
     } else if (oauth.startsWith('yuanta_error')) {
       const reason = params.get('reason') ?? 'unknown'
       setOauthToast({ ok: false, msg: `元大 Gmail 授權失敗：${reason}` })
@@ -100,7 +111,7 @@ export default function App() {
         <Topbar route={route} openModal={setModal} />
         <div className="page">
           {route === 'dashboard' && <DashboardTab openModal={setModal} />}
-          {route === 'sources' && <SourcesTab openModal={setModal} />}
+          {route === 'sources' && <SourcesTab openModal={setModal} yuantaFetchingUntil={yuantaFetchingUntil} />}
           {route === 'alerts' && <AlertsTab />}
           {route === 'settings' && <SettingsTab />}
         </div>

@@ -4,6 +4,7 @@ import axios from 'axios'
 import { Icon } from '../Icon'
 import {
   getConnectorCredentials,
+  initiateYuantaOAuth,
   listConnectors,
   updateConnector,
   type ConnectorUpdatePayload,
@@ -37,6 +38,25 @@ export default function EditSourceModal({ connectorId, close }: Props) {
   const [credentials, setCredentials] = useState<Record<string, unknown>>({})
   const [credentialsReady, setCredentialsReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reauthorizing, setReauthorizing] = useState(false)
+
+  const handleYuantaReauthorize = async () => {
+    const pdfPassword = (credentials.pdf_password as string) ?? ''
+    const gmailAddress = (credentials.gmail_address as string) || undefined
+    if (!pdfPassword.trim()) {
+      setError('請先填入 PDF 解密密碼。')
+      return
+    }
+    setReauthorizing(true)
+    setError(null)
+    try {
+      const { authorize_url } = await initiateYuantaOAuth(pdfPassword.trim(), gmailAddress)
+      window.location.href = authorize_url
+    } catch {
+      setError('無法取得授權連結，請稍後再試。')
+      setReauthorizing(false)
+    }
+  }
 
   useEffect(() => {
     if (connector?.account_label) setAccountLabel(connector.account_label)
@@ -159,7 +179,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
                     placeholder="example@gmail.com"
                     value={(credentials.gmail_address as string) ?? ''}
                     onChange={e => setCredential('gmail_address', e.target.value)}
-                    disabled={mut.isPending}
+                    disabled={mut.isPending || reauthorizing}
                   />
                 </div>
                 <div className="field">
@@ -169,9 +189,18 @@ export default function EditSourceModal({ connectorId, close }: Props) {
                     placeholder="通常為身分證字號"
                     value={(credentials.pdf_password as string) ?? ''}
                     onChange={v => setCredential('pdf_password', v)}
-                    disabled={mut.isPending}
+                    disabled={mut.isPending || reauthorizing}
                   />
                 </div>
+                <button
+                  className="btn btn-ghost"
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                  onClick={handleYuantaReauthorize}
+                  disabled={mut.isPending || reauthorizing}
+                >
+                  <Icon name="key" />
+                  {reauthorizing ? '跳轉中…' : '重新授權 Gmail'}
+                </button>
               </>
             )}
 
