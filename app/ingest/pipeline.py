@@ -92,18 +92,45 @@ def run_source_pipeline(connector, batch_id: str, user_id: str):
         # Fetch market prices (only for connectors that opt in, only fills missing prices)
         if getattr(connector, "use_pricer", True):
             from app.valuation.pricer import fetch_prices
+            from app.valuation.price_cache import get_cached_prices, save_prices
             symbols = list({h["platform_symbol"] for h in holdings if h.get("price") is None})
             if symbols:
-                prices = fetch_prices(symbols)
+                # Check shared DB cache first — avoids duplicate API calls across users
+                cached = get_cached_prices(symbols, snapshot_date)
+                missing = [s for s in symbols if cached.get(s) is None]
+                if missing:
+                    print(f"  [pricer] cache miss: fetching {len(missing)} symbols from API: {missing}")
+                    fetched = fetch_prices(missing)
+                    to_save = {s: p for s, p in fetched.items() if p is not None}
+                    if to_save:
+                        save_prices(to_save, snapshot_date, source="market")
+                    cached.update(fetched)
+                else:
+                    print(f"  [pricer] all {len(symbols)} prices served from cache")
                 for h in holdings:
                     if h.get("price") is not None:
                         continue  # preserve prices already set by connector (e.g. BlockVision)
                     sym = h["platform_symbol"]
-                    p = prices.get(sym)
+                    p = cached.get(sym)
                     if p is not None:
                         h["price"] = p
                         h["value"] = round(h["quantity"] * p, 8)
                         h["price_source"] = "market"
+        else:
+            # Platform-provided prices: save to cache so other connectors / users can reuse them
+            from app.valuation.price_cache import save_prices
+            platform_prices: dict[str, float] = {}
+            currency_hint = "USD"
+            for h in holdings:
+                if h.get("price") is not None and h.get("price_source") == "platform":
+                    sym = h["platform_symbol"]
+                    if sym not in platform_prices:
+                        platform_prices[sym] = float(h["price"])
+                        currency_hint = h.get("original_currency", "USD")
+            if platform_prices:
+                save_prices(platform_prices, snapshot_date,
+                            source=connector.platform_name, currency=currency_hint)
+                print(f"  [price_cache] saved {len(platform_prices)} platform prices ({connector.platform_name})")
 
         total_value = None
         currency = None

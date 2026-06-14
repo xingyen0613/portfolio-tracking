@@ -250,8 +250,36 @@ class YuantaConnector(BaseConnector):
         symbols = _collect_symbols(daily_entries)
         pledged_stocks = _extract_pledged_stocks(parsed_json)
         symbols = sorted(set(symbols) | {ps["symbol"] for ps in pledged_stocks})
-        price_doc = _fetch_prices(month, symbols)
-        prices_by_date: dict[str, dict[str, str]] = price_doc.get("prices", {})
+
+        # Check DB cache — symbols already fully cached for this month can skip Yahoo Finance
+        from app.valuation.price_cache import get_month_prices, save_prices as _cache_save
+        cached_month = get_month_prices(month, symbols)
+        symbols_in_cache = {sym for day in cached_month.values() for sym in day}
+        symbols_to_fetch = [s for s in symbols if s not in symbols_in_cache]
+
+        if symbols_to_fetch:
+            print(f"  [yuanta] fetching {len(symbols_to_fetch)} symbols from Yahoo Finance (cache miss): {symbols_to_fetch}", flush=True)
+            price_doc = _fetch_prices(month, symbols_to_fetch)
+            new_prices: dict[str, dict[str, str]] = price_doc.get("prices", {})
+            # Save newly fetched prices to cache (TWD)
+            for date_str, day_prices in new_prices.items():
+                floats = {sym: float(p.replace(",", "")) for sym, p in day_prices.items()}
+                if floats:
+                    _cache_save(floats, date_str, source="yahoo_finance", currency="TWD")
+            # Merge into cached_month (convert floats back to str for prices_by_date)
+            for date_str, day_prices in new_prices.items():
+                if date_str not in cached_month:
+                    cached_month[date_str] = {}
+                for sym, p in day_prices.items():
+                    cached_month[date_str][sym] = float(p.replace(",", ""))
+        else:
+            print(f"  [yuanta] all {len(symbols)} symbols served from price cache for {month}", flush=True)
+
+        # Convert back to {date: {sym: str}} for downstream processing
+        prices_by_date: dict[str, dict[str, str]] = {
+            d: {s: f"{p:.2f}" for s, p in day.items()}
+            for d, day in cached_month.items()
+        }
 
         # 5. Write to DB (multi-date)
         other_assets = _extract_other_assets(parsed_json)
