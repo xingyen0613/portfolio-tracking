@@ -205,11 +205,19 @@ def _aggregate_categories(batch_id: str, user_id: str) -> None:
               AND acs.total_value IS NOT NULL
         """, (batch_id,)).fetchall()
 
+    from datetime import date as _date, timedelta
     dates = {str(row["snapshot_date"]) for row in dates_rows}
-    # Always refresh today's snapshot so platforms with stale data (e.g. yuanta
-    # monthly statements) get carry-forwarded into today's category aggregate.
-    today = datetime.now(timezone.utc).date().isoformat()
-    dates.add(today)
+    today = _date.today().isoformat()
+    if dates:
+        # If batch contains historical dates, fill the gap from batch's last date
+        # to today so carry-forward is continuous and the chart has no sudden jumps.
+        last_batch = _date.fromisoformat(max(dates))
+        fill = last_batch + timedelta(days=1)
+        while fill.isoformat() <= today:
+            dates.add(fill.isoformat())
+            fill += timedelta(days=1)
+    else:
+        dates.add(today)
     dates = sorted(dates)
 
     fx_rate = get_latest_fx_rate()  # TWD per USD
