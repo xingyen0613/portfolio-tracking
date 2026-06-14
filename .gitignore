@@ -15,6 +15,8 @@ scripts/*
 !scripts/migrate_local_pg_to_supabase.py
 !scripts/populate_user_connectors.py
 !scripts/probe_exchange_balances.py
+!scripts/test_price_cache.py
+!scripts/test_e2e_price_cache.py
 .venv/
 /data/
 __pycache__/
