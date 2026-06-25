@@ -945,3 +945,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   .topbar { padding: 0 18px; }
   .settings-grid { grid-template-columns: 1fr; }
 }
+
+@keyframes demoFlash {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  15%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}

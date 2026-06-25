@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from './auth/AuthContext'
 import { CurrencyProvider } from './context/CurrencyContext'
+import { DemoProvider, useDemo } from './context/DemoContext'
 import LoginPage from './pages/LoginPage'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
+import DemoBanner from './components/DemoBanner'
 import ModalHost from './components/modals/ModalHost'
 import DashboardTab from './pages/DashboardTab'
 import SourcesTab from './pages/SourcesTab'
@@ -28,7 +30,16 @@ function isRoute(v: unknown): v is Route {
 }
 
 export default function App() {
+  return (
+    <DemoProvider>
+      <AppInner />
+    </DemoProvider>
+  )
+}
+
+function AppInner() {
   const { token } = useAuth()
+  const { isDemo } = useDemo()
   const qc = useQueryClient()
   const [route, setRoute] = useState<Route>(() => {
     const saved = localStorage.getItem(ROUTE_KEY)
@@ -101,14 +112,15 @@ export default function App() {
     if (mainRef.current) mainRef.current.scrollTop = 0
   }, [route])
 
-  if (!token) return <LoginPage />
+  if (!token && !isDemo) return <LoginPage />
 
   return (
     <CurrencyProvider>
     <div className="app">
       <Sidebar route={route} setRoute={setRoute} />
       <main className="main" ref={mainRef}>
-        <Topbar route={route} openModal={setModal} />
+        {isDemo && <DemoBanner />}
+        <Topbar route={route} openModal={setModal} isDemo={isDemo} />
         <div className="page">
           {route === 'dashboard' && <DashboardTab openModal={setModal} />}
           {route === 'sources' && <SourcesTab openModal={setModal} yuantaFetchingUntil={yuantaFetchingUntil} />}

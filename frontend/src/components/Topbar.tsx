@@ -12,9 +12,10 @@ const TITLES: Record<Route, string> = {
 interface Props {
   route: Route
   openModal: (m: ModalState) => void
+  isDemo?: boolean
 }
 
-export default function Topbar({ route, openModal }: Props) {
+export default function Topbar({ route, openModal, isDemo }: Props) {
   const { currency, toggle, rate, lastUpdated } = useCurrency()
 
   return (
@@ -54,12 +55,17 @@ export default function Topbar({ route, openModal }: Props) {
         <span className="topbar-rate mono">
           1 USD = {rate?.toFixed(2) ?? '--'} TWD
         </span>
-        <button className="icon-btn" title="Refresh">
-          <Icon name="refresh" />
-        </button>
+        {!isDemo && (
+          <button className="icon-btn" title="Refresh">
+            <Icon name="refresh" />
+          </button>
+        )}
         <button
           className="btn btn-primary"
-          onClick={() => openModal({ kind: 'addSource' })}
+          onClick={() => !isDemo && openModal({ kind: 'addSource' })}
+          disabled={isDemo}
+          title={isDemo ? '展示模式，無法操作' : undefined}
+          style={isDemo ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
         >
           <Icon name="plus" />
           Add source

@@ -10,7 +10,37 @@ import {
   refreshConnector,
 } from '../api/connectors'
 import { getTemplate, type SourceTemplate } from '../data/sourceTemplates'
+import { useDemo } from '../context/DemoContext'
+import { DEMO_CONNECTORS } from '../data/demoData'
 import type { ModalState } from '../App'
+
+function DemoLock({ children }: { children: React.ReactNode }) {
+  const [flash, setFlash] = useState(false)
+  return (
+    <div
+      style={{ position: 'relative', display: 'inline-flex' }}
+      onClick={e => {
+        e.stopPropagation()
+        setFlash(true)
+        setTimeout(() => setFlash(false), 1400)
+      }}
+      title="展示模式，無法操作"
+    >
+      <div style={{ opacity: 0.4, pointerEvents: 'none' }}>{children}</div>
+      {flash && (
+        <div style={{
+          position: 'absolute', bottom: '110%', left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--surf-3)', border: '1px solid var(--bdr)',
+          borderRadius: 5, padding: '3px 8px', fontSize: 10, color: 'var(--fg-2)',
+          whiteSpace: 'nowrap', zIndex: 999, pointerEvents: 'none',
+          animation: 'demoFlash 1.4s ease forwards',
+        }}>
+          展示模式
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface Props {
   openModal: (m: ModalState) => void
@@ -50,6 +80,7 @@ function ConnectorRow({
   busy,
   deleting,
   reauthorizing,
+  isDemo,
 }: {
   c: Connector
   template: SourceTemplate | undefined
@@ -61,6 +92,7 @@ function ConnectorRow({
   busy: boolean
   deleting: boolean
   reauthorizing?: boolean
+  isDemo?: boolean
 }) {
   const status = deleting
     ? { label: 'Removing', cls: 'status-fetching' }
@@ -122,50 +154,63 @@ function ConnectorRow({
       </div>
       <span className={`platform-status ${status.cls}`}>{status.label}</span>
       <div className="row-actions">
-        {!WALLET_PLATFORMS.has(c.platform_name) && (
-          <button
-            className="icon-btn"
-            title="Import history"
-            onClick={onImport}
-            disabled={busy || deleting}
-          >
-            <Icon name="upload" />
-          </button>
+        {isDemo ? (
+          <>
+            {!WALLET_PLATFORMS.has(c.platform_name) && (
+              <DemoLock><button className="icon-btn"><Icon name="upload" /></button></DemoLock>
+            )}
+            <DemoLock><button className="icon-btn"><Icon name="edit" /></button></DemoLock>
+            <DemoLock><button className="icon-btn"><Icon name="refresh" /></button></DemoLock>
+            <DemoLock><button className="icon-btn"><Icon name="trash" /></button></DemoLock>
+          </>
+        ) : (
+          <>
+            {!WALLET_PLATFORMS.has(c.platform_name) && (
+              <button
+                className="icon-btn"
+                title="Import history"
+                onClick={onImport}
+                disabled={busy || deleting}
+              >
+                <Icon name="upload" />
+              </button>
+            )}
+            {onReauthorize && (
+              <button
+                className={`icon-btn${reauthorizing ? ' btn-spinning' : ''}`}
+                title="重新授權 Gmail"
+                onClick={onReauthorize}
+                disabled={busy || deleting || reauthorizing}
+              >
+                <Icon name="key" />
+              </button>
+            )}
+            <button
+              className="icon-btn"
+              title="Edit"
+              onClick={onEdit}
+              disabled={busy || deleting}
+            >
+              <Icon name="edit" />
+            </button>
+            <button
+              className={`icon-btn${busy ? ' btn-spinning' : ''}`}
+              title="Refresh"
+              onClick={onRefresh}
+              disabled={busy || deleting}
+            >
+              <Icon name="refresh" />
+            </button>
+            <button
+              className="icon-btn"
+              title="Remove"
+              onClick={onRemove}
+              disabled={busy || deleting}
+            >
+              <Icon name="trash" />
+            </button>
+          </>
         )}
-        {onReauthorize && (
-          <button
-            className={`icon-btn${reauthorizing ? ' btn-spinning' : ''}`}
-            title="重新授權 Gmail"
-            onClick={onReauthorize}
-            disabled={busy || deleting || reauthorizing}
-          >
-            <Icon name="key" />
-          </button>
-        )}
-        <button
-          className="icon-btn"
-          title="Edit"
-          onClick={onEdit}
-          disabled={busy || deleting}
-        >
-          <Icon name="edit" />
-        </button>
-        <button
-          className={`icon-btn${busy ? ' btn-spinning' : ''}`}
-          title="Refresh"
-          onClick={onRefresh}
-          disabled={busy || deleting}
-        >
-          <Icon name="refresh" />
-        </button>
-        <button
-          className="icon-btn"
-          title="Remove"
-          onClick={onRemove}
-          disabled={busy || deleting}
-        >
-          <Icon name="trash" />
-        </button>
       </div>
     </div>
   )
@@ -173,6 +218,7 @@ function ConnectorRow({
 
 export default function SourcesTab({ openModal, yuantaFetchingUntil }: Props) {
   const qc = useQueryClient()
+  const { isDemo } = useDemo()
   const [reauthorizingId, setReauthorizingId] = useState<string | null>(null)
   const isYuantaFetching = !!yuantaFetchingUntil && Date.now() < yuantaFetchingUntil
 
@@ -193,6 +239,8 @@ export default function SourcesTab({ openModal, yuantaFetchingUntil }: Props) {
   const { data: connectors, isLoading, error } = useQuery({
     queryKey: ['connectors'],
     queryFn: listConnectors,
+    enabled: !isDemo,
+    initialData: isDemo ? DEMO_CONNECTORS : undefined,
   })
 
   const deleteMut = useMutation({
@@ -238,12 +286,20 @@ export default function SourcesTab({ openModal, yuantaFetchingUntil }: Props) {
             {' · '}sync history and credentials
           </div>
         </div>
-        <button
-          className="btn btn-primary btn-sm"
-          onClick={() => openModal({ kind: 'addSource' })}
-        >
-          <Icon name="plus" /> Add source
-        </button>
+        {isDemo ? (
+          <DemoLock>
+            <button className="btn btn-primary btn-sm">
+              <Icon name="plus" /> Add source
+            </button>
+          </DemoLock>
+        ) : (
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => openModal({ kind: 'addSource' })}
+          >
+            <Icon name="plus" /> Add source
+          </button>
+        )}
       </div>
 
       {error && (
@@ -279,6 +335,7 @@ export default function SourcesTab({ openModal, yuantaFetchingUntil }: Props) {
               deleting={deleteMut.isPending && deleteMut.variables === c.id}
               busy={(refreshMut.isPending && refreshMut.variables === c.id) || (isYuantaFetching && c.platform_name === 'yuanta')}
               reauthorizing={reauthorizingId === c.id}
+              isDemo={isDemo}
             />
           ))}
         </div>
