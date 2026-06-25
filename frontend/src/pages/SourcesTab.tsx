@@ -286,20 +286,12 @@ export default function SourcesTab({ openModal, yuantaFetchingUntil }: Props) {
             {' · '}sync history and credentials
           </div>
         </div>
-        {isDemo ? (
-          <DemoLock>
-            <button className="btn btn-primary btn-sm">
-              <Icon name="plus" /> Add source
-            </button>
-          </DemoLock>
-        ) : (
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => openModal({ kind: 'addSource' })}
-          >
-            <Icon name="plus" /> Add source
-          </button>
-        )}
+        <button
+          className="btn btn-primary btn-sm"
+          onClick={() => openModal({ kind: 'addSource' })}
+        >
+          <Icon name="plus" /> Add source
+        </button>
       </div>
 
       {error && (

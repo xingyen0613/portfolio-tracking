@@ -62,10 +62,7 @@ export default function Topbar({ route, openModal, isDemo }: Props) {
         )}
         <button
           className="btn btn-primary"
-          onClick={() => !isDemo && openModal({ kind: 'addSource' })}
-          disabled={isDemo}
-          title={isDemo ? '展示模式，無法操作' : undefined}
-          style={isDemo ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+          onClick={() => openModal({ kind: 'addSource' })}
         >
           <Icon name="plus" />
           Add source

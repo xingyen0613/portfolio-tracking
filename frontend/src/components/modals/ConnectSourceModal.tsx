@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useDemo } from '../../context/DemoContext'
 import axios from 'axios'
 import { Icon } from '../Icon'
 import { createConnector, type ConnectorCreatePayload } from '../../api/connectors'
@@ -23,12 +24,14 @@ interface Props {
 export default function ConnectSourceModal({ templateId, close, setModal }: Props) {
   const t = getTemplate(templateId)
   const qc = useQueryClient()
+  const { isDemo } = useDemo()
 
   const [accountLabel, setAccountLabel] = useState(t ? `${t.name} — Main` : 'Main')
   const [credentials, setCredentials] = useState<Record<string, unknown>>({})
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [showGetApi, setShowGetApi] = useState(false)
+  const [demoFlash, setDemoFlash] = useState(false)
   const [success, setSuccess] = useState<
     | { fetchStatus: 'success' | 'partial' | 'pending' }
     | null
@@ -363,13 +366,39 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
             <button className="btn btn-ghost" onClick={close} disabled={mut.isPending}>
               Cancel
             </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleSubmit}
-              disabled={mut.isPending || !canSubmit}
-            >
-              {mut.isPending ? 'Connecting…' : canSubmit ? 'Connect & sync' : 'Coming soon'}
-            </button>
+            {isDemo ? (
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  className="btn btn-primary"
+                  style={{ opacity: 0.55 }}
+                  onClick={() => {
+                    setDemoFlash(true)
+                    setTimeout(() => setDemoFlash(false), 1400)
+                  }}
+                >
+                  Connect & sync
+                </button>
+                {demoFlash && (
+                  <div style={{
+                    position: 'absolute', bottom: '110%', left: '50%', transform: 'translateX(-50%)',
+                    background: 'var(--surf-3)', border: '1px solid var(--bdr)',
+                    borderRadius: 5, padding: '4px 10px', fontSize: 11, color: 'var(--fg-2)',
+                    whiteSpace: 'nowrap', zIndex: 999, pointerEvents: 'none',
+                    animation: 'demoFlash 1.4s ease forwards',
+                  }}>
+                    預覽模式，無法新增來源
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                className="btn btn-primary"
+                onClick={handleSubmit}
+                disabled={mut.isPending || !canSubmit}
+              >
+                {mut.isPending ? 'Connecting…' : canSubmit ? 'Connect & sync' : 'Coming soon'}
+              </button>
+            )}
           </div>
         </div>
       )}
