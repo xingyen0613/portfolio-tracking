@@ -63,7 +63,7 @@ CHAIN_CONFIG: dict[str, dict] = {
         "subdomain":   "polygon-mainnet",
         "cg_platform": "polygon-pos",
         "short":       "matic",
-        "native": {"symbol": "POL",  "name": "Polygon",   "decimals": 18, "coingecko_id": "matic-network","is_stable": False},
+        "native": {"symbol": "POL",  "name": "Polygon",   "decimals": 18, "coingecko_id": "polygon-ecosystem-token","is_stable": False},
     },
     "linea": {
         "subdomain":   "linea-mainnet",
@@ -111,7 +111,11 @@ def _ensure_native_price_cache() -> None:
             )
             resp.raise_for_status()
             data = resp.json()
-            _native_price_cache = {cg_id: data[cg_id]["usd"] for cg_id in ids if cg_id in data}
+            _native_price_cache = {
+                cg_id: data[cg_id]["usd"]
+                for cg_id in ids
+                if cg_id in data and "usd" in data[cg_id]
+            }
             _native_cache_ts = time.time()
             return
         except Exception:
