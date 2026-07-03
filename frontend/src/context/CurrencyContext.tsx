@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { useDemo } from './DemoContext'
+import { DEMO_META } from '../data/demoData'
 
 interface MetaData {
   last_updated: string | null
@@ -20,11 +22,14 @@ const CurrencyContext = createContext<CurrencyCtx | null>(null)
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [currency, setCurrency] = useState<'USD' | 'TWD'>('USD')
+  const { isDemo } = useDemo()
 
   const { data: meta } = useQuery<MetaData>({
     queryKey: ['portfolio/meta'],
     queryFn: () => api.get('/api/portfolio/meta').then(r => r.data),
     staleTime: 5 * 60 * 1000,
+    enabled: !isDemo,
+    initialData: isDemo ? DEMO_META : undefined,
   })
 
   const rate = meta?.usd_twd_rate ?? 1
