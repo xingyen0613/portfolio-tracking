@@ -120,7 +120,7 @@ export default function LoginPage() {
                 e.currentTarget.style.background = 'transparent'
               }}
             >
-              探索展示模式 →
+              預覽模式（免登入）
             </button>
 
             <div

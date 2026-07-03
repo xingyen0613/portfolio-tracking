@@ -62,6 +62,7 @@ export default function Topbar({ route, openModal, isDemo }: Props) {
         )}
         <button
           className="btn btn-primary"
+          data-tour="add-source-btn"
           onClick={() => openModal({ kind: 'addSource' })}
         >
           <Icon name="plus" />

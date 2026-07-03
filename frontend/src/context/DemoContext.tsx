@@ -3,8 +3,10 @@ import { useQueryClient } from '@tanstack/react-query'
 
 interface DemoContextType {
   isDemo: boolean
+  tourActive: boolean
   enterDemo: () => void
   exitDemo: () => void
+  endTour: () => void
 }
 
 const DemoContext = createContext<DemoContextType | null>(null)
@@ -12,15 +14,21 @@ const DemoContext = createContext<DemoContextType | null>(null)
 export function DemoProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient()
   const [isDemo, setIsDemo] = useState(false)
+  const [tourActive, setTourActive] = useState(false)
 
-  const enterDemo = useCallback(() => setIsDemo(true), [])
+  const enterDemo = useCallback(() => {
+    setIsDemo(true)
+    setTourActive(true)
+  }, [])
   const exitDemo = useCallback(() => {
     setIsDemo(false)
+    setTourActive(false)
     queryClient.clear()
   }, [queryClient])
+  const endTour = useCallback(() => setTourActive(false), [])
 
   return (
-    <DemoContext.Provider value={{ isDemo, enterDemo, exitDemo }}>
+    <DemoContext.Provider value={{ isDemo, tourActive, enterDemo, exitDemo, endTour }}>
       {children}
     </DemoContext.Provider>
   )

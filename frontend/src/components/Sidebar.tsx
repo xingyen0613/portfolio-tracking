@@ -34,6 +34,7 @@ export default function Sidebar({ route, setRoute }: Props) {
     <div
       key={it.id}
       className={`nav-item ${route === it.id ? 'active' : ''}`}
+      data-tour={it.id === 'sources' ? 'sidebar-sources' : undefined}
       style={it.disabled ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
       onClick={() => !it.disabled && setRoute(it.id)}
     >

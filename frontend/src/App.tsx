@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import DemoBanner from './components/DemoBanner'
+import DemoTour from './components/DemoTour'
 import ModalHost from './components/modals/ModalHost'
 import DashboardTab from './pages/DashboardTab'
 import SourcesTab from './pages/SourcesTab'
@@ -50,6 +51,7 @@ function AppInner() {
   const [oauthToast, setOauthToast] = useState<{ ok: boolean; msg: string } | null>(null)
   const [yuantaFetchingUntil, setYuantaFetchingUntil] = useState<number | null>(null)
   const prevTokenRef = useRef(token)
+  const prevDemoRef = useRef(isDemo)
   const mainRef = useRef<HTMLElement>(null)
 
   const handleImportDone = useCallback((result: ImportHistoryResult) => {
@@ -79,6 +81,14 @@ function AppInner() {
     }
     prevTokenRef.current = token
   }, [token])
+
+  // Entering demo → land on dashboard so the tour targets exist
+  useEffect(() => {
+    if (!prevDemoRef.current && isDemo) {
+      setRoute('dashboard')
+    }
+    prevDemoRef.current = isDemo
+  }, [isDemo])
 
   // Detect OAuth callback (e.g. ?oauth=yuanta_success after Gmail redirect)
   useEffect(() => {
@@ -129,6 +139,7 @@ function AppInner() {
         </div>
       </main>
       <ModalHost modal={modal} setModal={setModal} />
+      {isDemo && <DemoTour />}
       {oauthToast && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9999,

@@ -36,11 +36,11 @@ export default function DashboardTab({ openModal }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-      <section>
+      <section data-tour="perf-metrics">
         <PerformanceMetrics />
       </section>
 
-      <section>
+      <section data-tour="asset-trend">
         <div className="section-head">
           <div>
             <div className="section-title">Asset Trend</div>
@@ -50,7 +50,7 @@ export default function DashboardTab({ openModal }: Props) {
         <TrendTab />
       </section>
 
-      <section>
+      <section data-tour="allocation">
         <div className="section-head">
           <div>
             <div className="section-title">Allocation</div>
@@ -60,7 +60,7 @@ export default function DashboardTab({ openModal }: Props) {
         <AllocationTab />
       </section>
 
-      <section>
+      <section data-tour="holdings">
         <div className="section-head">
           <div>
             <div className="section-title">Holdings by Source</div>
