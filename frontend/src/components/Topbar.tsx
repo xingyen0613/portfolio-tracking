@@ -24,7 +24,7 @@ export default function Topbar({ route, openModal, isDemo }: Props) {
         <div className="topbar-title">{TITLES[route]}</div>
       </div>
       <div className="topbar-meta">
-        {lastUpdated && <span>Updated {lastUpdated}</span>}
+        {lastUpdated && <span className="topbar-updated">Updated {lastUpdated}</span>}
         <div className="live-badge">
           <div className="live-dot"></div>
           LIVE

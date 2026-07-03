@@ -470,8 +470,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* ============ TREND ============ */
 .trend-controls {
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+  display: flex; align-items: center; justify-content: flex-start;
+  flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
 }
 .main-chart {
   background: var(--surf);
@@ -928,9 +928,44 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: var(--fg-2);
 }
 
+/* Asset Trend controls */
+.trend-chip-group { gap: 8px; }
+.trend-chip { padding: 4px 8px; }
+
+/* Performance metric cards */
+.perf-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
 /* responsive */
 @media (max-width: 900px) {
   .app { grid-template-columns: 64px 1fr; }
+  /* prevent the whole page from scrolling sideways */
+  .main { overflow-x: hidden; }
+  /* topbar: hide low-priority meta to save space, keep currency toggle + Add source */
+  .topbar-updated, .topbar-rate, .live-badge { display: none; }
+  .topbar-meta { gap: 10px; }
+  /* only the performance cards scroll horizontally, within their own track */
+  .perf-cards-scroll {
+    overflow-x: auto;
+    margin: 0 -18px;
+    padding: 2px 18px;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+  .perf-cards {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 72%;
+  }
+  .perf-cards > * { scroll-snap-align: start; }
+  /* Asset Trend controls: natural left-aligned wrap — category follows the mode
+     toggle, benchmark wraps to its own line when it runs out of room */
+  .trend-chip-group { gap: 5px; }
+  .trend-chip { padding: 4px 6px; }
+  .trend-divider { display: none; }
   .sidebar { padding: 12px 8px; }
   .brand-name, .brand-sub, .nav-item span:not(.nav-icon-wrap), .user-meta, .user-chev, .nav-label, .nav-badge { display: none; }
   .nav-item { justify-content: center; }

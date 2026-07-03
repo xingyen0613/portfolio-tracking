@@ -85,7 +85,8 @@ export default function PerformanceMetrics() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+      <div className="perf-cards-scroll">
+      <div className="perf-cards">
         {P_KEYS.map(key => {
           const color   = P_COLORS[key]
           const balance = portData?.latest[key]
@@ -129,6 +130,7 @@ export default function PerformanceMetrics() {
             </div>
           )
         })}
+      </div>
       </div>
     </div>
   )

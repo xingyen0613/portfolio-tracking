@@ -405,9 +405,10 @@ export default function TrendTab() {
   const chip = (label: string, color: string, active: boolean, dashed: boolean, onClick: () => void) => (
     <div
       onClick={onClick}
+      className="trend-chip"
       style={{
         display: 'flex', alignItems: 'center', gap: 5,
-        padding: '4px 8px', borderRadius: 5, cursor: 'pointer',
+        borderRadius: 5, cursor: 'pointer',
         border: `1px solid ${active ? 'var(--bdr)' : 'transparent'}`,
         background: active ? 'var(--surf2)' : 'transparent',
         color: active ? 'var(--fg1)' : 'var(--fg2)',
@@ -425,8 +426,8 @@ export default function TrendTab() {
 
   return (
     <>
-      {/* Controls: mode toggle + legend chips */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      {/* Controls: mode toggle + legend chips (mobile: each group on its own row) */}
+      <div className="trend-controls" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <div style={{
           display: 'flex', background: 'var(--surf3)', border: '1px solid var(--bdr)',
           borderRadius: 6, overflow: 'hidden',
@@ -442,20 +443,24 @@ export default function TrendTab() {
           ))}
         </div>
 
-        {P_KEYS.map(key => chip(P_LABELS[key], P_COLORS[key], pVis[key], false, () =>
-          setPVis(prev => ({ ...prev, [key]: !prev[key] }))
-        ))}
+        <div className="trend-chip-group" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+          {P_KEYS.map(key => chip(P_LABELS[key], P_COLORS[key], pVis[key], false, () =>
+            setPVis(prev => ({ ...prev, [key]: !prev[key] }))
+          ))}
+        </div>
 
-        <div style={{ width: 1, height: 16, background: 'var(--bdr)', margin: '0 4px' }} />
-        <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.5px' }}>BENCHMARK</span>
-        {B_TICKERS.map(t => chip(B_LABELS[t], B_COLORS[t], bVis[t], true, () => {
-          if (mode !== 'return') {
-            setMode('return')
-            setBVis(prev => ({ ...prev, [t]: true }))
-          } else {
-            setBVis(prev => ({ ...prev, [t]: !prev[t] }))
-          }
-        }))}
+        <div className="trend-chip-group" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="trend-divider" style={{ width: 1, height: 16, background: 'var(--bdr)', margin: '0 4px' }} />
+          <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.5px' }}>BENCHMARK</span>
+          {B_TICKERS.map(t => chip(B_LABELS[t], B_COLORS[t], mode === 'return' && bVis[t], true, () => {
+            if (mode !== 'return') {
+              setMode('return')
+              setBVis(prev => ({ ...prev, [t]: true }))
+            } else {
+              setBVis(prev => ({ ...prev, [t]: !prev[t] }))
+            }
+          }))}
+        </div>
       </div>
 
       {/* Chart */}
