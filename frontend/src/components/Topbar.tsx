@@ -12,9 +12,10 @@ const TITLES: Record<Route, string> = {
 interface Props {
   route: Route
   openModal: (m: ModalState) => void
+  isDemo?: boolean
 }
 
-export default function Topbar({ route, openModal }: Props) {
+export default function Topbar({ route, openModal, isDemo }: Props) {
   const { currency, toggle, rate, lastUpdated } = useCurrency()
 
   return (
@@ -54,11 +55,14 @@ export default function Topbar({ route, openModal }: Props) {
         <span className="topbar-rate mono">
           1 USD = {rate?.toFixed(2) ?? '--'} TWD
         </span>
-        <button className="icon-btn" title="Refresh">
-          <Icon name="refresh" />
-        </button>
+        {!isDemo && (
+          <button className="icon-btn" title="Refresh">
+            <Icon name="refresh" />
+          </button>
+        )}
         <button
           className="btn btn-primary"
+          data-tour="add-source-btn"
           onClick={() => openModal({ kind: 'addSource' })}
         >
           <Icon name="plus" />

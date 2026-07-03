@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from './auth/AuthContext'
 import { CurrencyProvider } from './context/CurrencyContext'
+import { DemoProvider, useDemo } from './context/DemoContext'
 import LoginPage from './pages/LoginPage'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
+import DemoBanner from './components/DemoBanner'
+import DemoTour from './components/DemoTour'
 import ModalHost from './components/modals/ModalHost'
 import DashboardTab from './pages/DashboardTab'
 import SourcesTab from './pages/SourcesTab'
@@ -28,7 +31,16 @@ function isRoute(v: unknown): v is Route {
 }
 
 export default function App() {
+  return (
+    <DemoProvider>
+      <AppInner />
+    </DemoProvider>
+  )
+}
+
+function AppInner() {
   const { token } = useAuth()
+  const { isDemo } = useDemo()
   const qc = useQueryClient()
   const [route, setRoute] = useState<Route>(() => {
     const saved = localStorage.getItem(ROUTE_KEY)
@@ -39,6 +51,7 @@ export default function App() {
   const [oauthToast, setOauthToast] = useState<{ ok: boolean; msg: string } | null>(null)
   const [yuantaFetchingUntil, setYuantaFetchingUntil] = useState<number | null>(null)
   const prevTokenRef = useRef(token)
+  const prevDemoRef = useRef(isDemo)
   const mainRef = useRef<HTMLElement>(null)
 
   const handleImportDone = useCallback((result: ImportHistoryResult) => {
@@ -68,6 +81,14 @@ export default function App() {
     }
     prevTokenRef.current = token
   }, [token])
+
+  // Entering demo → land on dashboard so the tour targets exist
+  useEffect(() => {
+    if (!prevDemoRef.current && isDemo) {
+      setRoute('dashboard')
+    }
+    prevDemoRef.current = isDemo
+  }, [isDemo])
 
   // Detect OAuth callback (e.g. ?oauth=yuanta_success after Gmail redirect)
   useEffect(() => {
@@ -101,14 +122,15 @@ export default function App() {
     if (mainRef.current) mainRef.current.scrollTop = 0
   }, [route])
 
-  if (!token) return <LoginPage />
+  if (!token && !isDemo) return <LoginPage />
 
   return (
     <CurrencyProvider>
     <div className="app">
       <Sidebar route={route} setRoute={setRoute} />
       <main className="main" ref={mainRef}>
-        <Topbar route={route} openModal={setModal} />
+        {isDemo && <DemoBanner />}
+        <Topbar route={route} openModal={setModal} isDemo={isDemo} />
         <div className="page">
           {route === 'dashboard' && <DashboardTab openModal={setModal} />}
           {route === 'sources' && <SourcesTab openModal={setModal} yuantaFetchingUntil={yuantaFetchingUntil} />}
@@ -117,6 +139,7 @@ export default function App() {
         </div>
       </main>
       <ModalHost modal={modal} setModal={setModal} />
+      {isDemo && <DemoTour />}
       {oauthToast && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9999,

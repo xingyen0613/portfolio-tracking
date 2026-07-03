@@ -5,20 +5,21 @@ import AllocationTab from '../components/tabs/AllocationTab'
 import TrendTab from '../components/tabs/TrendTab'
 import EmptyState from '../components/EmptyState'
 import { listConnectors } from '../api/connectors'
+import { useDemo } from '../context/DemoContext'
+import { DEMO_CONNECTORS } from '../data/demoData'
 import type { ModalState } from '../App'
 
 interface Props {
   openModal: (m: ModalState) => void
 }
 
-/**
- * V2 Dashboard combines Trend + Allocation + Holdings into a single page.
- * Empty state CTA shows when the user has no connectors yet.
- */
 export default function DashboardTab({ openModal }: Props) {
+  const { isDemo } = useDemo()
   const { data: connectors, isLoading } = useQuery({
     queryKey: ['connectors'],
     queryFn: listConnectors,
+    enabled: !isDemo,
+    initialData: isDemo ? DEMO_CONNECTORS : undefined,
   })
 
   if (!isLoading && connectors && connectors.length === 0) {
@@ -35,11 +36,11 @@ export default function DashboardTab({ openModal }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-      <section>
+      <section data-tour="perf-metrics">
         <PerformanceMetrics />
       </section>
 
-      <section>
+      <section data-tour="asset-trend">
         <div className="section-head">
           <div>
             <div className="section-title">Asset Trend</div>
@@ -49,7 +50,7 @@ export default function DashboardTab({ openModal }: Props) {
         <TrendTab />
       </section>
 
-      <section>
+      <section data-tour="allocation">
         <div className="section-head">
           <div>
             <div className="section-title">Allocation</div>
@@ -59,7 +60,7 @@ export default function DashboardTab({ openModal }: Props) {
         <AllocationTab />
       </section>
 
-      <section>
+      <section data-tour="holdings">
         <div className="section-head">
           <div>
             <div className="section-title">Holdings by Source</div>

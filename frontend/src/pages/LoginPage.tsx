@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../auth/AuthContext'
+import { useDemo } from '../context/DemoContext'
 
 export default function LoginPage() {
   const { login } = useAuth()
+  const { enterDemo } = useDemo()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -85,6 +87,41 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
+
+            <div style={{ margin: '16px 0 4px', display: 'flex', alignItems: 'center', gap: 10, width: 240 }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--bdr)' }} />
+              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>或</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--bdr)' }} />
+            </div>
+
+            <button
+              onClick={enterDemo}
+              style={{
+                width: 240,
+                padding: '9px 0',
+                background: 'transparent',
+                border: '1px solid var(--bdr)',
+                borderRadius: 20,
+                color: 'var(--fg-2)',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 150ms',
+                letterSpacing: '0.01em',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = 'var(--bdr-strong)'
+                e.currentTarget.style.color = 'var(--fg)'
+                e.currentTarget.style.background = 'var(--surf-2)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = 'var(--bdr)'
+                e.currentTarget.style.color = 'var(--fg-2)'
+                e.currentTarget.style.background = 'transparent'
+              }}
+            >
+              預覽模式（免登入）
+            </button>
 
             <div
               className="m-foot"

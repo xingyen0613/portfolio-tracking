@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
+import { useDemo } from '../../context/DemoContext'
+import { DEMO_ALLOCATION, DEMO_DRILL } from '../../data/demoData'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -46,16 +48,21 @@ function Donut({ slices, size = 120 }: { slices: { v: number; color: string }[];
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AllocationTab() {
+  const { isDemo } = useDemo()
   const [drill, setDrill] = useState<string | null>(null)
 
   const { data: allocData } = useQuery<AllocData>({
     queryKey: ['portfolio/allocation'],
     queryFn: () => api.get('/api/portfolio/allocation').then(r => r.data),
+    enabled: !isDemo,
+    initialData: isDemo ? DEMO_ALLOCATION : undefined,
   })
 
   const { data: drillData } = useQuery<DrillData>({
-    queryKey: ['portfolio/allocation/drill', drill],
-    queryFn: () => api.get(`/api/portfolio/allocation/${drill}`).then(r => r.data),
+    queryKey: ['portfolio/allocation/drill', drill, isDemo],
+    queryFn: isDemo
+      ? () => Promise.resolve(DEMO_DRILL[drill!] ?? { category: drill!, label: drill!, items: [] })
+      : () => api.get(`/api/portfolio/allocation/${drill}`).then(r => r.data),
     enabled: drill !== null,
   })
 

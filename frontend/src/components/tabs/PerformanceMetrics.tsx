@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
 import { useCurrency } from '../../context/CurrencyContext'
+import { useDemo } from '../../context/DemoContext'
+import { DEMO_HISTORY, DEMO_METRICS } from '../../data/demoData'
 
 const P_COLORS = {
   total:    '#7c6ef5',
@@ -37,17 +39,22 @@ function fmtPct(v: number | null) {
 }
 
 export default function PerformanceMetrics() {
+  const { isDemo } = useDemo()
   const [win, setWin] = useState('YTD')
   const { fmt } = useCurrency()
 
   const { data: portData } = useQuery<HistoryData>({
     queryKey: ['portfolio/history/all'],
     queryFn: () => api.get('/api/portfolio/history?window=all').then(r => r.data),
+    enabled: !isDemo,
+    initialData: isDemo ? DEMO_HISTORY : undefined,
   })
 
   const { data: metricsData } = useQuery<MetricsData>({
     queryKey: ['portfolio/metrics', win],
     queryFn: () => api.get(`/api/portfolio/metrics?window=${win}`).then(r => r.data),
+    enabled: !isDemo,
+    initialData: isDemo ? DEMO_METRICS : undefined,
   })
 
   const winLabel = win === 'all' ? 'ALL' : win

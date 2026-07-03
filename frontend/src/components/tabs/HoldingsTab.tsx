@@ -4,6 +4,8 @@ import { api } from '../../api/client'
 import { getConnectorCredentials, initiateYuantaOAuth, listConnectors, type Connector } from '../../api/connectors'
 import { useCurrency } from '../../context/CurrencyContext'
 import { getTemplate } from '../../data/sourceTemplates'
+import { useDemo } from '../../context/DemoContext'
+import { DEMO_HOLDINGS, DEMO_CONNECTORS } from '../../data/demoData'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -357,23 +359,30 @@ interface HoldingsTabProps {
 }
 
 export default function HoldingsTab({ onAddSource }: HoldingsTabProps = {}) {
+  const { isDemo } = useDemo()
+
   const { data, isLoading } = useQuery<HoldingsData>({
     queryKey: ['holdings'],
     queryFn: () => api.get('/api/holdings').then(r => r.data),
+    enabled: !isDemo,
+    initialData: isDemo ? (DEMO_HOLDINGS as unknown as HoldingsData) : undefined,
   })
 
   const { data: connectors = [] } = useQuery({
     queryKey: ['connectors'],
     queryFn: listConnectors,
+    enabled: !isDemo,
+    initialData: isDemo ? DEMO_CONNECTORS : undefined,
   })
 
   const connectorsByPlatform: Record<string, Connector[]> = {}
   for (const c of connectors) {
     if (!connectorsByPlatform[c.platform_name]) connectorsByPlatform[c.platform_name] = []
-    connectorsByPlatform[c.platform_name].push(c)
+    connectorsByPlatform[c.platform_name].push(c as Connector)
   }
 
   const handleYuantaReauth = async () => {
+    if (isDemo) return
     const yuantaConnector = connectors.find(c => c.platform_name === 'yuanta')
     if (!yuantaConnector) { onAddSource?.(); return }
     try {

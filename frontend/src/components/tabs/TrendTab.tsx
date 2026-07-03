@@ -6,6 +6,8 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
 import { useCurrency } from '../../context/CurrencyContext'
+import { useDemo } from '../../context/DemoContext'
+import { DEMO_HISTORY, DEMO_BENCHMARKS, DEMO_SNAPSHOT } from '../../data/demoData'
 
 // ── Portfolio constants ──────────────────────────────────────────────────────
 
@@ -155,6 +157,7 @@ function renderTooltip({
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function TrendTab() {
+  const { isDemo } = useDemo()
   const [mode, setMode] = useState<'USD' | 'return'>('USD')
   const { currency, convert, fmt } = useCurrency()
   const [pVis, setPVis] = useState<Record<PKey, boolean>>(
@@ -184,12 +187,16 @@ export default function TrendTab() {
   const { data: portData, isLoading } = useQuery<HistoryData>({
     queryKey: ['portfolio/history/all'],
     queryFn: () => api.get('/api/portfolio/history?window=all').then(r => r.data),
+    enabled: !isDemo,
+    initialData: isDemo ? DEMO_HISTORY : undefined,
   })
 
   const { data: benchData } = useQuery<BenchmarkData>({
     queryKey: ['benchmarks/all'],
     queryFn: () =>
       api.get('/api/benchmarks?tickers=%5EGSPC,0050.TW,BTC-USD&start=2015-01-01').then(r => r.data),
+    enabled: !isDemo,
+    initialData: isDemo ? DEMO_BENCHMARKS : undefined,
   })
 
   // keep portDataRef current so the crosshair handler (closed at chart init) always sees latest data
@@ -206,8 +213,10 @@ export default function TrendTab() {
   }, [tooltipIdx])
 
   const { data: snapshotData, isFetching: snapshotFetching } = useQuery<SnapshotData>({
-    queryKey: ['portfolio/snapshot', snapshotDate],
-    queryFn:  () => api.get(`/api/portfolio/snapshot?date=${snapshotDate}`).then(r => r.data),
+    queryKey: ['portfolio/snapshot', snapshotDate, isDemo],
+    queryFn: isDemo
+      ? () => Promise.resolve({ ...DEMO_SNAPSHOT, date: snapshotDate! })
+      : () => api.get(`/api/portfolio/snapshot?date=${snapshotDate}`).then(r => r.data),
     enabled:  snapshotDate !== null,
     staleTime: Infinity,
   })
