@@ -53,6 +53,11 @@ const btcSeries      = genSeries(N, 48000, 65000, 1500, rng)
 
 // ── Exported demo datasets ────────────────────────────────────────────────────
 
+export const DEMO_META = {
+  last_updated: '2026-06-25T00:00:00Z',
+  usd_twd_rate: 32.3,
+}
+
 const latest = {
   total:    totalSeries[N - 1],
   crypto:   cryptoSeries[N - 1],
