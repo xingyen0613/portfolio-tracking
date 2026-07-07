@@ -5,8 +5,9 @@ import AllocationTab from '../components/tabs/AllocationTab'
 import TrendTab from '../components/tabs/TrendTab'
 import EmptyState from '../components/EmptyState'
 import { listConnectors } from '../api/connectors'
+import { api } from '../api/client'
 import { useDemo } from '../context/DemoContext'
-import { DEMO_CONNECTORS } from '../data/demoData'
+import { DEMO_CONNECTORS, DEMO_HISTORY } from '../data/demoData'
 import type { ModalState } from '../App'
 
 interface Props {
@@ -21,6 +22,23 @@ export default function DashboardTab({ openModal }: Props) {
     enabled: !isDemo,
     initialData: isDemo ? DEMO_CONNECTORS : undefined,
   })
+
+  // 共用 PerformanceMetrics / TrendTab 的 history query key，react-query 會 dedupe
+  const { isLoading: historyLoading } = useQuery({
+    queryKey: ['portfolio/history/all'],
+    queryFn: () => api.get('/api/portfolio/history?window=all').then(r => r.data),
+    enabled: !isDemo,
+    initialData: isDemo ? DEMO_HISTORY : undefined,
+  })
+
+  if (isLoading || historyLoading) {
+    return (
+      <div className="dashboard-loading">
+        <div className="spinner" />
+        <div className="load-label">Loading your portfolio…</div>
+      </div>
+    )
+  }
 
   if (!isLoading && connectors && connectors.length === 0) {
     return (
