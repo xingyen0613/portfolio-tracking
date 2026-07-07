@@ -16,7 +16,9 @@ api.interceptors.request.use(config => {
 api.interceptors.response.use(
   res => res,
   err => {
-    if (err.response?.status === 401) {
+    // 登入 API 自己的 401 是「登入失敗」，要留給 LoginPage 顯示錯誤，不能 reload
+    const isLoginRequest = err.config?.url?.includes('/api/auth/google')
+    if (err.response?.status === 401 && !isLoginRequest) {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('portfolio_user')
       window.location.reload()

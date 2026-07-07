@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import axios from 'axios'
 import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../auth/AuthContext'
 import { useDemo } from '../context/DemoContext'
@@ -15,8 +16,10 @@ export default function LoginPage() {
     try {
       await login(credential)
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError(`登入失敗：${msg}`)
+      const detail = axios.isAxiosError(e)
+        ? e.response?.data?.detail ?? `${e.message}（HTTP ${e.response?.status ?? 'n/a'}）`
+        : e instanceof Error ? e.message : String(e)
+      setError(`登入失敗：${detail}`)
     } finally {
       setLoading(false)
     }
