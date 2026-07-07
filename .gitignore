@@ -40,6 +40,7 @@ docs/testing.md
 
 # SDK / runtime logs
 shioaji.log
+log/
 
 # 個人筆記與測試資料，不進版控
 how-to-get-api.md
