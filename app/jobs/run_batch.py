@@ -38,6 +38,33 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def active_batch_user_ids() -> list[str]:
+    """user_ids eligible for an automated batch run.
+
+    Single source of truth shared by the scheduler and every trigger endpoint:
+    a user must have an active connector AND an active subscription entitlement.
+    Users without entitlement keep their history but are skipped (no further
+    updates) — see app.services.entitlements. Callers wanting to force a specific
+    user (e.g. admin manual trigger) should bypass this and pass the user_id directly.
+    """
+    import logging
+    from app.services.entitlements import is_active
+
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT user_id FROM user_connectors WHERE status = 'active'"
+        ).fetchall()
+    candidates = [row["user_id"] for row in rows]
+
+    entitled = [uid for uid in candidates if is_active(uid)]
+    skipped = [uid for uid in candidates if uid not in entitled]
+    if skipped:
+        logging.getLogger(__name__).info(
+            "Skipping %d user(s) without active subscription: %s", len(skipped), skipped
+        )
+    return entitled
+
+
 def _get_user_connectors(user_id: str, platform_name: str) -> list[dict]:
     """
     Return all active user_connectors rows for (user_id, platform_name).
