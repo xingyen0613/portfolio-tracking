@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.auth.deps import get_current_user
+from app.services.entitlements import is_active
 from app.auth.encryption import decrypt, encrypt
 from app.jobs.rebuild_category_snapshots import rebuild_for_dates
 from config.db import get_conn
@@ -103,6 +104,13 @@ def list_connectors(current_user: dict = Depends(get_current_user)):
 def create_connector(body: ConnectorCreate, current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
     platform = body.platform_name
+
+    # Adding a source requires an active subscription (existing data stays readable).
+    if not is_active(user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="subscription_required",
+        )
 
     if platform not in SUPPORTED_PLATFORMS:
         raise HTTPException(
