@@ -6,11 +6,23 @@ PayPal, a future Stripe, and the `comp` whitelist all just write a `status` into
 `subscriptions` table. Swap or add a provider without touching callers here.
 """
 from datetime import datetime, timezone
+import os
 import uuid
 
 from app.storage.sqlite import execute, fetch_one
 
 ACTIVE_STATUSES = {"active", "trialing"}
+
+
+def _billing_enforced() -> bool:
+    """Master switch for the whole entitlement layer.
+
+    Until a payment provider is wired up, billing stays OFF and every user is
+    treated as entitled (batch runs for everyone, add-source is never gated).
+    Flip it on by setting BILLING_ENFORCED=true in the deploy env once a real
+    provider (or the comp whitelist) is ready to gate on.
+    """
+    return os.getenv("BILLING_ENFORCED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _now() -> datetime:
@@ -39,7 +51,14 @@ def get_entitlement(user_id: str) -> dict:
       1. is_system users are always active (owner exemption).
       2. Otherwise read the user's subscriptions row.
       3. No row → status 'none', inactive.
+
+    When billing is not enforced (default), short-circuit to entitled before any
+    DB read — also keeps things working before the subscriptions table exists.
     """
+    if not _billing_enforced():
+        return {"active": True, "status": "unenforced", "provider": None,
+                "current_period_end": None}
+
     user = fetch_one("SELECT is_system FROM users WHERE id = %s", (user_id,))
     if user and user["is_system"]:
         return {"active": True, "status": "active", "provider": "system",
