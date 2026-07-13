@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDemo } from '../../context/DemoContext'
-import { useEntitlement } from '../../api/billing'
+import { createCheckoutSession, useEntitlement } from '../../api/billing'
 import axios from 'axios'
 import { Icon } from '../Icon'
 import { createConnector, type ConnectorCreatePayload } from '../../api/connectors'
@@ -38,6 +38,19 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
   const [showGetApi, setShowGetApi] = useState(false)
   const [demoFlash, setDemoFlash] = useState(false)
   const [subFlash, setSubFlash] = useState(false)
+  const [subscribing, setSubscribing] = useState(false)
+
+  const goSubscribe = async () => {
+    setError(null)
+    setSubscribing(true)
+    try {
+      const { url } = await createCheckoutSession()
+      window.location.href = url
+    } catch {
+      setError('無法開啟訂閱頁面，請稍後再試。')
+      setSubscribing(false)
+    }
+  }
   const [success, setSuccess] = useState<
     | { fetchStatus: 'success' | 'partial' | 'pending' }
     | null
@@ -398,6 +411,14 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
               </div>
             ) : subGateActive ? (
               <div style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  className="btn btn-outline"
+                  onClick={goSubscribe}
+                  disabled={subscribing}
+                  style={{ marginRight: 8 }}
+                >
+                  {subscribing ? '前往訂閱…' : '前往訂閱'}
+                </button>
                 <button
                   className="btn btn-primary"
                   style={{ opacity: 0.55 }}

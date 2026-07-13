@@ -14,6 +14,18 @@ export async function getBillingStatus(): Promise<Entitlement> {
   return r.data
 }
 
+/** Start Stripe hosted Checkout; caller should redirect to the returned URL. */
+export async function createCheckoutSession(): Promise<{ url: string }> {
+  const r = await api.post('/api/billing/checkout-session')
+  return r.data
+}
+
+/** Open Stripe Customer Portal (cancel / update card); caller redirects to URL. */
+export async function createPortalSession(): Promise<{ url: string }> {
+  const r = await api.post('/api/billing/portal-session')
+  return r.data
+}
+
 /** Current user's subscription entitlement. Only fetched when logged in. */
 export function useEntitlement() {
   const { token } = useAuth()

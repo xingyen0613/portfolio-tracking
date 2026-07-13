@@ -24,4 +24,5 @@ dependencies = [
     "apscheduler==3.10.4",
     "shioaji==1.3.3",
     "python-multipart>=0.0.28",
+    "stripe==15.3.0",
 ]
