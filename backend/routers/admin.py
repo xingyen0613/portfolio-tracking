@@ -31,14 +31,6 @@ class AdminRunBatchResponse(BaseModel):
     benchmarks_updated: bool
 
 
-def _active_user_ids() -> list[str]:
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT DISTINCT user_id FROM user_connectors WHERE status = 'active'"
-        ).fetchall()
-    return [row["user_id"] for row in rows]
-
-
 @router.post("/run-batch", response_model=AdminRunBatchResponse)
 def admin_run_batch(
     body: AdminRunBatchRequest,
@@ -47,10 +39,12 @@ def admin_run_batch(
     if current_user["id"] != SYSTEM_OWNER_ID:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
-    from app.jobs.run_batch import _fetch_benchmarks, run_batch
+    from app.jobs.run_batch import _fetch_benchmarks, active_batch_user_ids, run_batch
 
     target_platforms = body.platforms or [p for p in ENABLED_PLATFORMS if p in _IMPLEMENTED]
-    target_users = [body.user_id] if body.user_id else _active_user_ids()
+    # Explicit user_id = admin override (runs regardless of subscription);
+    # no user_id = the gated "run everyone eligible" set.
+    target_users = [body.user_id] if body.user_id else active_batch_user_ids()
 
     results: list[BatchResult] = []
     batch_ids: list[str] = []

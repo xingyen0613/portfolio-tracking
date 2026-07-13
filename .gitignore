@@ -17,6 +17,8 @@ scripts/*
 !scripts/probe_exchange_balances.py
 !scripts/test_price_cache.py
 !scripts/test_e2e_price_cache.py
+!scripts/grant_comp.py
+!scripts/verify_entitlements.py
 .venv/
 /data/
 __pycache__/

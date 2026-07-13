@@ -9,7 +9,6 @@ from typing import Literal
 from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel
 
-from config.db import get_conn
 from config.settings import ENABLED_PLATFORMS, SCHEDULER_SECRET
 
 router = APIRouter()
@@ -20,14 +19,6 @@ _DAILY_PLATFORMS = {"binance", "okx", "mexc", "bybit", "sol_wallet", "sui_wallet
 
 class TriggerRequest(BaseModel):
     job: Literal["daily", "monthly_yuanta", "smoke"]
-
-
-def _active_user_ids() -> list[str]:
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT DISTINCT user_id FROM user_connectors WHERE status = 'active'"
-        ).fetchall()
-    return [row["user_id"] for row in rows]
 
 
 def _verify_secret(x_scheduler_secret: str | None) -> None:
@@ -44,9 +35,9 @@ def trigger_batch(
 ):
     _verify_secret(x_scheduler_secret)
 
-    from app.jobs.run_batch import _fetch_benchmarks, run_batch
+    from app.jobs.run_batch import _fetch_benchmarks, active_batch_user_ids, run_batch
 
-    user_ids = _active_user_ids()
+    user_ids = active_batch_user_ids()
     if not user_ids:
         log.warning("trigger-batch: no active users, skipping.")
         return {"status": "skipped", "reason": "no active users"}

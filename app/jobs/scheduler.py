@@ -27,7 +27,6 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
 import config.settings  # triggers load_dotenv
-from config.db import get_conn
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,12 +37,9 @@ log = logging.getLogger(__name__)
 
 
 def _active_user_ids() -> list[str]:
-    """Return all user_ids that have at least one active connector."""
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT DISTINCT user_id FROM user_connectors WHERE status = 'active'"
-        ).fetchall()
-    return [row["user_id"] for row in rows]
+    """Delegates to the shared gated helper (active connector + active subscription)."""
+    from app.jobs.run_batch import active_batch_user_ids
+    return active_batch_user_ids()
 
 
 def run_monthly_yuanta() -> None:

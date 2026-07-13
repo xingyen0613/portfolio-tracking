@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDemo } from '../../context/DemoContext'
+import { useEntitlement } from '../../api/billing'
 import axios from 'axios'
 import { Icon } from '../Icon'
 import { createConnector, type ConnectorCreatePayload } from '../../api/connectors'
@@ -25,6 +26,10 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
   const t = getTemplate(templateId)
   const qc = useQueryClient()
   const { isDemo } = useDemo()
+  const { data: entitlement } = useEntitlement()
+  // Gate only when we positively know the user is not subscribed (avoid flashing
+  // the gate while loading, and while demo mode has its own gate). Backend enforces regardless.
+  const subGateActive = !isDemo && entitlement !== undefined && !entitlement.active
 
   const [accountLabel, setAccountLabel] = useState(t ? `${t.name} — Main` : 'Main')
   const [credentials, setCredentials] = useState<Record<string, unknown>>({})
@@ -32,6 +37,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
   const [warning, setWarning] = useState<string | null>(null)
   const [showGetApi, setShowGetApi] = useState(false)
   const [demoFlash, setDemoFlash] = useState(false)
+  const [subFlash, setSubFlash] = useState(false)
   const [success, setSuccess] = useState<
     | { fetchStatus: 'success' | 'partial' | 'pending' }
     | null
@@ -387,6 +393,30 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
                     animation: 'demoFlash 1.4s ease forwards',
                   }}>
                     預覽模式，無法新增來源
+                  </div>
+                )}
+              </div>
+            ) : subGateActive ? (
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  className="btn btn-primary"
+                  style={{ opacity: 0.55 }}
+                  onClick={() => {
+                    setSubFlash(true)
+                    setTimeout(() => setSubFlash(false), 1400)
+                  }}
+                >
+                  Connect & sync
+                </button>
+                {subFlash && (
+                  <div style={{
+                    position: 'absolute', bottom: '110%', left: '50%', transform: 'translateX(-50%)',
+                    background: 'var(--surf-3)', border: '1px solid var(--bdr)',
+                    borderRadius: 5, padding: '4px 10px', fontSize: 11, color: 'var(--fg-2)',
+                    whiteSpace: 'nowrap', zIndex: 999, pointerEvents: 'none',
+                    animation: 'demoFlash 1.4s ease forwards',
+                  }}>
+                    需有效訂閱才能新增來源
                   </div>
                 )}
               </div>
