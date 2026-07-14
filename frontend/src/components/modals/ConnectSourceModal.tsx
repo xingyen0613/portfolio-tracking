@@ -47,6 +47,8 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
       await redirectToEcpayCheckout()
     } catch {
       setError('無法前往綠界付款頁，請稍後再試。')
+    } finally {
+      // Checkout opens in a new tab, so this modal stays interactive.
       setSubscribing(false)
     }
   }

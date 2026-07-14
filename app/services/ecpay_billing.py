@@ -28,7 +28,7 @@ import uuid
 
 import requests
 
-from app.storage.sqlite import execute, fetch_one
+from app.storage.sqlite import execute, fetch_all, fetch_one
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +225,91 @@ def _upsert(user_id: str, trade_no: str, status: str, period_end: str) -> None:
         """,
         (str(uuid.uuid4()), user_id, trade_no, status, period_end, now, now),
     )
+
+
+# --- Daily pull reconciliation -------------------------------------------------
+# Callbacks are the primary signal but can be lost (4 retries max). Once a day
+# we pull the real charge state from ECPay and realign the subscriptions table.
+# Spec: https://developers.ecpay.com.tw/2892.md (fetched 2026-07-14)
+
+def query_period_info(trade_no: str) -> dict:
+    """QueryCreditCardPeriodInfo — actual charge history for one recurring order."""
+    params = {
+        "MerchantID": _cfg("ECPAY_MERCHANT_ID"),
+        "MerchantTradeNo": trade_no,
+        "TimeStamp": str(int(time.time())),
+    }
+    params["CheckMacValue"] = generate_check_mac_value(params)
+    resp = requests.post(f"{_base_url()}/Cashier/QueryCreditCardPeriodInfo",
+                         data=params, timeout=15)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _parse_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def reconcile_subscriptions() -> dict:
+    """Align every ECPay subscription row with ECPay's actual charge state.
+
+    - A successful charge whose callback we missed → extend current_period_end
+      (and restore status to active).
+    - ExecStatus 0 (terminated, e.g. 6 failed charges or backoffice cancel) or
+      2 (all ExecTimes done) → flag cancel_at_period_end; entitlement then
+      lapses when the paid period ends, same as a user-initiated cancel.
+    """
+    rows = fetch_all(
+        """SELECT user_id, external_id, status, current_period_end, cancel_at_period_end
+             FROM subscriptions WHERE provider = 'ecpay' AND external_id IS NOT NULL""",
+    )
+    stats = {"checked": 0, "updated": 0, "errors": 0}
+    for row in rows:
+        stats["checked"] += 1
+        try:
+            info = query_period_info(row["external_id"])
+        except (requests.RequestException, ValueError) as exc:
+            stats["errors"] += 1
+            logger.warning("ecpay reconcile query failed for %s: %s", row["external_id"], exc)
+            continue
+        if str(info.get("RtnCode")) != "1":
+            stats["errors"] += 1
+            logger.warning("ecpay reconcile RtnCode=%s for %s", info.get("RtnCode"),
+                           row["external_id"])
+            continue
+
+        # Latest successful charge (ExecLog holds only successes, incl. the first).
+        success_dates = [entry.get("process_date")
+                         for entry in (info.get("ExecLog") or [])
+                         if str(entry.get("RtnCode")) == "1" and entry.get("process_date")]
+        last_charge = max(success_dates, default=info.get("process_date"))
+        expected_end = _parse_iso(_period_end_iso(last_charge)) if last_charge else None
+        db_end = _parse_iso(row["current_period_end"])
+        ended = str(info.get("ExecStatus")) in ("0", "2")
+
+        updates: dict = {}
+        if expected_end and (db_end is None or expected_end > db_end):
+            updates["current_period_end"] = expected_end.isoformat()
+            updates["status"] = "active"
+        if ended and not row["cancel_at_period_end"]:
+            updates["cancel_at_period_end"] = True
+        if not updates:
+            continue
+
+        sets = ", ".join(f"{col} = %s" for col in updates)
+        execute(
+            f"UPDATE subscriptions SET {sets}, updated_at = %s WHERE user_id = %s AND provider = 'ecpay'",
+            (*updates.values(), datetime.now(timezone.utc).isoformat(), row["user_id"]),
+        )
+        stats["updated"] += 1
+        logger.info("ecpay reconcile updated %s: %s", row["external_id"], updates)
+    return stats
 
 
 # --- Cancel -------------------------------------------------------------------

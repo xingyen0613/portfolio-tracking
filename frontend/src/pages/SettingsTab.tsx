@@ -28,6 +28,8 @@ function SubscriptionSection() {
       await redirectToEcpayCheckout()
     } catch {
       setError('無法前往綠界付款頁，請稍後再試。')
+    } finally {
+      // Checkout opens in a new tab, so this page stays interactive.
       setBusy(false)
     }
   }
@@ -46,7 +48,7 @@ function SubscriptionSection() {
     }
   }
 
-  const label = entitlement.cancel_at_period_end
+  const label = entitlement.cancel_at_period_end && entitlement.active
     ? '已排程取消'
     : (STATUS_LABELS[entitlement.status] ?? entitlement.status)
   const periodEnd = entitlement.current_period_end?.slice(0, 10)
