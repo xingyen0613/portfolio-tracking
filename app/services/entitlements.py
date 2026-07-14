@@ -57,25 +57,26 @@ def get_entitlement(user_id: str) -> dict:
     """
     if not _billing_enforced():
         return {"active": True, "status": "unenforced", "provider": None,
-                "current_period_end": None}
+                "current_period_end": None, "cancel_at_period_end": False}
 
     user = fetch_one("SELECT is_system FROM users WHERE id = %s", (user_id,))
     if user and user["is_system"]:
         return {"active": True, "status": "active", "provider": "system",
-                "current_period_end": None}
+                "current_period_end": None, "cancel_at_period_end": False}
 
     row = fetch_one(
-        """SELECT status, provider, current_period_end
+        """SELECT status, provider, current_period_end, cancel_at_period_end
              FROM subscriptions WHERE user_id = %s""",
         (user_id,),
     )
     if not row:
         return {"active": False, "status": "none", "provider": None,
-                "current_period_end": None}
+                "current_period_end": None, "cancel_at_period_end": False}
 
     active = row["status"] in ACTIVE_STATUSES and not _is_expired(row["current_period_end"])
     return {"active": active, "status": row["status"], "provider": row["provider"],
-            "current_period_end": row["current_period_end"]}
+            "current_period_end": row["current_period_end"],
+            "cancel_at_period_end": bool(row["cancel_at_period_end"])}
 
 
 def is_active(user_id: str) -> bool:
@@ -103,11 +104,12 @@ def grant_comp(email: str) -> None:
              created_at, updated_at)
         VALUES (%s, %s, 'comp', NULL, 'active', NULL, %s, %s)
         ON CONFLICT (user_id) DO UPDATE SET
-            provider           = 'comp',
-            external_id        = NULL,
-            status             = 'active',
-            current_period_end = NULL,
-            updated_at         = EXCLUDED.updated_at
+            provider             = 'comp',
+            external_id          = NULL,
+            status               = 'active',
+            current_period_end   = NULL,
+            cancel_at_period_end = FALSE,
+            updated_at           = EXCLUDED.updated_at
         """,
         (str(uuid.uuid4()), user_id, now, now),
     )
