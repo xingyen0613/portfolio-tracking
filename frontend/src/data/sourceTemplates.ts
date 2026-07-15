@@ -92,7 +92,7 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
   { id: 'schwab',   name: 'Charles Schwab',    desc: 'US broker',                 category: 'us',     auth: 'manual',  abbr: 'SCHW', color: '#00a0df', textColor: '#fff', implemented: false, comingSoon: 'Coming soon' },
   { id: 'yuanta',   name: '元大證券',           desc: 'Taiwan broker · Gmail PDF', category: 'tw',     auth: 'yuanta',  abbr: 'YT',   color: '#004b99', textColor: '#fff', implemented: true, singleInstance: true },
   { id: 'sinopac',  name: '永豐證券',           desc: 'Taiwan broker · Shioaji API', category: 'tw',   auth: 'sinopac', abbr: '永',   color: '#003D82', textColor: '#fff', implemented: true },
-  { id: 'fubon',    name: '富邦證券',           desc: 'Taiwan broker · Neo API',   category: 'tw',     auth: 'fubon',   abbr: 'FB',   color: '#0a5e3e', textColor: '#fff', implemented: true },
+  { id: 'fubon',    name: '富邦證券',           desc: 'Taiwan broker · Neo API',   category: 'tw',     auth: 'fubon',   abbr: 'FB',   color: '#0a5e3e', textColor: '#fff', implemented: true, logoUrl: '/logos/fubon.png' },
   { id: 'manual',   name: 'Manual Entry',      desc: 'Real estate, cash, custom', category: 'other',  auth: 'manual',  abbr: '+',    color: '#3a3a44', textColor: '#fff', implemented: false, comingSoon: 'Coming in v2' },
 ]
 
