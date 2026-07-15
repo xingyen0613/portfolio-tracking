@@ -85,8 +85,8 @@
 
 **結論**：走「唯讀 API Key + IP 白名單 + 不存電子平台密碼 + 加密儲存」，憑證託管屬**可控的隱私風險，非資金風險**。是否接入為商業/風險決策。
 
-## 4. 待辦（若決定正式接入）
-- [ ] 用戶到富邦後台補開 API Key 的 `maintenance`（維持率/負債）與歷史查詢 scope，再驗證這兩塊
-- [ ] 向富邦確認出金風險（見殘留風險）
-- [ ] 取得 Linux x86_64 `.whl` 供 GCP Cloud Run 部署
-- [ ] 寫正式 `FubonConnector`（處理整股+零股相加、市值來源、多用戶憑證加密儲存）
+## 4. 待辦（2026-07-15 正式接入完成）
+- [ ] 用戶到富邦後台補開 API Key 的 `maintenance`（維持率/負債）與歷史查詢 scope，再驗證這兩塊——**暫不需要**（帳戶只有現股，無融資）
+- [x] 出金風險：以 SDK 實測排除（見上節權限範圍實測）
+- [x] Linux x86_64 `.whl` 已進 `vendor/`，Dockerfile 安裝，Cloud Run 部署驗證通過
+- [x] 正式 `FubonConnector`（`app/connectors/fubon_connector.py`）：現股+零股相加、unrealized 反推市值、憑證 Fernet 加密儲存＋暫存檔登入；production E2E 驗證通過（715,222 TWD 與富邦 App 對帳一致）
