@@ -1,4 +1,5 @@
 import os
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -11,9 +12,19 @@ _default_origins = "http://localhost:5173,http://127.0.0.1:5173"
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", _default_origins).split(",")
 
 
+def _refresh_fx_background():
+    try:
+        ensure_updated()
+    except Exception:
+        pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    ensure_updated()
+    # Refresh FX in the background so startup readiness is not gated on the
+    # yfinance network call. On Cloud Run (scale-to-zero) a blocking fetch here
+    # inflates cold-start latency past the client login timeout.
+    threading.Thread(target=_refresh_fx_background, daemon=True).start()
     yield
 
 

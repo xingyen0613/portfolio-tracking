@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
 
+from app.utils.fx import ensure_updated
 from config.db import get_conn
 from config.settings import ENABLED_PLATFORMS, ENV_PATH, PLATFORM_CATEGORY, WALLETS_ENV_PATH
 
@@ -347,6 +348,15 @@ def run_batch(platforms: list[str], user_id: str,
     started_at = _now()
     print(f"\n[Batch {batch_id[:8]}] user={user_id[:8]} starting — {started_at}")
     print(f"Platforms: {', '.join(platforms)}\n")
+
+    # Refresh FX rates as part of the daily batch (primary refresh point).
+    # ensure_updated() is self-guarding: it only hits the network when the DB
+    # rate is stale, so running it per-user is a no-op after the first call.
+    # Never let an FX fetch failure abort the batch.
+    try:
+        ensure_updated()
+    except Exception as e:
+        print(f"[Batch {batch_id[:8]}] FX refresh skipped: {e}")
 
     with get_conn() as conn:
         conn.execute(
