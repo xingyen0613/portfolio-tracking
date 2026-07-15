@@ -30,7 +30,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   })
 
   const login = useCallback(async (credential: string) => {
-    const res = await api.post('/api/auth/google', { credential })
+    // Cloud Run scales to zero; a cold start can push this request past the
+    // 10s client default (the server still returns 200, just late). Override
+    // the timeout so a cold-start login succeeds instead of showing a false
+    // "timeout of 10000ms exceeded".
+    const res = await api.post('/api/auth/google', { credential }, { timeout: 30000 })
     const { token: t, user: u } = res.data
     localStorage.setItem(TOKEN_KEY, t)
     localStorage.setItem(USER_KEY, JSON.stringify(u))
