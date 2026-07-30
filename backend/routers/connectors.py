@@ -25,6 +25,8 @@ PLATFORM_REQUIRED_FIELDS = {
     "pionex":  ["api_key", "secret"],
     "ibkr":    ["flex_token", "query_id"],
     "sinopac": ["api_key", "secret_key"],
+    # cert_pfx_b64 = 電子交易憑證 .pfx 的 base64；cert_password 可選（預設 = 身分證號）
+    "fubon":   ["fubon_id", "api_key", "cert_pfx_b64"],
     # Alchemy API key is system-level (server ALCHEMY_API_KEY env), not per-user
     "evm_wallet": ["addresses"],
     "sol_wallet": ["addresses"],
@@ -199,7 +201,8 @@ def create_connector(body: ConnectorCreate, current_user: dict = Depends(get_cur
 # Only mask the OAuth token — it's system-managed JSON the user never entered.
 # All user-entered credentials (api_key, secret, passphrase, flex_token, pdf_password, etc.)
 # are returned as plaintext so the frontend can pre-fill the edit form.
-SENSITIVE_FIELDS = {"gmail_token_json"}
+# cert_pfx_b64 also masked: it's a binary blob, editing re-uploads instead of pre-filling.
+SENSITIVE_FIELDS = {"gmail_token_json", "cert_pfx_b64"}
 
 
 class ConnectorUpdate(BaseModel):
@@ -286,7 +289,7 @@ def update_connector(
     return _row_to_connector(updated)
 
 
-EXCHANGE_LIKE_PLATFORMS = {"binance", "okx", "mexc", "bybit", "pionex", "ibkr", "yuanta"}
+EXCHANGE_LIKE_PLATFORMS = {"binance", "okx", "mexc", "bybit", "pionex", "ibkr", "yuanta", "fubon"}
 
 
 def _resolve_account_ids(conn, platform: str, account_key: str, creds: dict, user_id: str) -> list[int]:

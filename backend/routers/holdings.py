@@ -78,6 +78,7 @@ PLATFORM_META: dict[str, dict] = {
     "firsttrade": {"display": "Firsttrade（美股）", "abbr": "FT",  "color": "#2c8af8", "fg": "#fff"},
     "yuanta":     {"display": "元大證券（台股）",   "abbr": "元",  "color": "#27ae60", "fg": "#fff"},
     "sinopac":    {"display": "永豐證券（台股）",   "abbr": "永",  "color": "#003D82", "fg": "#fff"},
+    "fubon":      {"display": "富邦證券（台股）",   "abbr": "富",  "color": "#0a5e3e", "fg": "#fff"},
 }
 
 CATEGORY_ORDER = {"crypto": 0, "us_stock": 1, "tw_stock": 2}

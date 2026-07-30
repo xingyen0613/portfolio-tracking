@@ -64,6 +64,15 @@ uv run alembic upgrade head
 - Login session 共用，整個 batch 只 login 一次（`_get_shioaji_api` 以 api_key 為 key cache）
 - `SINOPAC_SIMULATION` env flag 可切換 simulation / production 模式（Zeabur 上不設則預設 production）
 
+### 富邦證券（Fubon Neo API）Connector
+- `apikey_login`（唯讀 API Key + .pfx 電子交易憑證），**電子平台密碼不進系統**；權限實測證據見 docs/fubon-api-poc.md（SDK 無出金介面、唯讀 key 下單被權限層拒絕）
+- credentials schema：`{fubon_id, api_key, cert_pfx_b64, cert_password?}`（cert_password 空 = 身分證號）；憑證 base64 解回 0600 暫存檔登入，用畢即刪
+- 範圍只做**現股+零股**：`inventories` 的 `today_qty + odd.today_qty` 相加；order_type 非 Stock（Margin/Short/DayTrade/SBL）略過並留 log
+- 定價：`unrealized_gains_and_loses` 反推市值（cost×qty+損益），**不打外部查價**；platform 價格回存 price_cache；ENABLED_PLATFORMS 中 fubon 排在 sinopac 之後（cache 熱）
+- SDK 回傳 pyo3 原生物件（無 `__dict__`/`model_dump`）：序列化用 `dir()+getattr`，enum 以 `str(v).startswith(型別名+'.')` 判別（dir() 展開 enum 會遞迴）
+- `fubon-neo` 不在 PyPI：官方 binary whl 放 `vendor/`（Linux x86_64），Dockerfile 安裝；本機 macOS arm64 另裝
+- 新增平台清單共**六處**：settings.py（ENABLED_PLATFORMS + PLATFORM_CATEGORY）、run_batch.py（dispatch + account tuple + implemented）、internal.py `_DAILY_PLATFORMS`、app/jobs/scheduler.py `implemented`、admin.py `_IMPLEMENTED`、holdings.py 顯示 meta；刪除級聯要加 connectors.py `EXCHANGE_LIKE_PLATFORMS`
+
 ### Yuanta net_asset 計算
 - 公式：`market_value + other_assets + cum_cash − margin_balance`
   - `market_value`：自有 + 擔保品 × 每日股價

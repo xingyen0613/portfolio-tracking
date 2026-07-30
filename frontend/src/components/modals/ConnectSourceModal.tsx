@@ -10,6 +10,7 @@ import ApiKeyForm from '../connectors/ApiKeyForm'
 import AddressForm from '../connectors/AddressForm'
 import IBKRForm from '../connectors/IBKRForm'
 import SinopacForm from '../connectors/SinopacForm'
+import FubonForm from '../connectors/FubonForm'
 import YuantaForm from '../connectors/YuantaForm'
 import EmailForm from '../connectors/EmailForm'
 import ManualForm from '../connectors/ManualForm'
@@ -315,6 +316,9 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
         )}
         {t.auth === 'sinopac' && (
           <SinopacForm credentials={credentials} setCredential={setCredential} />
+        )}
+        {t.auth === 'fubon' && (
+          <FubonForm credentials={credentials} setCredential={setCredential} />
         )}
         {t.auth === 'yuanta' && <YuantaForm />}
         {t.auth === 'email' && <EmailForm template={t} />}

@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
 
+from app.utils.fx import ensure_updated
 from config.db import get_conn
 from config.settings import ENABLED_PLATFORMS, ENV_PATH, PLATFORM_CATEGORY, WALLETS_ENV_PATH
 
@@ -127,6 +128,9 @@ def _instantiate_connectors(platform: str, credentials: dict, account_key: str) 
     if platform == "sinopac":
         from app.connectors.sinopac_connector import SinopacStockConnector
         return [SinopacStockConnector(credentials, account_key=account_key)]
+    if platform == "fubon":
+        from app.connectors.fubon_connector import FubonConnector
+        return [FubonConnector(credentials, account_key=account_key)]
     if platform == "yuanta":
         from app.connectors.yuanta_connector import YuantaConnector
         return [YuantaConnector(credentials, account_key=account_key)]
@@ -345,6 +349,15 @@ def run_batch(platforms: list[str], user_id: str,
     print(f"\n[Batch {batch_id[:8]}] user={user_id[:8]} starting — {started_at}")
     print(f"Platforms: {', '.join(platforms)}\n")
 
+    # Refresh FX rates as part of the daily batch (primary refresh point).
+    # ensure_updated() is self-guarding: it only hits the network when the DB
+    # rate is stale, so running it per-user is a no-op after the first call.
+    # Never let an FX fetch failure abort the batch.
+    try:
+        ensure_updated()
+    except Exception as e:
+        print(f"[Batch {batch_id[:8]}] FX refresh skipped: {e}")
+
     with get_conn() as conn:
         conn.execute(
             "INSERT INTO batches (id, started_at, status, user_id) VALUES (%s,%s,%s,%s)",
@@ -367,7 +380,7 @@ def run_batch(platforms: list[str], user_id: str,
 
             # Ensure accounts row exists for this connector
             try:
-                if platform in ("binance", "okx", "mexc", "bybit", "pionex", "ibkr", "sinopac", "yuanta"):
+                if platform in ("binance", "okx", "mexc", "bybit", "pionex", "ibkr", "sinopac", "fubon", "yuanta"):
                     _ensure_exchange_or_ibkr_account(platform, account_key, label, user_id)
                 elif platform == "sol_wallet":
                     addresses = creds.get("addresses") or [
@@ -475,7 +488,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     platforms = [args.platform] if args.platform else ENABLED_PLATFORMS
-    implemented = {"binance", "okx", "mexc", "bybit", "pionex", "sui_wallet", "sol_wallet", "ibkr", "evm_wallet", "sinopac", "yuanta"}
+    implemented = {"binance", "okx", "mexc", "bybit", "pionex", "sui_wallet", "sol_wallet", "ibkr", "evm_wallet", "sinopac", "fubon", "yuanta"}
     platforms = [p for p in platforms if p in implemented]
 
     if not platforms:

@@ -14,7 +14,7 @@ from config.settings import ENABLED_PLATFORMS, SCHEDULER_SECRET
 router = APIRouter()
 log = logging.getLogger(__name__)
 
-_DAILY_PLATFORMS = {"binance", "okx", "mexc", "bybit", "sol_wallet", "sui_wallet", "ibkr", "evm_wallet", "sinopac"}
+_DAILY_PLATFORMS = {"binance", "okx", "mexc", "bybit", "sol_wallet", "sui_wallet", "ibkr", "evm_wallet", "sinopac", "fubon"}
 
 
 class TriggerRequest(BaseModel):

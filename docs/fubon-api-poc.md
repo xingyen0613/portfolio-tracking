@@ -71,13 +71,22 @@
 3. API Key 設**僅查詢**權限；憑證有**效期**（約 1 年）、key **可隨時撤銷**。
 
 ### 殘留風險（待正式上線前確認）
-- **出金能力**：無法從文件 100% 確認「API 是否可能出金 / 唯讀 key 是否徹底無此能力」。牽涉資金，上線前應請用戶或本方**直接向富邦書面確認**。
+- **出金能力**：✅ 已於 2026-07-15 實測排除（見下節）。
 - 憑證有效期內三樣全洩 → 攻擊者可見持倉（隱私洩漏），但動不了資金；撤銷 key 即失效。
+
+### 2026-07-15 權限範圍實測（scripts/fubon_key_scope_probe.py）
+| 驗證項 | 方法 | 結果 |
+|--|--|--|
+| SDK 有無出金介面 | 枚舉 sdk / sdk.stock / sdk.accounting / sdk.futopt 全部 91 個公開方法，掃 withdraw/transfer/deposit/remit 等關鍵字 | ✅ 零命中——SDK 能力僅限下單、帳務查詢、行情，**沒有任何資金移轉介面** |
+| 唯讀 key 能否下單 | 用唯讀 key `place_order`（無效代號 0000 雙保險） | ✅ 被權限層擋下：`此 API KEY 未授權該功能`（未進訂單驗證） |
+| 對照組 | 同一把 key `inventories` | ✅ is_success=True（4 筆持倉），證明擋的是權限非連線 |
+
+補充：金鑰權限在富邦後台申請時設定（可限僅查詢、IP 白名單、效期，[金鑰申請及管理](https://www.fbs.com.tw/TradeAPI/docs/key/)），SDK/文檔**無**查詢金鑰 scope 的 API，key 權限內容以後台「查看管理」頁為準。
 
 **結論**：走「唯讀 API Key + IP 白名單 + 不存電子平台密碼 + 加密儲存」，憑證託管屬**可控的隱私風險，非資金風險**。是否接入為商業/風險決策。
 
-## 4. 待辦（若決定正式接入）
-- [ ] 用戶到富邦後台補開 API Key 的 `maintenance`（維持率/負債）與歷史查詢 scope，再驗證這兩塊
-- [ ] 向富邦確認出金風險（見殘留風險）
-- [ ] 取得 Linux x86_64 `.whl` 供 GCP Cloud Run 部署
-- [ ] 寫正式 `FubonConnector`（處理整股+零股相加、市值來源、多用戶憑證加密儲存）
+## 4. 待辦（2026-07-15 正式接入完成）
+- [ ] 用戶到富邦後台補開 API Key 的 `maintenance`（維持率/負債）與歷史查詢 scope，再驗證這兩塊——**暫不需要**（帳戶只有現股，無融資）
+- [x] 出金風險：以 SDK 實測排除（見上節權限範圍實測）
+- [x] Linux x86_64 `.whl` 已進 `vendor/`，Dockerfile 安裝，Cloud Run 部署驗證通過
+- [x] 正式 `FubonConnector`（`app/connectors/fubon_connector.py`）：現股+零股相加、unrealized 反推市值、憑證 Fernet 加密儲存＋暫存檔登入；production E2E 驗證通過（715,222 TWD 與富邦 App 對帳一致）
