@@ -5,6 +5,10 @@ import { useDemo } from '../context/DemoContext'
 import { Icon } from '../components/Icon'
 import { cancelSubscription, redirectToEcpayCheckout, useEntitlement } from '../api/billing'
 
+// 綠界信用卡收款服務審核中，正式金流未開通 → 訂閱入口停用、顯示「申請中」。
+// 審核通過並完成正式環境測試後改為 false（取消訂閱按鈕不受此旗標影響）。
+const CHECKOUT_PENDING = true
+
 const STATUS_LABELS: Record<string, string> = {
   active: '訂閱中',
   trialing: '試用中',
@@ -81,7 +85,11 @@ function SubscriptionSection() {
               NT$50
               <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--fg-3)' }}> / 月</span>
             </div>
-            {isDemo ? (
+            {CHECKOUT_PENDING && (isDemo || showSubscribe) ? (
+              <button className="btn btn-outline btn-sm" disabled title="金流服務審核中，尚無法訂閱">
+                申請中
+              </button>
+            ) : isDemo ? (
               <button className="btn btn-primary btn-sm" onClick={exitDemo}>
                 登入後訂閱
               </button>
@@ -98,6 +106,11 @@ function SubscriptionSection() {
         </div>
         {error && (
           <div style={{ fontSize: 12, color: 'var(--c-neg)', marginTop: 8 }}>{error}</div>
+        )}
+        {CHECKOUT_PENDING && (isDemo || showSubscribe) && (
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 8 }}>
+            金流服務審核中，開通後即可訂閱。
+          </div>
         )}
         <div style={{ borderTop: '1px solid var(--bdr)', marginTop: 14, paddingTop: 14 }}>
           <div style={{ fontSize: 12, color: 'var(--fg-2)', marginBottom: 6 }}>
