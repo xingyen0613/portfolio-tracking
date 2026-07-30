@@ -3,6 +3,7 @@ import axios from 'axios'
 import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../auth/AuthContext'
 import { useDemo } from '../context/DemoContext'
+import Footer from '../components/Footer'
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -137,12 +138,17 @@ export default function LoginPage() {
             >
               By continuing you agree to our
               <br />
-              <span style={{ color: 'var(--fg-2)' }}>Terms</span> ·{' '}
-              <span style={{ color: 'var(--fg-2)' }}>Privacy</span>
+              <a className="legal-inline-link" href="/terms" target="_blank" rel="noopener noreferrer">
+                Terms
+              </a>{' '}
+              ·{' '}
+              <a className="legal-inline-link" href="/privacy" target="_blank" rel="noopener noreferrer">
+                Privacy
+              </a>
             </div>
           </div>
 
-          <div className="m-foot">© 2026 ALL IN</div>
+          <Footer compact />
         </div>
       </div>
     </div>

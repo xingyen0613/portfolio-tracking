@@ -98,6 +98,13 @@ function SubscriptionSection() {
             <li>細部持倉明細</li>
             <li>各項 benchmark 回測比較</li>
           </ul>
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 10 }}>
+            可隨時取消，取消後不再扣款、本期可用至期末。詳見{' '}
+            <a href="/refund" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+              退款政策
+            </a>
+            。
+          </div>
         </div>
       </div>
     </>
@@ -138,30 +145,6 @@ export default function SettingsTab() {
       </div>
 
       <SubscriptionSection />
-
-      <h3 style={{ marginTop: 24 }}>Support</h3>
-      <p className="muted">問題回報、功能建議或訂閱相關問題，歡迎直接聯絡。</p>
-      <div className="card card-pad">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <span style={{ color: 'var(--fg-3)', width: 64, flexShrink: 0 }}>Mail</span>
-            <a href="mailto:xingyen0613@gmail.com" style={{ color: 'var(--accent)' }}>
-              xingyen0613@gmail.com
-            </a>
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <span style={{ color: 'var(--fg-3)', width: 64, flexShrink: 0 }}>Telegram</span>
-            <a
-              href="https://t.me/xingyen0613"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: 'var(--accent)' }}
-            >
-              @xingyen0613
-            </a>
-          </div>
-        </div>
-      </div>
 
       <h3 style={{ marginTop: 24, color: 'var(--c-neg)' }}>Danger zone</h3>
       <p className="muted">Sign out of this device.</p>
