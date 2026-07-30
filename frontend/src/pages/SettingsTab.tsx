@@ -15,7 +15,7 @@ const STATUS_LABELS: Record<string, string> = {
   past_due: '扣款失敗（寬限中）',
   canceled: '已取消',
   none: '未訂閱',
-  unenforced: '未啟用收費',
+  unenforced: '尚未開放訂閱',
 }
 
 function SubscriptionSection() {
