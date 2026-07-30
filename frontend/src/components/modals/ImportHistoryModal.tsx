@@ -60,7 +60,7 @@ export default function ImportHistoryModal({ connector, close }: Props) {
       const detail = err.response?.data?.detail
       setError(typeof detail === 'string' ? detail : err.message)
     } else {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      setError(err instanceof Error ? err.message : '上傳失敗')
     }
   }
 
@@ -102,14 +102,14 @@ export default function ImportHistoryModal({ connector, close }: Props) {
   // ── checking / uploading ────────────────────────────────────────────────
   if (phase === 'checking' || phase === 'uploading') {
     const msg = phase === 'checking'
-      ? 'Checking for conflicts…'
-      : 'Uploading and processing your CSV. This may take a few seconds for large files.'
+      ? '檢查衝突中…'
+      : '正在上傳並處理您的 CSV，檔案較大時可能需要幾秒鐘。'
     return (
       <div className="modal">
         <div className="modal-head">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div className="platform-abbr" style={{ background: color, color: textColor }}>{abbr}</div>
-            <div className="modal-title">{phase === 'checking' ? 'Checking…' : 'Importing history…'}</div>
+            <div className="modal-title">{phase === 'checking' ? '檢查中…' : '匯入歷史資料中…'}</div>
           </div>
         </div>
         <div className="modal-body">
@@ -122,7 +122,7 @@ export default function ImportHistoryModal({ connector, close }: Props) {
             <div>{msg}</div>
             {phase === 'checking' && (
               <div style={{ marginTop: 6, fontSize: 12, color: 'var(--fg-3)' }}>
-                Please don't close this window while checking.
+                檢查期間請勿關閉此視窗。
               </div>
             )}
           </div>
@@ -139,7 +139,7 @@ export default function ImportHistoryModal({ connector, close }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div className="platform-abbr" style={{ background: color, color: textColor }}>{abbr}</div>
             <div>
-              <div className="modal-title">Duplicate dates found</div>
+              <div className="modal-title">發現重複日期</div>
               <div className="modal-sub">{name}</div>
             </div>
           </div>
@@ -151,8 +151,7 @@ export default function ImportHistoryModal({ connector, close }: Props) {
             border: '1px solid rgba(240,162,60,0.35)',
             color: 'var(--c-crypto)', fontSize: 13, marginBottom: 12,
           }}>
-            {conflictingDates.length} {conflictingDates.length === 1 ? 'date' : 'dates'} in your CSV already have data.
-            How would you like to handle them?
+            您的 CSV 中有 {conflictingDates.length} 個日期已存在資料，要如何處理？
           </div>
           <div
             style={{
@@ -167,18 +166,18 @@ export default function ImportHistoryModal({ connector, close }: Props) {
           </div>
         </div>
         <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={close}>Cancel</button>
+          <button className="btn btn-ghost" onClick={close}>取消</button>
           <button
             className="btn btn-ghost"
             onClick={() => importMut.mutate('skip')}
           >
-            Skip duplicates
+            略過重複
           </button>
           <button
             className="btn btn-primary"
             onClick={() => importMut.mutate('override')}
           >
-            Override existing
+            覆蓋現有資料
           </button>
         </div>
       </div>
@@ -195,7 +194,7 @@ export default function ImportHistoryModal({ connector, close }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div className="platform-abbr" style={{ background: color, color: textColor }}>{abbr}</div>
             <div>
-              <div className="modal-title">Import complete</div>
+              <div className="modal-title">匯入完成</div>
               <div className="modal-sub">{name}</div>
             </div>
           </div>
@@ -210,7 +209,7 @@ export default function ImportHistoryModal({ connector, close }: Props) {
             fontSize: 13, lineHeight: 1.6,
           }}>
             <div style={{ fontWeight: 600, marginBottom: 4 }}>
-              {result.written_count} {result.written_count === 1 ? 'row' : 'rows'} written
+              已寫入 {result.written_count} 筆
             </div>
             {result.date_from && result.date_to && (
               <div style={{ color: 'var(--fg-2)' }}>{result.date_from} → {result.date_to}</div>
@@ -220,7 +219,7 @@ export default function ImportHistoryModal({ connector, close }: Props) {
           {hasSkipped && (
             <div style={{ marginTop: 10 }}>
               <div style={{ fontSize: 12, color: 'var(--fg-2)', marginBottom: 4 }}>
-                {result.skipped_count} {result.skipped_count === 1 ? 'date' : 'dates'} skipped (existing data preserved)
+                略過 {result.skipped_count} 個日期（保留原有資料）
               </div>
               <div style={{
                 maxHeight: 80, overflowY: 'auto',
@@ -237,7 +236,7 @@ export default function ImportHistoryModal({ connector, close }: Props) {
           {hasInvalid && (
             <div style={{ marginTop: 10 }}>
               <div style={{ fontSize: 12, color: 'var(--c-neg)', marginBottom: 4 }}>
-                {result.invalid_rows.length} {result.invalid_rows.length === 1 ? 'row' : 'rows'} could not be parsed
+                {result.invalid_rows.length} 筆資料無法解析
               </div>
               <div style={{
                 maxHeight: 80, overflowY: 'auto',
@@ -245,14 +244,14 @@ export default function ImportHistoryModal({ connector, close }: Props) {
                 background: 'var(--surf-2)', borderRadius: 6, padding: '6px 8px',
               }}>
                 {result.invalid_rows.map(r => (
-                  <div key={r.row_num}>Row {r.row_num}: {r.reason}</div>
+                  <div key={r.row_num}>第 {r.row_num} 列：{r.reason}</div>
                 ))}
               </div>
             </div>
           )}
         </div>
         <div className="modal-foot">
-          <button className="btn btn-primary" onClick={close}>Done</button>
+          <button className="btn btn-primary" onClick={close}>完成</button>
         </div>
       </div>
     )
@@ -267,7 +266,7 @@ export default function ImportHistoryModal({ connector, close }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div className="platform-abbr" style={{ background: color, color: textColor }}>{abbr}</div>
           <div>
-            <div className="modal-title">Import history</div>
+            <div className="modal-title">匯入歷史資料</div>
             <div className="modal-sub">{name}{connector.account_label ? ` · ${connector.account_label}` : ''}</div>
           </div>
         </div>
@@ -282,21 +281,21 @@ export default function ImportHistoryModal({ connector, close }: Props) {
           border: '1px solid var(--bdr)',
           fontSize: 12, color: 'var(--fg-2)', lineHeight: 1.6, marginBottom: 14,
         }}>
-          <div style={{ fontWeight: 600, color: 'var(--fg)', marginBottom: 4 }}>CSV format</div>
+          <div style={{ fontWeight: 600, color: 'var(--fg)', marginBottom: 4 }}>CSV 格式</div>
           <code style={{ display: 'block', color: 'var(--fg-3)', fontSize: 11 }}>
             date,total_value{'\n'}
             2024-01-01,50000{'\n'}
             2024-01-02,51200.50
           </code>
           <div style={{ marginTop: 6 }}>
-            Two columns required: <code>date</code> (YYYY-MM-DD) and <code>total_value</code>.
-            Max 5,000 rows · 5 MB.
+            需包含兩欄：<code>date</code>（YYYY-MM-DD）與 <code>total_value</code>。
+            最多 5,000 筆 · 5 MB。
           </div>
         </div>
 
         {/* File drop zone — input overlay covers the zone so any click opens file dialog */}
         <div className="field">
-          <label className="field-label">CSV file</label>
+          <label className="field-label">CSV 檔案</label>
           <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -331,7 +330,7 @@ export default function ImportHistoryModal({ connector, close }: Props) {
             />
             <Icon name="upload" />
             <span style={{ fontSize: 13, color: file ? 'var(--fg)' : 'var(--fg-2)', pointerEvents: 'none' }}>
-              {file ? file.name : 'Drop CSV here or click to browse'}
+              {file ? file.name : '拖曳 CSV 至此或點擊瀏覽'}
             </span>
             {file && (
               <span style={{ fontSize: 11, color: 'var(--fg-3)', pointerEvents: 'none' }}>
@@ -343,14 +342,14 @@ export default function ImportHistoryModal({ connector, close }: Props) {
 
         {/* Currency */}
         <div className="field">
-          <label className="field-label">Currency of values in CSV</label>
+          <label className="field-label">CSV 金額幣別</label>
           <select
             className="select"
             value={currency}
             onChange={e => setCurrency(e.target.value as 'USD' | 'TWD')}
           >
-            <option value="USD">USD (US Dollar)</option>
-            <option value="TWD">TWD (Taiwan Dollar — auto-converted to USD)</option>
+            <option value="USD">USD（美元）</option>
+            <option value="TWD">TWD（新台幣，自動換算為美元）</option>
           </select>
         </div>
 
@@ -367,13 +366,13 @@ export default function ImportHistoryModal({ connector, close }: Props) {
       </div>
 
       <div className="modal-foot">
-        <button className="btn btn-ghost" onClick={close}>Cancel</button>
+        <button className="btn btn-ghost" onClick={close}>取消</button>
         <button
           className="btn btn-primary"
           onClick={() => checkMut.mutate()}
           disabled={!canSubmit}
         >
-          Import
+          匯入
         </button>
       </div>
     </div>

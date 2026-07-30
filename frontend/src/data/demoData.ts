@@ -235,7 +235,7 @@ export const DEMO_HOLDINGS = {
       color: '#f3ba2f', fg: '#000', category: 'crypto',
       total_usd: 27500,
       sections: [{
-        label: 'Spot', total_usd: 27500,
+        label: '現貨', total_usd: 27500,
         rows: [
           { symbol: 'BTC', name: 'Bitcoin',  quantity: '0.28', price: '$65,000', value_usd: 18200 },
           { symbol: 'ETH', name: 'Ethereum', quantity: '2.5',  price: '$2,800',  value_usd: 7000  },
@@ -244,17 +244,17 @@ export const DEMO_HOLDINGS = {
       }],
     },
     {
-      name: 'evm_wallet', display: 'ETH Wallet', abbr: 'ETH',
+      name: 'evm_wallet', display: 'ETH 錢包', abbr: 'ETH',
       color: '#627eea', fg: '#fff', category: 'crypto',
       total_usd: 5500,
       accounts: [{
         account_key: '0x742d35Cc6634C0532925a3b8D4C2C4e1DB9Cc5e8_ethereum',
         address: '0x742d35Cc6634C0532925a3b8D4C2C4e1DB9Cc5e8',
         chain: 'ethereum',
-        label: 'Main Wallet',
+        label: '主錢包',
         total_usd: 5500,
         sections: [{
-          label: 'Tokens', total_usd: 5500,
+          label: '代幣', total_usd: 5500,
           rows: [
             { symbol: 'ETH',  name: 'Ethereum', quantity: '1.5',   price: '$2,800', value_usd: 4200 },
             { symbol: 'USDC', name: 'USD Coin', quantity: '1,000', price: '$1.00',  value_usd: 1000 },
@@ -268,7 +268,7 @@ export const DEMO_HOLDINGS = {
       color: '#c8102e', fg: '#fff', category: 'us_stock',
       total_usd: latest.us_stock,
       sections: [{
-        label: 'US Stocks', total_usd: latest.us_stock,
+        label: '美股', total_usd: latest.us_stock,
         rows: [
           { symbol: 'MSFT', name: 'Microsoft',        quantity: '20', price: '$375.00', value_usd: 7500 },
           { symbol: 'SPY',  name: 'SPDR S&P 500 ETF', quantity: '12', price: '$556.00', value_usd: 6672 },
@@ -283,7 +283,7 @@ export const DEMO_HOLDINGS = {
       color: '#e31e24', fg: '#fff', category: 'tw_stock',
       total_usd: latest.tw_stock,
       sections: [{
-        label: 'TW Stocks', total_usd: latest.tw_stock,
+        label: '台股', total_usd: latest.tw_stock,
         rows: [
           { symbol: '2330', name: '台積電', quantity: '210', price: 'TWD 940', value_usd: 6169 },
           { symbol: '2454', name: '聯發科', quantity: '100', price: 'TWD 580', value_usd: 1813 },

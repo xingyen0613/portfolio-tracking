@@ -94,8 +94,8 @@ export default function Sidebar({ route, setRoute }: Props) {
             <div className="user-avatar">{initials}</div>
           )}
           <div className="user-meta">
-            <div className="user-name">{user?.name || user?.email || 'User'}</div>
-            <div className="user-plan">Manage account</div>
+            <div className="user-name">{user?.name || user?.email || '使用者'}</div>
+            <div className="user-plan">管理帳戶</div>
           </div>
           <Icon name="chevronR" className="user-chev" />
         </div>

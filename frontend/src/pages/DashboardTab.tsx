@@ -35,7 +35,7 @@ export default function DashboardTab({ openModal }: Props) {
     return (
       <div className="dashboard-loading">
         <div className="spinner" />
-        <div className="load-label">Loading your portfolio…</div>
+        <div className="load-label">載入您的資產中…</div>
       </div>
     )
   }
@@ -44,9 +44,9 @@ export default function DashboardTab({ openModal }: Props) {
     return (
       <EmptyState
         icon="plug"
-        title="Connect your first source"
-        description="Add an exchange, wallet or broker to start tracking your portfolio in one place. Your data syncs automatically every day."
-        ctaLabel="Add a data source"
+        title="連接您的第一個來源"
+        description="新增交易所、錢包或券商，開始在同一處追蹤您的資產。資料每天自動同步。"
+        ctaLabel="新增資料來源"
         onCta={() => openModal({ kind: 'addSource' })}
       />
     )
@@ -62,7 +62,7 @@ export default function DashboardTab({ openModal }: Props) {
         <div className="section-head">
           <div>
             <div className="section-title">Asset Trend</div>
-            <div className="section-sub">Historical value across categories</div>
+            <div className="section-sub">各類別的歷史資產走勢</div>
           </div>
         </div>
         <TrendTab />
@@ -72,7 +72,7 @@ export default function DashboardTab({ openModal }: Props) {
         <div className="section-head">
           <div>
             <div className="section-title">Allocation</div>
-            <div className="section-sub">Click any category to drill into top holdings</div>
+            <div className="section-sub">點擊任一類別可查看主要持倉明細</div>
           </div>
         </div>
         <AllocationTab />
@@ -82,7 +82,7 @@ export default function DashboardTab({ openModal }: Props) {
         <div className="section-head">
           <div>
             <div className="section-title">Holdings by Source</div>
-            <div className="section-sub">Click any platform to expand</div>
+            <div className="section-sub">點擊任一平台可展開明細</div>
           </div>
         </div>
         <HoldingsTab onAddSource={() => openModal({ kind: 'addSource' })} />

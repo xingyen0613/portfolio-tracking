@@ -85,7 +85,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
         const detail = err.response?.data?.detail
         setError(typeof detail === 'string' ? detail : err.message)
       } else {
-        setError(err instanceof Error ? err.message : 'Unknown error')
+        setError(err instanceof Error ? err.message : '未知錯誤')
       }
     },
   })
@@ -94,7 +94,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
     return (
       <div className="modal" style={{ padding: 20 }}>
         <div className="modal-head">
-          <div className="modal-title">Loading…</div>
+          <div className="modal-title">載入中…</div>
           <button className="modal-close" onClick={close}><Icon name="x" /></button>
         </div>
       </div>
@@ -104,7 +104,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
   const handleSubmit = () => {
     setError(null)
     if (!accountLabel.trim()) {
-      setError('Connection name is required.')
+      setError('請輸入連接名稱。')
       return
     }
     mut.mutate({ account_label: accountLabel.trim(), credentials })
@@ -121,7 +121,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
             {t.abbr}
           </div>
           <div>
-            <div className="modal-title">Edit {t.name}</div>
+            <div className="modal-title">編輯 {t.name}</div>
             <div className="modal-sub">{t.desc}</div>
           </div>
         </div>
@@ -130,11 +130,11 @@ export default function EditSourceModal({ connectorId, close }: Props) {
 
       <div className="modal-body">
         {isLoading ? (
-          <div style={{ color: 'var(--fg-3)', textAlign: 'center', padding: 24 }}>Loading…</div>
+          <div style={{ color: 'var(--fg-3)', textAlign: 'center', padding: 24 }}>載入中…</div>
         ) : (
           <>
             <div className="field">
-              <label className="field-label">Connection name</label>
+              <label className="field-label">連接名稱</label>
               <input
                 className="input"
                 value={accountLabel}
@@ -154,7 +154,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
                 marginBottom: 4,
               }}
             >
-              All fields are pre-filled. Leave any field blank to keep the current value.
+              所有欄位已預先填入，若要保留原值，留空即可。
             </div>
 
             {t.auth === 'apikey' && (
@@ -224,14 +224,14 @@ export default function EditSourceModal({ connectorId, close }: Props) {
 
       <div className="modal-foot">
         <button className="btn btn-ghost" onClick={close} disabled={mut.isPending}>
-          Cancel
+          取消
         </button>
         <button
           className="btn btn-primary"
           onClick={handleSubmit}
           disabled={mut.isPending || isLoading}
         >
-          {mut.isPending ? 'Saving…' : 'Save changes'}
+          {mut.isPending ? '儲存中…' : '儲存變更'}
         </button>
       </div>
     </div>

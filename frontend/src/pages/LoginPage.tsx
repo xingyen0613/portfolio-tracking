@@ -49,13 +49,12 @@ export default function LoginPage() {
             }}
           >
             <div className="m-headline" style={{ marginBottom: 8 }}>
-              Every account.
+              帳戶再多，
               <br />
-              One number.
+              資產一眼看懂。
             </div>
             <div className="m-sub" style={{ marginBottom: 32 }}>
-              Connect exchanges, wallets and brokers — track your full portfolio in one
-              private dashboard.
+              連接交易所、錢包與券商，在專屬儀表板一次掌握完整資產。
             </div>
 
             {loading ? (
@@ -136,14 +135,14 @@ export default function LoginPage() {
                 lineHeight: 1.5,
               }}
             >
-              By continuing you agree to our
+              繼續即代表您同意我們的
               <br />
               <a className="legal-inline-link" href="/terms" target="_blank" rel="noopener noreferrer">
-                Terms
+                服務條款
               </a>{' '}
               ·{' '}
               <a className="legal-inline-link" href="/privacy" target="_blank" rel="noopener noreferrer">
-                Privacy
+                隱私權政策
               </a>
             </div>
           </div>

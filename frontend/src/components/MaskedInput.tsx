@@ -27,7 +27,7 @@ export default function MaskedInput({ className, placeholder, value, onChange, d
         type="button"
         onClick={() => setVisible(v => !v)}
         disabled={disabled || !value}
-        title={visible ? 'Hide' : 'Show'}
+        title={visible ? '隱藏' : '顯示'}
         style={{
           position: 'absolute',
           right: 8,

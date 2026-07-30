@@ -48,23 +48,23 @@ interface Props {
 }
 
 function statusOf(c: Connector): { label: string; cls: string } {
-  if (c.last_error) return { label: 'Error', cls: 'status-error' }
-  if (c.last_sync_at) return { label: 'Synced', cls: 'status-synced' }
-  return { label: 'Pending', cls: 'status-pending' }
+  if (c.last_error) return { label: '錯誤', cls: 'status-error' }
+  if (c.last_sync_at) return { label: '已同步', cls: 'status-synced' }
+  return { label: '待處理', cls: 'status-pending' }
 }
 
 function formatRelative(iso: string | null): string {
-  if (!iso) return 'Never'
+  if (!iso) return '從未'
   const t = new Date(iso).getTime()
   const diff = Date.now() - t
   if (Number.isNaN(diff)) return iso
   const min = Math.floor(diff / 60000)
-  if (min < 1) return 'Just now'
-  if (min < 60) return `${min}m ago`
+  if (min < 1) return '剛剛'
+  if (min < 60) return `${min} 分鐘前`
   const hr = Math.floor(min / 60)
-  if (hr < 24) return `${hr}h ago`
+  if (hr < 24) return `${hr} 小時前`
   const day = Math.floor(hr / 24)
-  return `${day}d ago`
+  return `${day} 天前`
 }
 
 const WALLET_PLATFORMS = new Set(['evm_wallet', 'sol_wallet', 'sui_wallet'])
@@ -95,21 +95,21 @@ function ConnectorRow({
   isDemo?: boolean
 }) {
   const status = deleting
-    ? { label: 'Removing', cls: 'status-fetching' }
+    ? { label: '移除中', cls: 'status-fetching' }
     : busy
-      ? { label: 'Fetching', cls: 'status-fetching' }
+      ? { label: '抓取中', cls: 'status-fetching' }
       : statusOf(c)
   const abbr = template?.abbr ?? c.platform_name.slice(0, 3).toUpperCase()
   const name = template?.name ?? c.platform_name
   const color = template?.color ?? '#3a3a44'
   const textColor = template?.textColor ?? '#fff'
   const typeLabel = template?.auth === 'apikey'
-    ? 'Exchange'
+    ? '交易所'
     : template?.auth === 'address'
-      ? 'Wallet'
+      ? '錢包'
       : template?.auth === 'ibkr'
-        ? 'Broker'
-        : 'Source'
+        ? '券商'
+        : '來源'
 
   return (
     <div className="row-item">
@@ -140,7 +140,7 @@ function ConnectorRow({
         <div className="row-meta">
           <span>{typeLabel}</span>
           <span>·</span>
-          <span>Last sync {formatRelative(c.last_sync_at)}</span>
+          <span>最後同步 {formatRelative(c.last_sync_at)}</span>
           {c.last_error && (
             <>
               <span>·</span>
@@ -168,7 +168,7 @@ function ConnectorRow({
             {!WALLET_PLATFORMS.has(c.platform_name) && (
               <button
                 className="icon-btn"
-                title="Import history"
+                title="匯入歷史紀錄"
                 onClick={onImport}
                 disabled={busy || deleting}
               >
@@ -187,7 +187,7 @@ function ConnectorRow({
             )}
             <button
               className="icon-btn"
-              title="Edit"
+              title="編輯"
               onClick={onEdit}
               disabled={busy || deleting}
             >
@@ -195,7 +195,7 @@ function ConnectorRow({
             </button>
             <button
               className={`icon-btn${busy ? ' btn-spinning' : ''}`}
-              title="Refresh"
+              title="重新整理"
               onClick={onRefresh}
               disabled={busy || deleting}
             >
@@ -203,7 +203,7 @@ function ConnectorRow({
             </button>
             <button
               className="icon-btn"
-              title="Remove"
+              title="移除"
               onClick={onRemove}
               disabled={busy || deleting}
             >
@@ -247,8 +247,8 @@ export default function SourcesTab({ openModal, yuantaFetchingUntil }: Props) {
     mutationFn: (id: string) => deleteConnector(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['connectors'] }),
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
-      alert(`Failed to delete connector: ${msg}`)
+      const msg = err instanceof Error ? err.message : '未知錯誤'
+      alert(`刪除連接器失敗：${msg}`)
     },
   })
 
@@ -266,10 +266,10 @@ export default function SourcesTab({ openModal, yuantaFetchingUntil }: Props) {
     const label = c.account_label || c.platform_name
     if (
       !confirm(
-        `Remove "${label}"?\n\nThis will also delete all historical data ` +
-          `(holdings, snapshots, source runs) belonging to this connector.\n` +
-          `Other connectors and your account-level history are not affected.\n\n` +
-          `This action cannot be undone.`,
+        `確定要移除「${label}」？\n\n這將同時刪除此連接器所屬的所有歷史資料` +
+          `（持倉、快照、來源紀錄）。\n` +
+          `其他連接器與帳戶層級的歷史紀錄不受影響。\n\n` +
+          `此操作無法復原。`,
       )
     )
       return
@@ -282,33 +282,33 @@ export default function SourcesTab({ openModal, yuantaFetchingUntil }: Props) {
         <div>
           <div className="section-title">Connected Sources</div>
           <div className="section-sub">
-            {connectors ? `${connectors.length} sources` : 'Loading...'}
-            {' · '}sync history and credentials
+            {connectors ? `${connectors.length} 個來源` : '載入中...'}
+            {' · '}同步紀錄與憑證
           </div>
         </div>
         <button
           className="btn btn-primary btn-sm"
           onClick={() => openModal({ kind: 'addSource' })}
         >
-          <Icon name="plus" /> Add source
+          <Icon name="plus" /> 新增來源
         </button>
       </div>
 
       {error && (
         <div className="card card-pad" style={{ color: 'var(--c-neg)' }}>
-          Failed to load connectors: {(error as Error).message}
+          載入連接器失敗：{(error as Error).message}
         </div>
       )}
 
       {isLoading && (
         <div className="card card-pad" style={{ color: 'var(--fg-3)', textAlign: 'center', padding: 48 }}>
-          Loading…
+          載入中…
         </div>
       )}
 
       {connectors && connectors.length === 0 && (
         <div className="card card-pad" style={{ color: 'var(--fg-3)', textAlign: 'center', padding: 48 }}>
-          No sources connected yet. Click <strong>Add source</strong> above to get started.
+          尚未連接任何來源，點擊上方「<strong>新增來源</strong>」開始使用。
         </div>
       )}
 

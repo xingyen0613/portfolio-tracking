@@ -31,7 +31,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
   // the gate while loading, and while demo mode has its own gate). Backend enforces regardless.
   const subGateActive = !isDemo && entitlement !== undefined && !entitlement.active
 
-  const [accountLabel, setAccountLabel] = useState(t ? `${t.name} — Main` : 'Main')
+  const [accountLabel, setAccountLabel] = useState(t ? `${t.name} — 主帳戶` : '主帳戶')
   const [credentials, setCredentials] = useState<Record<string, unknown>>({})
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
@@ -99,8 +99,8 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
             ? (detail as { fetch_error?: string }).fetch_error
             : detail
           setWarning(
-            `Credentials saved but the initial sync failed: ${fetchErr ?? 'unknown error'}. ` +
-              'The next scheduled sync will try again — you can also click Refresh from Sources.',
+            `憑證已儲存，但首次同步失敗：${fetchErr ?? '未知錯誤'}。` +
+              '下次排程同步會自動重試，您也可以到「來源」頁面點擊重新整理。',
           )
           qc.invalidateQueries({ queryKey: ['connectors'] })
           return
@@ -112,7 +112,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
         setError(err.message)
         return
       }
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : '未知錯誤')
     },
   })
 
@@ -120,7 +120,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
     return (
       <div className="modal" style={{ padding: 20 }}>
         <div className="modal-head">
-          <div className="modal-title">Unknown source</div>
+          <div className="modal-title">未知的來源</div>
           <button className="modal-close" onClick={close}>
             <Icon name="x" />
           </button>
@@ -144,7 +144,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
               {t.abbr}
             </div>
             <div>
-              <div className="modal-title">Syncing {t.name} in background…</div>
+              <div className="modal-title">背景同步 {t.name} 中…</div>
               <div className="modal-sub">{t.desc}</div>
             </div>
           </div>
@@ -164,18 +164,16 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
               lineHeight: 1.55,
             }}
           >
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>First sync in progress</div>
-            We're fetching balances now. Wallet syncs query every chain in parallel and may take
-            10–30 seconds.
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>首次同步進行中</div>
+            系統正在抓取餘額。錢包同步會平行查詢每條鏈，可能需要 10–30 秒。
             <div style={{ marginTop: 8, color: 'var(--fg-2)' }}>
-              You can close this window — the sync continues in the background and your Dashboard
-              will update automatically when it finishes.
+              您可以關閉此視窗，同步會在背景繼續進行，完成後 Dashboard 會自動更新。
             </div>
           </div>
         </div>
         <div className="modal-foot">
           <button className="btn btn-primary" onClick={close}>
-            Close
+            關閉
           </button>
         </div>
       </div>
@@ -201,15 +199,15 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
         ? 'rgba(240,162,60,0.35)'
         : 'rgba(46,184,138,0.35)'
     const heading = isPending
-      ? `${t.name} added — first sync still running`
+      ? `${t.name} 已新增 — 首次同步仍在進行`
       : isPartial
-        ? `${t.name} added with partial data`
-        : `${t.name} connected`
+        ? `${t.name} 已新增，部分資料不完整`
+        : `${t.name} 已連接`
     const message = isPending
-      ? 'Credentials saved. The first sync is taking longer than usual and is still running in the background. Holdings will appear in Sources & Dashboard once it finishes.'
+      ? '憑證已儲存。首次同步耗時較長，仍在背景執行中，完成後持倉會顯示在「來源」與 Dashboard。'
       : isPartial
-        ? 'Credentials saved and the initial sync completed, but some sub-accounts returned partial data. Check the Sources tab for details.'
-        : 'Credentials saved and the first sync completed successfully. Holdings are now visible in your Dashboard.'
+        ? '憑證已儲存，首次同步已完成，但部分子帳戶回傳資料不完整，請至「來源」頁面查看詳情。'
+        : '憑證已儲存，首次同步已成功完成，持倉現在會顯示在您的 Dashboard。'
     return (
       <div className="modal">
         <div className="modal-head">
@@ -243,7 +241,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
         </div>
         <div className="modal-foot">
           <button className="btn btn-primary" onClick={close}>
-            Done
+            完成
           </button>
         </div>
       </div>
@@ -255,7 +253,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
     setWarning(null)
     if (!canSubmit) return
     if (!accountLabel.trim()) {
-      setError('Connection name is required.')
+      setError('請輸入連接名稱。')
       return
     }
     mut.mutate({
@@ -272,7 +270,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
           <button
             className="modal-close"
             onClick={() => setModal({ kind: 'addSource' })}
-            title="Back"
+            title="返回"
           >
             <Icon name="chevronL" />
           </button>
@@ -280,7 +278,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
             {t.abbr}
           </div>
           <div>
-            <div className="modal-title">Connect {t.name}</div>
+            <div className="modal-title">連接 {t.name}</div>
             <div className="modal-sub">{t.desc}</div>
           </div>
         </div>
@@ -292,16 +290,16 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
       <div className="modal-body">
         {t.auth !== 'yuanta' && (
           <div className="field">
-            <label className="field-label">Connection name</label>
+            <label className="field-label">連接名稱</label>
             <input
               className="input"
-              placeholder={`${t.name} — Main`}
+              placeholder={`${t.name} — 主帳戶`}
               value={accountLabel}
               onChange={e => setAccountLabel(e.target.value)}
               disabled={!canSubmit}
             />
             <div className="field-hint">
-              Helps you tell multiple {t.name} accounts apart. Must be unique within {t.name}.
+              方便您區分多個 {t.name} 帳戶，同一個 {t.name} 底下需唯一。
             </div>
           </div>
         )}
@@ -384,7 +382,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
           )}
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-ghost" onClick={close} disabled={mut.isPending}>
-              Cancel
+              取消
             </button>
             {isDemo ? (
               <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -396,7 +394,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
                     setTimeout(() => setDemoFlash(false), 1400)
                   }}
                 >
-                  Connect & sync
+                  連接並同步
                 </button>
                 {demoFlash && (
                   <div style={{
@@ -428,7 +426,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
                     setTimeout(() => setSubFlash(false), 1400)
                   }}
                 >
-                  Connect & sync
+                  連接並同步
                 </button>
                 {subFlash && (
                   <div style={{
@@ -448,7 +446,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
                 onClick={handleSubmit}
                 disabled={mut.isPending || !canSubmit}
               >
-                {mut.isPending ? 'Connecting…' : canSubmit ? 'Connect & sync' : 'Coming soon'}
+                {mut.isPending ? '連接中…' : canSubmit ? '連接並同步' : '即將推出'}
               </button>
             )}
           </div>

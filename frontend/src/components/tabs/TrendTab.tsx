@@ -455,7 +455,7 @@ export default function TrendTab() {
 
         <div className="trend-chip-group" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="trend-divider" style={{ width: 1, height: 16, background: 'var(--bdr)', margin: '0 4px' }} />
-          <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.5px' }}>BENCHMARK</span>
+          <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.5px' }}>比較基準</span>
           {B_TICKERS.map(t => chip(B_LABELS[t], B_COLORS[t], mode === 'return' && bVis[t], true, () => {
             if (mode !== 'return') {
               setMode('return')

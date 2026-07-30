@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthContext'
+import { useDemo } from '../context/DemoContext'
 import { Icon } from '../components/Icon'
 import { cancelSubscription, redirectToEcpayCheckout, useEntitlement } from '../api/billing'
 
@@ -15,11 +16,14 @@ const STATUS_LABELS: Record<string, string> = {
 
 function SubscriptionSection() {
   const queryClient = useQueryClient()
+  const { isDemo, exitDemo } = useDemo()
   const { data: entitlement, isLoading } = useEntitlement()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (isLoading || !entitlement) return null
+  // Demo mode has no token, so the entitlement query stays disabled — show the
+  // plan itself (price + benefits) and send the visitor to login to subscribe.
+  if (!isDemo && (isLoading || !entitlement)) return null
 
   const goSubscribe = async () => {
     setError(null)
@@ -48,34 +52,40 @@ function SubscriptionSection() {
     }
   }
 
-  const label = entitlement.cancel_at_period_end && entitlement.active
-    ? '已排程取消'
-    : (STATUS_LABELS[entitlement.status] ?? entitlement.status)
-  const periodEnd = entitlement.current_period_end?.slice(0, 10)
+  const label = !entitlement
+    ? STATUS_LABELS.none
+    : entitlement.cancel_at_period_end && entitlement.active
+      ? '已排程取消'
+      : (STATUS_LABELS[entitlement.status] ?? entitlement.status)
+  const periodEnd = entitlement?.current_period_end?.slice(0, 10)
   const canCancel =
-    entitlement.provider === 'ecpay' && entitlement.active && !entitlement.cancel_at_period_end
-  const showSubscribe = !entitlement.active && entitlement.status !== 'unenforced'
+    entitlement?.provider === 'ecpay' && entitlement.active && !entitlement.cancel_at_period_end
+  const showSubscribe = !entitlement || (!entitlement.active && entitlement.status !== 'unenforced')
 
   return (
     <>
       <h3 style={{ marginTop: 24 }}>Subscription</h3>
-      <p className="muted">Unlocks adding sources and daily auto-sync.</p>
+      <p className="muted">訂閱後可新增來源並啟用每日自動同步。</p>
       <div className="card card-pad">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
             {periodEnd && (
               <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
-                {entitlement.cancel_at_period_end ? '可用至' : '本期至'} {periodEnd}
+                {entitlement?.cancel_at_period_end ? '可用至' : '本期至'} {periodEnd}
               </div>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
               NT$50
-              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--fg-3)' }}> / month</span>
+              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--fg-3)' }}> / 月</span>
             </div>
-            {showSubscribe ? (
+            {isDemo ? (
+              <button className="btn btn-primary btn-sm" onClick={exitDemo}>
+                登入後訂閱
+              </button>
+            ) : showSubscribe ? (
               <button className="btn btn-primary btn-sm" onClick={goSubscribe} disabled={busy}>
                 {busy ? '前往訂閱…' : '前往訂閱'}
               </button>
@@ -123,7 +133,7 @@ export default function SettingsTab() {
   return (
     <div className="settings-block">
       <h3>Profile</h3>
-      <p className="muted">Visible inside your workspace only.</p>
+      <p className="muted">僅在您的工作區內可見。</p>
       <div className="card card-pad">
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
           {user?.picture ? (
@@ -138,7 +148,7 @@ export default function SettingsTab() {
             </div>
           )}
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.name || 'Unnamed'}</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.name || '未命名'}</div>
             <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{user?.email}</div>
           </div>
         </div>
@@ -147,10 +157,10 @@ export default function SettingsTab() {
       <SubscriptionSection />
 
       <h3 style={{ marginTop: 24, color: 'var(--c-neg)' }}>Danger zone</h3>
-      <p className="muted">Sign out of this device.</p>
+      <p className="muted">登出此裝置。</p>
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn btn-outline btn-sm" onClick={logout}>
-          <Icon name="logout" /> Sign out
+          <Icon name="logout" /> 登出
         </button>
       </div>
     </div>

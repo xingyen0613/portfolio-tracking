@@ -191,10 +191,10 @@ function AppInner() {
           }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--fg)', marginBottom: 2 }}>
-              Import complete
+              匯入完成
             </div>
             <div style={{ fontSize: 12, color: 'var(--fg-2)' }}>
-              {importToast.written_count} {importToast.written_count === 1 ? 'row' : 'rows'} written
+              已寫入 {importToast.written_count} 筆
               {importToast.date_from && importToast.date_to && (
                 <> · {importToast.date_from} → {importToast.date_to}</>
               )}

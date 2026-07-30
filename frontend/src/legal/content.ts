@@ -41,7 +41,7 @@ const terms: LegalDoc = {
   slug: 'terms',
   path: '/terms',
   title: '服務條款',
-  navLabel: 'Terms',
+  navLabel: '服務條款',
   intro: `本條款規範您使用 ${SERVICE}（以下稱「本服務」）的權利與義務。開始使用本服務，即表示您已閱讀、理解並同意本條款全部內容；若不同意，請停止使用。`,
   updated: UPDATED,
   sections: [
@@ -221,7 +221,7 @@ const privacy: LegalDoc = {
   slug: 'privacy',
   path: '/privacy',
   title: '隱私權政策',
-  navLabel: 'Privacy',
+  navLabel: '隱私權政策',
   intro: `本政策說明 ${SERVICE}（以下稱「本服務」）蒐集哪些資料、如何使用與保護，以及您可以行使哪些權利。本服務的核心是您的財務資料，我們把它當作最高規格的機密處理。`,
   updated: UPDATED,
   sections: [
@@ -380,7 +380,7 @@ const refund: LegalDoc = {
   slug: 'refund',
   path: '/refund',
   title: '退款政策',
-  navLabel: 'Refunds',
+  navLabel: '退款政策',
   intro: `本政策說明 ${SERVICE}（以下稱「本服務」）訂閱費用的取消與退款規則。訂閱費用由本服務委任之第三方金流服務商代為收取。`,
   updated: UPDATED,
   sections: [
