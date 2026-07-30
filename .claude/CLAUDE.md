@@ -83,6 +83,14 @@ uv run alembic upgrade head
 - 月底 anchor 校準：`correction = official_net_asset − pre_anchor_calc`，結構上必然把 cum_cash 拉到 0
 - yuanta 對帳單**沒有**現金存款餘額欄位、**沒有**外部出入金記錄 — 限制詳見 docs/yuanta-cumcash-known-limitations.md
 
+### 預覽模式（demo）路由與登入 popup
+- 前端無 router library，路由靠 `window.location.pathname` 判斷：legal 頁（`legal/content.ts`）、預覽頁（`frontend/src/preview.ts`）
+- `/preview/<page>` 免登入直接進預覽模式並落在該分頁（settings / sources / dashboard / alerts，相容單數形）；預覽中切分頁會 `replaceState` 同步網址，退出預覽時還原 `/`
+- 由網址進入**不跑導覽教學**（`DemoProvider initialDemo`），只有從登入頁按「預覽模式」才啟動 tour
+- 預覽模式的訂閱按鈕不受 `SettingsTab.tsx` 的 `CHECKOUT_PENDING` 影響：一律顯示可點的「登入後訂閱」→ 開 `LoginPromptModal`（與登入頁相同的 GoogleLogin），登入成功即 `exitDemo()`
+- 用途：可把 `https://allin-portfolio-tracking.pages.dev/preview/settings` 這種網址交給第三方（如金流服務商）審核，對方不需帳號即可看到訂閱方案頁
+- Cloudflare Pages 靠 `frontend/public/_redirects` 的 `/* /index.html 200` 支援子路徑直開
+
 ### Holdings API dust 過濾
 - `backend/routers/holdings.py:_build_sections` 在顯示層過濾 `|value_usd| < 5`
 - DB 仍存全量；只有 API response 過濾
