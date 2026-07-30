@@ -70,19 +70,35 @@ function SubscriptionSection() {
               </div>
             )}
           </div>
-          {showSubscribe ? (
-            <button className="btn btn-primary btn-sm" onClick={goSubscribe} disabled={busy}>
-              {busy ? '前往訂閱…' : '前往訂閱'}
-            </button>
-          ) : canCancel ? (
-            <button className="btn btn-outline btn-sm" onClick={doCancel} disabled={busy}>
-              {busy ? '處理中…' : '取消訂閱'}
-            </button>
-          ) : null}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+              $1 USD
+              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--fg-3)' }}> / month</span>
+            </div>
+            {showSubscribe ? (
+              <button className="btn btn-primary btn-sm" onClick={goSubscribe} disabled={busy}>
+                {busy ? '前往訂閱…' : '前往訂閱'}
+              </button>
+            ) : canCancel ? (
+              <button className="btn btn-outline btn-sm" onClick={doCancel} disabled={busy}>
+                {busy ? '處理中…' : '取消訂閱'}
+              </button>
+            ) : null}
+          </div>
         </div>
         {error && (
           <div style={{ fontSize: 12, color: 'var(--c-neg)', marginTop: 8 }}>{error}</div>
         )}
+        <div style={{ borderTop: '1px solid var(--bdr)', marginTop: 14, paddingTop: 14 }}>
+          <div style={{ fontSize: 12, color: 'var(--fg-2)', marginBottom: 6 }}>
+            訂閱以獲得完整的網站功能，包括：
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18, listStyle: 'disc', fontSize: 12, color: 'var(--fg-3)', lineHeight: 1.8 }}>
+            <li>每日自動跨平台紀錄資產變化</li>
+            <li>細部持倉明細</li>
+            <li>各項 benchmark 回測比較</li>
+          </ul>
+        </div>
       </div>
     </>
   )
@@ -122,6 +138,30 @@ export default function SettingsTab() {
       </div>
 
       <SubscriptionSection />
+
+      <h3 style={{ marginTop: 24 }}>Support</h3>
+      <p className="muted">問題回報、功能建議或訂閱相關問題，歡迎直接聯絡。</p>
+      <div className="card card-pad">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <span style={{ color: 'var(--fg-3)', width: 64, flexShrink: 0 }}>Mail</span>
+            <a href="mailto:xingyen0613@gmail.com" style={{ color: 'var(--accent)' }}>
+              xingyen0613@gmail.com
+            </a>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <span style={{ color: 'var(--fg-3)', width: 64, flexShrink: 0 }}>Telegram</span>
+            <a
+              href="https://t.me/xingyen0613"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--accent)' }}
+            >
+              @xingyen0613
+            </a>
+          </div>
+        </div>
+      </div>
 
       <h3 style={{ marginTop: 24, color: 'var(--c-neg)' }}>Danger zone</h3>
       <p className="muted">Sign out of this device.</p>
