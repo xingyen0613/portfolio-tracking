@@ -49,9 +49,9 @@ export default function LoginPage() {
             }}
           >
             <div className="m-headline" style={{ marginBottom: 8 }}>
-              帳戶再多，
+              All Accounts,
               <br />
-              資產一眼看懂。
+              All In One.
             </div>
             <div className="m-sub" style={{ marginBottom: 32 }}>
               連接交易所、錢包與券商，在專屬儀表板一次掌握完整資產。
