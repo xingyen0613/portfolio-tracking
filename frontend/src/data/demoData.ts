@@ -48,6 +48,8 @@ const twSeries       = genSeries(N, 7000,  8800,  150,  rng)
 const totalSeries    = cryptoSeries.map((v, i) => v + usSeries[i] + twSeries[i])
 
 const sp500Series    = genSeries(N, 5850,  6120,  40,   rng)
+const ndxSeries      = genSeries(N, 20800, 22400, 180,  rng)
+const soxSeries      = genSeries(N, 5100,  5950,  90,   rng)
 const tw0050Series   = genSeries(N, 174,   192,   1.5,  rng)
 const btcSeries      = genSeries(N, 48000, 65000, 1500, rng)
 
@@ -84,8 +86,10 @@ export const DEMO_HISTORY = {
 
 export const DEMO_BENCHMARKS = {
   benchmarks: [
-    { ticker: '^GSPC',   label: 'S&P 500', color: '#a371f7', dates: DEMO_DATES, closes: sp500Series  },
-    { ticker: '0050.TW', label: '0050',    color: '#39d353', dates: DEMO_DATES, closes: tw0050Series },
+    { ticker: '^GSPC',   label: 'S&P 500',  color: '#a371f7', dates: DEMO_DATES, closes: sp500Series  },
+    { ticker: '^NDX',    label: 'NASDAQ100', color: '#58a6ff', dates: DEMO_DATES, closes: ndxSeries   },
+    { ticker: '^SOX',    label: '費半',      color: '#e3b341', dates: DEMO_DATES, closes: soxSeries   },
+    { ticker: '0050.TW', label: '0050',     color: '#39d353', dates: DEMO_DATES, closes: tw0050Series },
     { ticker: 'BTC-USD', label: 'BTC',     color: '#f0883e', dates: DEMO_DATES, closes: btcSeries    },
   ],
 }
