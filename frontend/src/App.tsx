@@ -18,6 +18,7 @@ import AlertsTab from './pages/AlertsTab'
 import SettingsTab from './pages/SettingsTab'
 import { type ImportHistoryResult } from './api/connectors'
 import { IMPORT_HISTORY_MUTATION_KEY } from './components/modals/ImportHistoryModal'
+import { isPreviewPath, previewPath, previewRouteForPath } from './preview'
 
 export type Route = 'dashboard' | 'sources' | 'alerts' | 'settings'
 
@@ -38,18 +39,22 @@ export default function App() {
   const legalSlug = legalSlugForPath(window.location.pathname)
   if (legalSlug) return <LegalPage slug={legalSlug} />
 
+  // /preview/<route> 免登入直接進入預覽模式並落在指定分頁
+  const previewRoute = previewRouteForPath(window.location.pathname)
+
   return (
-    <DemoProvider>
-      <AppInner />
+    <DemoProvider initialDemo={previewRoute !== null}>
+      <AppInner initialRoute={previewRoute} />
     </DemoProvider>
   )
 }
 
-function AppInner() {
+function AppInner({ initialRoute }: { initialRoute: Route | null }) {
   const { token } = useAuth()
   const { isDemo } = useDemo()
   const qc = useQueryClient()
   const [route, setRoute] = useState<Route>(() => {
+    if (initialRoute) return initialRoute
     const saved = localStorage.getItem(ROUTE_KEY)
     return isRoute(saved) ? saved : 'dashboard'
   })
@@ -128,6 +133,15 @@ function AppInner() {
     localStorage.setItem(ROUTE_KEY, route)
     if (mainRef.current) mainRef.current.scrollTop = 0
   }, [route])
+
+  // 預覽模式讓網址反映當前分頁（可直接複製分享）；退出預覽時把網址還原
+  useEffect(() => {
+    if (isDemo) {
+      window.history.replaceState({}, '', previewPath(route))
+    } else if (isPreviewPath(window.location.pathname)) {
+      window.history.replaceState({}, '', '/')
+    }
+  }, [isDemo, route])
 
   if (!token && !isDemo) return <LoginPage />
 

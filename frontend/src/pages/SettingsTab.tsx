@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthContext'
 import { useDemo } from '../context/DemoContext'
 import { Icon } from '../components/Icon'
+import LoginPromptModal from '../components/modals/LoginPromptModal'
 import { cancelSubscription, redirectToEcpayCheckout, useEntitlement } from '../api/billing'
 
 // 綠界信用卡收款服務審核中，正式金流未開通 → 訂閱入口停用、顯示「申請中」。
@@ -20,10 +21,11 @@ const STATUS_LABELS: Record<string, string> = {
 
 function SubscriptionSection() {
   const queryClient = useQueryClient()
-  const { isDemo, exitDemo } = useDemo()
+  const { isDemo } = useDemo()
   const { data: entitlement, isLoading } = useEntitlement()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showLogin, setShowLogin] = useState(false)
 
   // Demo mode has no token, so the entitlement query stays disabled — show the
   // plan itself (price + benefits) and send the visitor to login to subscribe.
@@ -85,13 +87,14 @@ function SubscriptionSection() {
               NT$50
               <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--fg-3)' }}> / 月</span>
             </div>
-            {CHECKOUT_PENDING && (isDemo || showSubscribe) ? (
+            {isDemo ? (
+              // 預覽模式的按鈕只是叫出登入視窗，不會進金流，因此不受 CHECKOUT_PENDING 影響
+              <button className="btn btn-primary btn-sm" onClick={() => setShowLogin(true)}>
+                登入後訂閱
+              </button>
+            ) : CHECKOUT_PENDING && showSubscribe ? (
               <button className="btn btn-outline btn-sm" disabled title="金流服務審核中，尚無法訂閱">
                 申請中
-              </button>
-            ) : isDemo ? (
-              <button className="btn btn-primary btn-sm" onClick={exitDemo}>
-                登入後訂閱
               </button>
             ) : showSubscribe ? (
               <button className="btn btn-primary btn-sm" onClick={goSubscribe} disabled={busy}>
@@ -107,7 +110,7 @@ function SubscriptionSection() {
         {error && (
           <div style={{ fontSize: 12, color: 'var(--c-neg)', marginTop: 8 }}>{error}</div>
         )}
-        {CHECKOUT_PENDING && (isDemo || showSubscribe) && (
+        {!isDemo && CHECKOUT_PENDING && showSubscribe && (
           <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 8 }}>
             金流服務審核中，開通後即可訂閱。
           </div>
@@ -130,18 +133,28 @@ function SubscriptionSection() {
           </div>
         </div>
       </div>
+      {showLogin && (
+        <LoginPromptModal
+          close={() => setShowLogin(false)}
+          title="登入以訂閱"
+          sub="使用 Google 帳號登入後即可開通訂閱"
+        />
+      )}
     </>
   )
 }
 
 export default function SettingsTab() {
   const { user, logout } = useAuth()
-  const initials = (user?.name || user?.email || 'U')
-    .split(/\s+/)
-    .map(p => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
+  const { isDemo } = useDemo()
+  const initials = isDemo
+    ? 'D'
+    : (user?.name || user?.email || 'U')
+        .split(/\s+/)
+        .map(p => p[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
 
   return (
     <div className="settings-block">
@@ -149,7 +162,7 @@ export default function SettingsTab() {
       <p className="muted">僅在您的工作區內可見。</p>
       <div className="card card-pad">
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-          {user?.picture ? (
+          {user?.picture && !isDemo ? (
             <img
               src={user.picture}
               alt={user.name}
@@ -161,8 +174,12 @@ export default function SettingsTab() {
             </div>
           )}
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.name || '未命名'}</div>
-            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{user?.email}</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>
+              {isDemo ? '訪客（預覽模式）' : user?.name || '未命名'}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
+              {isDemo ? '未登入 · 頁面資料均為範例' : user?.email}
+            </div>
           </div>
         </div>
       </div>

@@ -11,9 +11,16 @@ interface DemoContextType {
 
 const DemoContext = createContext<DemoContextType | null>(null)
 
-export function DemoProvider({ children }: { children: React.ReactNode }) {
+export function DemoProvider({
+  children,
+  initialDemo = false,
+}: {
+  children: React.ReactNode
+  // 由 /preview/* 網址直接進入預覽時為 true；此時不跑導覽（訪客是來看指定分頁的）。
+  initialDemo?: boolean
+}) {
   const queryClient = useQueryClient()
-  const [isDemo, setIsDemo] = useState(false)
+  const [isDemo, setIsDemo] = useState(initialDemo)
   const [tourActive, setTourActive] = useState(false)
 
   const enterDemo = useCallback(() => {
