@@ -9,8 +9,8 @@ interface TourStep {
 
 const STEPS: TourStep[] = [
   {
-    title: 'Add Source',
-    body: '從左側 Sources 或右上角的按鈕，加入交易所、錢包或券商作為數據來源。',
+    title: '新增來源',
+    body: '從左側 Sources 或右上角的按鈕，加入交易所、錢包或券商作為資料來源。',
     targets: ['[data-tour="sidebar-sources"]', '[data-tour="add-source-btn"]'],
   },
   {
@@ -191,7 +191,7 @@ export default function DemoTour() {
         }}
       >
         <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, marginBottom: 6, letterSpacing: '0.02em' }}>
-          STEP {step + 1} / {STEPS.length}
+          步驟 {step + 1} / {STEPS.length}
         </div>
         <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg)', marginBottom: 6 }}>
           {cur.title}

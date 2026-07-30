@@ -7,16 +7,20 @@ from config.db import get_conn
 
 router = APIRouter()
 
-AVAILABLE_TICKERS = {"^GSPC", "0050.TW", "BTC-USD"}
+AVAILABLE_TICKERS = {"^GSPC", "^NDX", "^SOX", "0050.TW", "BTC-USD"}
 
 TICKER_LABELS = {
     "^GSPC": "S&P 500",
+    "^NDX": "NASDAQ100",
+    "^SOX": "費半",
     "0050.TW": "0050",
     "BTC-USD": "BTC",
 }
 
 TICKER_COLORS = {
     "^GSPC": "#a371f7",
+    "^NDX": "#58a6ff",
+    "^SOX": "#e3b341",
     "0050.TW": "#39d353",
     "BTC-USD": "#f0883e",
 }
@@ -24,7 +28,7 @@ TICKER_COLORS = {
 
 @router.get("")
 def get_benchmarks(
-    tickers: str = Query("^GSPC,0050.TW,BTC-USD"),
+    tickers: str = Query("^GSPC,^NDX,^SOX,0050.TW,BTC-USD"),
     start: str = Query(""),
     _: dict = Depends(get_current_user),
 ) -> dict[str, Any]:

@@ -18,16 +18,20 @@ const P_KEYS: PKey[] = ['total', 'crypto', 'us_stock', 'tw_stock']
 
 // ── Benchmark constants ──────────────────────────────────────────────────────
 
-const B_TICKERS = ['^GSPC', '0050.TW', 'BTC-USD'] as const
+const B_TICKERS = ['^GSPC', '^NDX', '^SOX', '0050.TW', 'BTC-USD'] as const
 type BTicker = typeof B_TICKERS[number]
 
 const B_COLORS: Record<BTicker, string> = {
   '^GSPC':   '#a371f7',
+  '^NDX':    '#58a6ff',
+  '^SOX':    '#e3b341',
   '0050.TW': '#39d353',
   'BTC-USD': '#f0883e',
 }
 const B_LABELS: Record<BTicker, string> = {
   '^GSPC':   'S&P 500',
+  '^NDX':    'NASDAQ100',
+  '^SOX':    '費半',
   '0050.TW': '0050',
   'BTC-USD': 'BTC',
 }
@@ -194,7 +198,7 @@ export default function TrendTab() {
   const { data: benchData } = useQuery<BenchmarkData>({
     queryKey: ['benchmarks/all'],
     queryFn: () =>
-      api.get('/api/benchmarks?tickers=%5EGSPC,0050.TW,BTC-USD&start=2015-01-01').then(r => r.data),
+      api.get('/api/benchmarks?tickers=%5EGSPC,%5ENDX,%5ESOX,0050.TW,BTC-USD&start=2015-01-01').then(r => r.data),
     enabled: !isDemo,
     initialData: isDemo ? DEMO_BENCHMARKS : undefined,
   })
@@ -451,7 +455,7 @@ export default function TrendTab() {
 
         <div className="trend-chip-group" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="trend-divider" style={{ width: 1, height: 16, background: 'var(--bdr)', margin: '0 4px' }} />
-          <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.5px' }}>BENCHMARK</span>
+          <span style={{ fontSize: 10, color: 'var(--fg3)', letterSpacing: '.5px' }}>比較基準</span>
           {B_TICKERS.map(t => chip(B_LABELS[t], B_COLORS[t], mode === 'return' && bVis[t], true, () => {
             if (mode !== 'return') {
               setMode('return')

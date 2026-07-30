@@ -145,8 +145,8 @@ function AddSourceRow({ onClick }: { onClick: () => void }) {
         </svg>
       </div>
       <div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg1)' }}>Add another source</div>
-        <div style={{ fontSize: 11, color: 'var(--fg3)', marginTop: 2 }}>Connect an exchange, wallet, broker, or add manual assets</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg1)' }}>新增其他來源</div>
+        <div style={{ fontSize: 11, color: 'var(--fg3)', marginTop: 2 }}>連接交易所、錢包、券商，或手動新增資產</div>
       </div>
     </div>
   )
@@ -164,11 +164,11 @@ function platformStatus(connectors: Connector[]): PlatformStatus | null {
   if (connectors.length === 0) return null
   const errored = connectors.find(c => c.last_error)
   if (errored) {
-    return { label: 'Error', cls: 'status-error', errorMessage: errored.last_error ?? undefined }
+    return { label: '錯誤', cls: 'status-error', errorMessage: errored.last_error ?? undefined }
   }
   const synced = connectors.find(c => c.last_sync_at)
-  if (synced) return { label: 'Synced', cls: 'status-synced' }
-  return { label: 'Pending', cls: 'status-pending' }
+  if (synced) return { label: '已同步', cls: 'status-synced' }
+  return { label: '待處理', cls: 'status-pending' }
 }
 
 function PlatformCard({
@@ -245,12 +245,12 @@ function PlatformCard({
           }}
         >
           <div style={{ flex: 1, color: 'var(--c-neg)' }}>
-            <strong>Sync failed:</strong> {status.errorMessage.slice(0, 120)}
+            <strong>同步失敗：</strong> {status.errorMessage.slice(0, 120)}
             {status.errorMessage.length > 120 ? '…' : ''}
           </div>
           {onReconnect && (
             <button className="btn btn-outline btn-sm" onClick={onReconnect}>
-              Reconnect
+              重新連接
             </button>
           )}
         </div>

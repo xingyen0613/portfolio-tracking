@@ -13,10 +13,10 @@ const P_COLORS = {
 } as const
 
 const P_LABELS = {
-  total:    'Total',
-  crypto:   'Crypto',
-  us_stock: 'US Stock',
-  tw_stock: 'TW Stock',
+  total:    '總資產',
+  crypto:   '加密貨幣',
+  us_stock: '美股',
+  tw_stock: '台股',
 } as const
 
 type PKey = keyof typeof P_COLORS
@@ -67,7 +67,7 @@ export default function PerformanceMetrics() {
       }}>
         <div>
           <div className="section-title">Performance Metrics</div>
-          <div className="section-sub">Balance, return, Sharpe and max drawdown by category</div>
+          <div className="section-sub">各類別的餘額、報酬率、Sharpe 與最大回落</div>
         </div>
         <div style={{ display: 'flex', gap: 2 }}>
           {WINDOWS.map(w => (

@@ -4,8 +4,11 @@ import { useAuth } from './auth/AuthContext'
 import { CurrencyProvider } from './context/CurrencyContext'
 import { DemoProvider, useDemo } from './context/DemoContext'
 import LoginPage from './pages/LoginPage'
+import LegalPage from './pages/LegalPage'
+import { legalSlugForPath } from './legal/content'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
+import Footer from './components/Footer'
 import DemoBanner from './components/DemoBanner'
 import DemoTour from './components/DemoTour'
 import ModalHost from './components/modals/ModalHost'
@@ -31,6 +34,10 @@ function isRoute(v: unknown): v is Route {
 }
 
 export default function App() {
+  // Legal pages live at their own URLs and need no auth.
+  const legalSlug = legalSlugForPath(window.location.pathname)
+  if (legalSlug) return <LegalPage slug={legalSlug} />
+
   return (
     <DemoProvider>
       <AppInner />
@@ -137,6 +144,7 @@ function AppInner() {
           {route === 'alerts' && <AlertsTab />}
           {route === 'settings' && <SettingsTab />}
         </div>
+        <Footer />
       </main>
       <ModalHost modal={modal} setModal={setModal} />
       {isDemo && <DemoTour />}
@@ -183,10 +191,10 @@ function AppInner() {
           }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--fg)', marginBottom: 2 }}>
-              Import complete
+              匯入完成
             </div>
             <div style={{ fontSize: 12, color: 'var(--fg-2)' }}>
-              {importToast.written_count} {importToast.written_count === 1 ? 'row' : 'rows'} written
+              已寫入 {importToast.written_count} 筆
               {importToast.date_from && importToast.date_to && (
                 <> · {importToast.date_from} → {importToast.date_to}</>
               )}

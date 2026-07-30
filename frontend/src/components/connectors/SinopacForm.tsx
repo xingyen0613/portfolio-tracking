@@ -13,7 +13,7 @@ export default function SinopacForm({ credentials, setCredential }: Props) {
         <label className="field-label">API Key</label>
         <MaskedInput
           className="input mono"
-          placeholder="Paste your Shioaji API key"
+          placeholder="貼上您的 Shioaji API Key"
           value={(credentials.api_key as string) ?? ''}
           onChange={v => setCredential('api_key', v)}
         />
@@ -55,7 +55,7 @@ export default function SinopacForm({ credentials, setCredential }: Props) {
             gap: 6,
           }}
         >
-          <Icon name="info" /> Read-only by design
+          <Icon name="info" /> 設計上僅唯讀
         </div>
         本系統只查詢持倉與現金餘額，不下單、不轉帳。Shioaji 下單需要額外的 CA 憑證簽章，本系統不會請求。
       </div>

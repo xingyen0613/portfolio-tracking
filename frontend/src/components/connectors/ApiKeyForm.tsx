@@ -16,7 +16,7 @@ export default function ApiKeyForm({ credentials, setCredential, template }: Pro
         <label className="field-label">API Key</label>
         <MaskedInput
           className="input mono"
-          placeholder="Paste read-only API key"
+          placeholder="貼上唯讀 API Key"
           value={(credentials.api_key as string) ?? ''}
           onChange={v => setCredential('api_key', v)}
         />
@@ -62,10 +62,9 @@ export default function ApiKeyForm({ credentials, setCredential, template }: Pro
             gap: 6,
           }}
         >
-          <Icon name="info" /> Read-only permissions only
+          <Icon name="info" /> 僅開啟唯讀權限
         </div>
-        Create the API key with <span className="kbd">Read</span> permission only. Never enable trading or
-        withdrawal.
+        建立 API Key 時只勾選 <span className="kbd">Read</span>（唯讀）權限，切勿開啟交易或提款權限。
       </div>
     </>
   )

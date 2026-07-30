@@ -13,7 +13,7 @@ export default function IBKRForm({ credentials, setCredential }: Props) {
         <label className="field-label">Flex Query Token</label>
         <MaskedInput
           className="input mono"
-          placeholder="Paste your Flex token"
+          placeholder="貼上您的 Flex token"
           value={(credentials.flex_token as string) ?? ''}
           onChange={v => setCredential('flex_token', v)}
         />
@@ -25,13 +25,12 @@ export default function IBKRForm({ credentials, setCredential }: Props) {
         <label className="field-label">Query ID</label>
         <input
           className="input mono"
-          placeholder="e.g. 123456789"
+          placeholder="例如 123456789"
           value={(credentials.query_id as string) ?? ''}
           onChange={e => setCredential('query_id', e.target.value)}
         />
         <div className="field-hint">
-          Create a Flex Query covering OpenPosition (SUMMARY) + EquitySummaryByReportDateInBase, then copy
-          its numeric ID here.
+          建立一個包含 OpenPosition (SUMMARY) + EquitySummaryByReportDateInBase 的 Flex Query，再把它的數字 ID 貼在這裡。
         </div>
       </div>
 
@@ -56,9 +55,9 @@ export default function IBKRForm({ credentials, setCredential }: Props) {
             gap: 6,
           }}
         >
-          <Icon name="info" /> Read-only by design
+          <Icon name="info" /> 設計上僅唯讀
         </div>
-        Flex tokens cannot place trades or move funds. They expose only your portfolio reports.
+        Flex token 無法用來下單或轉帳，僅能讀取您的投資組合報表。
       </div>
     </>
   )

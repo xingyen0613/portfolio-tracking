@@ -20,6 +20,8 @@ from config.db import get_conn
 
 TICKERS = {
     "^GSPC": "S&P 500",
+    "^NDX": "納斯達克100",
+    "^SOX": "費城半導體",
     "0050.TW": "元大台灣50",
     "BTC-USD": "Bitcoin",
 }

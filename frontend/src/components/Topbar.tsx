@@ -24,7 +24,7 @@ export default function Topbar({ route, openModal, isDemo }: Props) {
         <div className="topbar-title">{TITLES[route]}</div>
       </div>
       <div className="topbar-meta">
-        {lastUpdated && <span className="topbar-updated">Updated {lastUpdated}</span>}
+        {lastUpdated && <span className="topbar-updated">更新於 {lastUpdated}</span>}
         <div className="live-badge">
           <div className="live-dot"></div>
           LIVE
@@ -56,7 +56,7 @@ export default function Topbar({ route, openModal, isDemo }: Props) {
           1 USD = {rate?.toFixed(2) ?? '--'} TWD
         </span>
         {!isDemo && (
-          <button className="icon-btn" title="Refresh">
+          <button className="icon-btn" title="重新整理">
             <Icon name="refresh" />
           </button>
         )}
@@ -66,7 +66,7 @@ export default function Topbar({ route, openModal, isDemo }: Props) {
           onClick={() => openModal({ kind: 'addSource' })}
         >
           <Icon name="plus" />
-          Add source
+          新增來源
         </button>
       </div>
     </div>

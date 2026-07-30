@@ -37,6 +37,15 @@ def trigger_batch(
 
     from app.jobs.run_batch import _fetch_benchmarks, active_batch_user_ids, run_batch
 
+    if body.job == "daily":
+        # Realign ECPay subscriptions before gating, so a user whose payment
+        # callback was missed gets their entitlement (and batch) back today.
+        try:
+            from app.services.ecpay_billing import reconcile_subscriptions
+            log.info("billing reconcile: %s", reconcile_subscriptions())
+        except Exception as e:
+            log.error("billing reconcile failed: %s", e)
+
     user_ids = active_batch_user_ids()
     if not user_ids:
         log.warning("trigger-batch: no active users, skipping.")

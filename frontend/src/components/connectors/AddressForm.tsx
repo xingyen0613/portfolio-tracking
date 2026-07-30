@@ -29,7 +29,7 @@ export default function AddressForm({ credentials, setCredential, template }: Pr
   return (
     <>
       <div className="field">
-        <label className="field-label">Public address(es)</label>
+        <label className="field-label">公開錢包地址</label>
         <textarea
           className="textarea"
           placeholder={placeholder}
@@ -38,7 +38,7 @@ export default function AddressForm({ credentials, setCredential, template }: Pr
           onChange={e => setAddressesText(e.target.value)}
         />
         <div className="field-hint">
-          One per line. We only read public chain data — never any private keys.
+          每行一個地址。我們只讀取鏈上公開資料，絕不會取得任何私鑰。
         </div>
       </div>
 
@@ -63,10 +63,9 @@ export default function AddressForm({ credentials, setCredential, template }: Pr
             gap: 6,
           }}
         >
-          <Icon name="info" /> Read-only access
+          <Icon name="info" /> 唯讀存取
         </div>
-        We only query public on-chain balances. Wallet addresses are public — never share private
-        keys or seed phrases with anyone.
+        我們只查詢鏈上公開餘額。錢包地址本身是公開資訊，但請絕不與任何人分享私鑰或助記詞。
       </div>
     </>
   )

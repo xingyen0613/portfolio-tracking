@@ -33,7 +33,7 @@ export interface SourceTemplate {
 
 export const SOURCE_TEMPLATES: SourceTemplate[] = [
   {
-    id: 'binance', name: 'Binance', desc: 'Crypto exchange', category: 'crypto', auth: 'apikey',
+    id: 'binance', name: 'Binance', desc: '加密貨幣交易所', category: 'crypto', auth: 'apikey',
     abbr: 'BNB', color: '#f3ba2f', textColor: '#000', implemented: true, logoUrl: '/logos/binance.png',
     getApiConfig: {
       hasAccountUrl: 'https://www.binance.com/zh-TC/my/settings/api-management',
@@ -43,7 +43,7 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
     },
   },
   {
-    id: 'okx', name: 'OKX', desc: 'Crypto exchange', category: 'crypto', auth: 'apikey',
+    id: 'okx', name: 'OKX', desc: '加密貨幣交易所', category: 'crypto', auth: 'apikey',
     abbr: 'OKX', color: '#000', textColor: '#fff', implemented: true, logoUrl: '/logos/okx.png',
     getApiConfig: {
       hasAccountUrl: 'https://www.okx.com/zh-hant/account/my-api',
@@ -53,7 +53,7 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
     },
   },
   {
-    id: 'mexc', name: 'MEXC', desc: 'Crypto exchange', category: 'crypto', auth: 'apikey',
+    id: 'mexc', name: 'MEXC', desc: '加密貨幣交易所', category: 'crypto', auth: 'apikey',
     abbr: 'MEXC', color: '#1972e8', textColor: '#fff', implemented: true, logoUrl: '/logos/mexc.webp',
     getApiConfig: {
       hasAccountUrl: 'https://www.mexc.com/zh-TW/user/openapi',
@@ -64,7 +64,7 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
     },
   },
   {
-    id: 'bybit', name: 'Bybit', desc: 'Crypto exchange', category: 'crypto', auth: 'apikey',
+    id: 'bybit', name: 'Bybit', desc: '加密貨幣交易所', category: 'crypto', auth: 'apikey',
     abbr: 'BYBT', color: '#f7a600', textColor: '#000', implemented: true, logoUrl: '/logos/bybit.png',
     getApiConfig: {
       hasAccountUrl: 'https://www.bybit.com/app/user/api-management',
@@ -74,7 +74,7 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
     },
   },
   {
-    id: 'pionex', name: '派網 Pionex', desc: 'Crypto exchange', category: 'crypto', auth: 'apikey',
+    id: 'pionex', name: '派網 Pionex', desc: '加密貨幣交易所', category: 'crypto', auth: 'apikey',
     abbr: 'PIX', color: '#f15a28', textColor: '#fff', implemented: true,
     logoUrl: '/logos/pionex.png',
     getApiConfig: {
@@ -84,24 +84,24 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
       noAccountTooltip: '走此連結註冊可獲得合約交易15%手續費及現貨10%手續費反饋',
     },
   },
-  { id: 'coinbase', name: 'Coinbase',          desc: 'Crypto exchange',           category: 'crypto', auth: 'apikey',  abbr: 'CB',   color: '#0052ff', textColor: '#fff', implemented: false, comingSoon: 'Coming soon' },
-  { id: 'evm_wallet', name: 'EVM Wallet',      desc: 'Ethereum / Polygon / BSC',  category: 'crypto', auth: 'address', abbr: 'ETH',  color: '#627eea', textColor: '#fff', implemented: true, logoUrl: '/logos/evm.png' },
-  { id: 'sol_wallet', name: 'Solana Wallet',   desc: 'SOL wallet (read-only)',    category: 'crypto', auth: 'address', abbr: 'SOL',  color: '#9945ff', textColor: '#fff', implemented: true, logoUrl: '/logos/solana.jpeg' },
-  { id: 'sui_wallet', name: 'SUI Wallet',      desc: 'SUI wallet (read-only)',    category: 'crypto', auth: 'address', abbr: 'SUI',  color: '#6fbcf0', textColor: '#000', implemented: true, logoUrl: '/logos/sui.jpeg' },
-  { id: 'ibkr',     name: 'Interactive Brokers', desc: 'US broker · Flex Web',    category: 'us',     auth: 'ibkr',    abbr: 'IBKR', color: '#cc0000', textColor: '#fff', implemented: true, logoUrl: '/logos/ibkr.png' },
-  { id: 'schwab',   name: 'Charles Schwab',    desc: 'US broker',                 category: 'us',     auth: 'manual',  abbr: 'SCHW', color: '#00a0df', textColor: '#fff', implemented: false, comingSoon: 'Coming soon' },
-  { id: 'yuanta',   name: '元大證券',           desc: 'Taiwan broker · Gmail PDF', category: 'tw',     auth: 'yuanta',  abbr: 'YT',   color: '#004b99', textColor: '#fff', implemented: true, singleInstance: true },
-  { id: 'sinopac',  name: '永豐證券',           desc: 'Taiwan broker · Shioaji API', category: 'tw',   auth: 'sinopac', abbr: '永',   color: '#003D82', textColor: '#fff', implemented: true, logoUrl: '/logos/sinopac.jpg' },
-  { id: 'fubon',    name: '富邦證券',           desc: 'Taiwan broker · Neo API',   category: 'tw',     auth: 'fubon',   abbr: 'FB',   color: '#0a5e3e', textColor: '#fff', implemented: true, logoUrl: '/logos/fubon.png' },
-  { id: 'manual',   name: 'Manual Entry',      desc: 'Real estate, cash, custom', category: 'other',  auth: 'manual',  abbr: '+',    color: '#3a3a44', textColor: '#fff', implemented: false, comingSoon: 'Coming in v2' },
+  { id: 'coinbase', name: 'Coinbase',          desc: '加密貨幣交易所',              category: 'crypto', auth: 'apikey',  abbr: 'CB',   color: '#0052ff', textColor: '#fff', implemented: false, comingSoon: '即將推出' },
+  { id: 'evm_wallet', name: 'EVM 錢包',        desc: 'Ethereum / Polygon / BSC 錢包', category: 'crypto', auth: 'address', abbr: 'ETH',  color: '#627eea', textColor: '#fff', implemented: true, logoUrl: '/logos/evm.png' },
+  { id: 'sol_wallet', name: 'Solana 錢包',     desc: 'SOL 錢包（唯讀）',            category: 'crypto', auth: 'address', abbr: 'SOL',  color: '#9945ff', textColor: '#fff', implemented: true, logoUrl: '/logos/solana.jpeg' },
+  { id: 'sui_wallet', name: 'SUI 錢包',        desc: 'SUI 錢包（唯讀）',            category: 'crypto', auth: 'address', abbr: 'SUI',  color: '#6fbcf0', textColor: '#000', implemented: true, logoUrl: '/logos/sui.jpeg' },
+  { id: 'ibkr',     name: 'Interactive Brokers', desc: '美股券商 · Flex Web',       category: 'us',     auth: 'ibkr',    abbr: 'IBKR', color: '#cc0000', textColor: '#fff', implemented: true, logoUrl: '/logos/ibkr.png' },
+  { id: 'schwab',   name: 'Charles Schwab',    desc: '美股券商',                    category: 'us',     auth: 'manual',  abbr: 'SCHW', color: '#00a0df', textColor: '#fff', implemented: false, comingSoon: '即將推出' },
+  { id: 'yuanta',   name: '元大證券',           desc: '台灣券商 · Gmail PDF',        category: 'tw',     auth: 'yuanta',  abbr: 'YT',   color: '#004b99', textColor: '#fff', implemented: true, singleInstance: true },
+  { id: 'sinopac',  name: '永豐證券',           desc: '台灣券商 · Shioaji API',      category: 'tw',   auth: 'sinopac', abbr: '永',   color: '#003D82', textColor: '#fff', implemented: true, logoUrl: '/logos/sinopac.jpg' },
+  { id: 'fubon',    name: '富邦證券',           desc: '台灣券商 · Neo API',          category: 'tw',     auth: 'fubon',   abbr: 'FB',   color: '#0a5e3e', textColor: '#fff', implemented: true, logoUrl: '/logos/fubon.png' },
+  { id: 'manual',   name: '手動輸入',           desc: '不動產、現金、自訂資產',       category: 'other',  auth: 'manual',  abbr: '+',    color: '#3a3a44', textColor: '#fff', implemented: false, comingSoon: 'v2 推出' },
 ]
 
 export const CATEGORY_LABEL: Record<Category | 'all', string> = {
-  all: 'All',
-  crypto: 'Crypto',
-  us: 'US Stocks',
-  tw: 'TW Stocks',
-  other: 'Other',
+  all: '全部',
+  crypto: '加密貨幣',
+  us: '美股',
+  tw: '台股',
+  other: '其他',
 }
 
 export function getTemplate(id: string): SourceTemplate | undefined {

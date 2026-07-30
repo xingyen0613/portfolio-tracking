@@ -36,8 +36,8 @@ export default function AddSourceModal({ close, setModal }: Props) {
     <div className="modal wide">
       <div className="modal-head">
         <div>
-          <div className="modal-title">Add a data source</div>
-          <div className="modal-sub">Connect an exchange, wallet, broker, or manual source</div>
+          <div className="modal-title">新增資料來源</div>
+          <div className="modal-sub">連接交易所、錢包、券商或手動來源</div>
         </div>
         <button className="modal-close" onClick={close}>
           <Icon name="x" />
@@ -94,7 +94,7 @@ export default function AddSourceModal({ close, setModal }: Props) {
                       ? '已連接'
                       : t.implemented
                         ? t.desc
-                        : (t.comingSoon ?? 'Coming soon')}
+                        : (t.comingSoon ?? '即將推出')}
                   </div>
                 </div>
                 <Icon name="chevronR" />
