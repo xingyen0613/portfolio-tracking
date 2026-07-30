@@ -72,7 +72,7 @@ function SubscriptionSection() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
-              $1 USD
+              NT$50
               <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--fg-3)' }}> / month</span>
             </div>
             {showSubscribe ? (
