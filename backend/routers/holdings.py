@@ -34,6 +34,9 @@ RESOURCE_TYPE_LABEL = {
     "futures_um":         "U本位永續",
     "futures_cm":         "幣本位永續",
     "futures":            "合約",
+    "perp_cash":          "永續保證金",
+    "perp_position":      "永續部位",
+    "perp_upnl":          "未實現損益",
     "tw_futures":         "期貨",
     "options":            "期權",
     "stock":              "持股",
@@ -54,12 +57,13 @@ RESOURCE_TYPE_ORDER = {
     "spot": 0, "wallet": 0, "stock": 0, "yuanta_statement": 0,
     "yuanta_collateral": 1,
     "yuanta_sub_brokerage": 1,
-    "cash": 2, "yuanta_cash": 2,
+    "cash": 2, "yuanta_cash": 2, "perp_cash": 2,
     "savings": 3, "earn_flexible": 4, "earn_flexiblesaving": 4,
     "earn_locked": 5, "earn_onchain": 6,
     "funding": 7,
     "margin_cross": 8,
     "futures": 9, "tw_futures": 9, "futures_um": 9, "futures_cm": 10, "yuanta_futures_equity": 9,
+    "perp_position": 9, "perp_upnl": 10,
     "yuanta_other": 10,
     "options": 11,
     "yuanta_margin": 12,
@@ -74,6 +78,7 @@ PLATFORM_META: dict[str, dict] = {
     "sui_wallet": {"display": "SUI Wallet",        "abbr": "SUI", "color": "#6fbcf0", "fg": "#000"},
     "sol_wallet": {"display": "Solana Wallet",     "abbr": "SOL", "color": "#9945FF", "fg": "#fff"},
     "evm_wallet": {"display": "EVM Wallet",        "abbr": "EVM", "color": "#627eea", "fg": "#fff"},
+    "hyperliquid": {"display": "Hyperliquid",      "abbr": "HL",  "color": "#97fce4", "fg": "#000"},
     "ibkr":       {"display": "IBKR（美股）",       "abbr": "IB",  "color": "#c0392b", "fg": "#fff"},
     "firsttrade": {"display": "Firsttrade（美股）", "abbr": "FT",  "color": "#2c8af8", "fg": "#fff"},
     "yuanta":     {"display": "元大證券（台股）",   "abbr": "元",  "color": "#27ae60", "fg": "#fff"},
@@ -84,7 +89,7 @@ PLATFORM_META: dict[str, dict] = {
 CATEGORY_ORDER = {"crypto": 0, "us_stock": 1, "tw_stock": 2}
 
 # Platforms where holdings should be grouped by wallet address
-WALLET_PLATFORMS = {"sui_wallet", "sol_wallet", "evm_wallet"}
+WALLET_PLATFORMS = {"sui_wallet", "sol_wallet", "evm_wallet", "hyperliquid"}
 
 
 def _fmt_qty(q: float, decimals: int = 4) -> str:

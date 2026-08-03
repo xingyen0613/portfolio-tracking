@@ -9,7 +9,7 @@ router = APIRouter()
 
 _IMPLEMENTED = {
     "binance", "okx", "mexc", "bybit",
-    "sui_wallet", "sol_wallet", "evm_wallet",
+    "sui_wallet", "sol_wallet", "evm_wallet", "hyperliquid",
     "ibkr", "sinopac", "fubon", "yuanta",
 }
 

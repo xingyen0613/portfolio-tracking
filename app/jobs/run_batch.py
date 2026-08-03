@@ -140,6 +140,12 @@ def _instantiate_connectors(platform: str, credentials: dict, account_key: str) 
         if not addresses:
             raise ValueError("sui_wallet credentials.addresses is required")
         return [SuiWalletConnector(addr) for addr in addresses]
+    if platform == "hyperliquid":
+        from app.connectors.hyperliquid_connector import HyperliquidConnector
+        addresses = credentials.get("addresses") or []
+        if not addresses:
+            raise ValueError("hyperliquid credentials.addresses is required")
+        return [HyperliquidConnector(addr) for addr in addresses]
     if platform == "sol_wallet":
         from app.connectors.sol_wallet_connector import SolWalletConnector
         # Alchemy is a system-level read-only query tool shared by all users
@@ -177,6 +183,18 @@ def _ensure_sui_accounts(addresses: list[str], user_id: str) -> None:
             conn.execute(
                 """INSERT INTO accounts (platform_id, account_key, label, user_id)
                    SELECT id, %s, %s, %s FROM platforms WHERE name = 'sui_wallet'
+                   ON CONFLICT (platform_id, account_key, user_id) DO NOTHING""",
+                (account_key, addr, user_id),
+            )
+
+
+def _ensure_hyperliquid_accounts(addresses: list[str], user_id: str) -> None:
+    for addr in addresses:
+        account_key = addr[:10] if len(addr) >= 10 else addr
+        with get_conn() as conn:
+            conn.execute(
+                """INSERT INTO accounts (platform_id, account_key, label, user_id)
+                   SELECT id, %s, %s, %s FROM platforms WHERE name = 'hyperliquid'
                    ON CONFLICT (platform_id, account_key, user_id) DO NOTHING""",
                 (account_key, addr, user_id),
             )
@@ -402,6 +420,10 @@ def run_batch(platforms: list[str], user_id: str,
                     addresses = creds.get("addresses") or []
                     if addresses:
                         _ensure_sui_accounts(addresses, user_id)
+                elif platform == "hyperliquid":
+                    addresses = creds.get("addresses") or []
+                    if addresses:
+                        _ensure_hyperliquid_accounts(addresses, user_id)
             except Exception as e:
                 print(f"  ✗ [{platform}/{account_key}] account setup error: {e}")
 
@@ -488,7 +510,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     platforms = [args.platform] if args.platform else ENABLED_PLATFORMS
-    implemented = {"binance", "okx", "mexc", "bybit", "pionex", "sui_wallet", "sol_wallet", "ibkr", "evm_wallet", "sinopac", "fubon", "yuanta"}
+    implemented = {"binance", "okx", "mexc", "bybit", "pionex", "sui_wallet", "sol_wallet", "ibkr", "evm_wallet", "hyperliquid", "sinopac", "fubon", "yuanta"}
     platforms = [p for p in platforms if p in implemented]
 
     if not platforms:

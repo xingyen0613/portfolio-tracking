@@ -19,6 +19,7 @@ scripts/*
 !scripts/test_e2e_price_cache.py
 !scripts/grant_comp.py
 !scripts/verify_entitlements.py
+!scripts/hyperliquid_poc.py
 .venv/
 /data/
 __pycache__/
