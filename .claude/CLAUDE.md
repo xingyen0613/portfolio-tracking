@@ -21,6 +21,7 @@
 
 - [資料處理 Pipeline 說明](../docs/data-pipeline.md) — 各平台斷點設計、儲存位置、定價來源
 - [元大 cum_cash 限制](../docs/yuanta-cumcash-known-limitations.md) — 月底 anchor step 成因與未來解法
+- [Hyperliquid API PoC](../docs/hyperliquid-api-poc.md) — 淨值公式驗證、未實現損益拆分、歷史取樣限制
 
 ## 部署注意事項
 
@@ -90,6 +91,18 @@ uv run alembic upgrade head
 - 預覽模式的訂閱按鈕不受 `SettingsTab.tsx` 的 `CHECKOUT_PENDING` 影響：一律顯示可點的「登入後訂閱」→ 開 `LoginPromptModal`（與登入頁相同的 GoogleLogin），登入成功即 `exitDemo()`
 - 用途：可把 `https://allin-portfolio-tracking.pages.dev/preview/settings` 這種網址交給第三方（如金流服務商）審核，對方不需帳號即可看到訂閱方案頁
 - Cloudflare Pages 靠 `frontend/public/_redirects` 的 `/* /index.html 200` 支援子路徑直開
+
+### Hyperliquid Connector
+- info endpoint **公開唯讀，不需 API key**，只要地址（同 sui_wallet 模式，1:N by `addr[:10]`）；下單才需私鑰，本專案不碰
+- 淨值公式：`accountValue = totalRawUsd + Σ sign(szi) × positionValue`（實測差 0.00000000）
+  - `totalRawUsd` 是**純現金**；開空會增加現金但部位計負值，故部位項必須帶正負號
+  - `positionValue` 以 markPx 計價，**本身已含未實現損益**
+- 未實現損益要「既是子分類又計入淨值」→ 拆兩段避免重複計算：
+  `perp_position.value = sign(szi)×positionValue − uPnL`，`perp_upnl.value = ΣuPnL`，相加還原市值
+- `perp_position` 的 `price` 是 entryPx 非市價，**price_source 不可設 "platform"**（會污染 price_cache）
+- 歷史回補只在 `POST /api/connectors` 初次連接時跑一次（`hyperliquid_history.py`），取 `portfolio` 的 `allTime`
+  - 取樣密度是 API 先天限制：近 30 天每日、更早每 7 天、三年帳戶可達 14 天一點
+- 現貨 481 token 多為 meme，`USD_THRESHOLD = 1.0` 過濾粉塵；無 USDC 計價對的 token 直接略過
 
 ### Holdings API dust 過濾
 - `backend/routers/holdings.py:_build_sections` 在顯示層過濾 `|value_usd| < 5`

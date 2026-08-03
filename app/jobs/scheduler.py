@@ -68,7 +68,7 @@ def run_daily_batch() -> None:
     from config.settings import ENABLED_PLATFORMS
     from app.jobs.run_batch import run_batch, _fetch_benchmarks
 
-    implemented = {"binance", "okx", "mexc", "bybit", "sol_wallet", "sui_wallet", "ibkr", "evm_wallet", "sinopac", "fubon"}
+    implemented = {"binance", "okx", "mexc", "bybit", "sol_wallet", "sui_wallet", "ibkr", "evm_wallet", "hyperliquid", "sinopac", "fubon"}
     platforms = [p for p in ENABLED_PLATFORMS if p in implemented]
 
     user_ids = _active_user_ids()

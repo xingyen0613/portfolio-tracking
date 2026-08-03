@@ -32,6 +32,8 @@ PLATFORM_REQUIRED_FIELDS = {
     "sol_wallet": ["addresses"],
     # SUI uses public RPC + Pyth, no API key needed
     "sui_wallet": ["addresses"],
+    # Hyperliquid info endpoint is public read-only, no API key needed
+    "hyperliquid": ["addresses"],
     # Gmail OAuth token + PDF password stored per-user; token obtained via migration script (Phase 1) or web OAuth (Phase 2)
     "yuanta": ["gmail_token_json", "pdf_password"],
 }
@@ -171,6 +173,21 @@ def create_connector(body: ConnectorCreate, current_user: dict = Depends(get_cur
         fetch_status = "failed"
         fetch_error = str(e)
 
+    # Hyperliquid：初次連接時回補一年歷史（僅此一次，日常 batch 不重複觸發）。
+    # 失敗不影響連接本身 —— 當前持倉已抓到，只是歷史折線少一段。
+    if platform == "hyperliquid" and fetch_status != "failed":
+        try:
+            from app.connectors.hyperliquid_history import backfill_history
+            result = backfill_history(body.credentials.get("addresses") or [], user_id)
+            print(f"  [hyperliquid] backfill: {result['written_count']} days written "
+                  f"({result['date_from']} → {result['date_to']}), "
+                  f"{result['skipped_count']} skipped")
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "hyperliquid history backfill failed for connector %s", connector_id
+            )
+
     # Read back the connector row with updated last_sync/error fields
     with get_conn() as conn:
         row = conn.execute(
@@ -299,6 +316,7 @@ def _resolve_account_ids(conn, platform: str, account_key: str, creds: dict, use
       - exchanges/IBKR: 1:1 by account_key
       - sol_wallet:     1:N by addresses (account_key = addr[:10])
       - sui_wallet:     1:N by addresses (account_key = addr[:10])
+      - hyperliquid:    1:N by addresses (account_key = addr[:10])
       - evm_wallet:     1:N by addresses × chains (account_key = addr[:10] || '_' || short)
     """
     if platform in EXCHANGE_LIKE_PLATFORMS:
@@ -311,7 +329,7 @@ def _resolve_account_ids(conn, platform: str, account_key: str, creds: dict, use
         return [r["id"] for r in rows]
 
     addrs = creds.get("addresses") or []
-    if platform in ("sol_wallet", "sui_wallet"):
+    if platform in ("sol_wallet", "sui_wallet", "hyperliquid"):
         keys = [a[:10] if len(a) >= 10 else a for a in addrs]
         if not keys:
             return []
