@@ -21,6 +21,8 @@ scripts/*
 !scripts/verify_entitlements.py
 .venv/
 /data/
+# 元大 Spark API 官方元件包（356 個 dll/dylib，62MB，各平台自行下載）
+vendor/yuanta_spark/
 __pycache__/
 *.pyc
 *.pyo
