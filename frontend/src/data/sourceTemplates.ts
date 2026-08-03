@@ -88,7 +88,7 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
   { id: 'evm_wallet', name: 'EVM 錢包',        desc: 'Ethereum / Polygon / BSC 錢包', category: 'crypto', auth: 'address', abbr: 'ETH',  color: '#627eea', textColor: '#fff', implemented: true, logoUrl: '/logos/evm.png' },
   { id: 'sol_wallet', name: 'Solana 錢包',     desc: 'SOL 錢包（唯讀）',            category: 'crypto', auth: 'address', abbr: 'SOL',  color: '#9945ff', textColor: '#fff', implemented: true, logoUrl: '/logos/solana.jpeg' },
   { id: 'sui_wallet', name: 'SUI 錢包',        desc: 'SUI 錢包（唯讀）',            category: 'crypto', auth: 'address', abbr: 'SUI',  color: '#6fbcf0', textColor: '#000', implemented: true, logoUrl: '/logos/sui.jpeg' },
-  { id: 'hyperliquid', name: 'Hyperliquid',    desc: '永續合約 + 現貨（唯讀）',      category: 'crypto', auth: 'address', abbr: 'HL',   color: '#97fce4', textColor: '#000', implemented: true },
+  { id: 'hyperliquid', name: 'Hyperliquid',    desc: '永續合約 + 現貨（唯讀）',      category: 'crypto', auth: 'address', abbr: 'HL',   color: '#97fce4', textColor: '#000', implemented: true, logoUrl: '/logos/hyperliquid.svg' },
   { id: 'ibkr',     name: 'Interactive Brokers', desc: '美股券商 · Flex Web',       category: 'us',     auth: 'ibkr',    abbr: 'IBKR', color: '#cc0000', textColor: '#fff', implemented: true, logoUrl: '/logos/ibkr.png' },
   { id: 'schwab',   name: 'Charles Schwab',    desc: '美股券商',                    category: 'us',     auth: 'manual',  abbr: 'SCHW', color: '#00a0df', textColor: '#fff', implemented: false, comingSoon: '即將推出' },
   { id: 'yuanta',   name: '元大證券',           desc: '台灣券商 · Gmail PDF',        category: 'tw',     auth: 'yuanta',  abbr: 'YT',   color: '#004b99', textColor: '#fff', implemented: true, singleInstance: true },
