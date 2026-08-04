@@ -1,4 +1,5 @@
 """User-managed connector CRUD."""
+import hashlib
 import json
 import re
 import uuid
@@ -36,9 +37,14 @@ PLATFORM_REQUIRED_FIELDS = {
     "hyperliquid": ["addresses"],
     # Gmail OAuth token + PDF password stored per-user; token obtained via migration script (Phase 1) or web OAuth (Phase 2)
     "yuanta": ["gmail_token_json", "pdf_password"],
+    # 手動 CSV 來源：沒有憑證，資料全靠 historical-import 上傳
+    "manual": [],
 }
 
 SUPPORTED_PLATFORMS = set(PLATFORM_REQUIRED_FIELDS.keys())
+
+# 沒有 connector 可跑的平台 —— 不做 try-fetch / refresh，資料只從 CSV 匯入而來
+NO_FETCH_PLATFORMS = {"manual"}
 
 
 class ConnectorOut(BaseModel):
@@ -67,11 +73,20 @@ class ConnectorCreateResponse(BaseModel):
 
 
 def _slugify(text: str) -> str:
-    """Generate ASCII slug from a label. Falls back to 'account' if empty."""
+    """Generate ASCII slug from a label.
+
+    Labels with no ASCII characters at all (e.g. 「台北市的公寓」) would otherwise
+    all collapse to the same slug and collide with each other — fall back to a
+    hash of the label so different names stay distinct while the same name still
+    conflicts (which is the intended 409).
+    """
     s = text.strip().lower()
     s = re.sub(r"[^a-z0-9_-]+", "_", s)
     s = re.sub(r"_+", "_", s).strip("_")
-    return s or "account"
+    if s:
+        return s
+    digest = hashlib.sha1(text.strip().encode("utf-8")).hexdigest()[:8]
+    return f"acct_{digest}"
 
 
 def _row_to_connector(row) -> ConnectorOut:
@@ -158,20 +173,21 @@ def create_connector(body: ConnectorCreate, current_user: dict = Depends(get_cur
     fetch_status = "success"
     fetch_error: str | None = None
     batch_id: str | None = None
-    try:
-        from app.jobs.run_batch import run_batch
-        batch_id = run_batch([platform], user_id, connector_ids=[connector_id])
+    if platform not in NO_FETCH_PLATFORMS:
+        try:
+            from app.jobs.run_batch import run_batch
+            batch_id = run_batch([platform], user_id, connector_ids=[connector_id])
 
-        # Read back batch status
-        with get_conn() as conn:
-            row = conn.execute(
-                "SELECT status FROM batches WHERE id=%s", (batch_id,)
-            ).fetchone()
-            if row:
-                fetch_status = row["status"]
-    except Exception as e:
-        fetch_status = "failed"
-        fetch_error = str(e)
+            # Read back batch status
+            with get_conn() as conn:
+                row = conn.execute(
+                    "SELECT status FROM batches WHERE id=%s", (batch_id,)
+                ).fetchone()
+                if row:
+                    fetch_status = row["status"]
+        except Exception as e:
+            fetch_status = "failed"
+            fetch_error = str(e)
 
     # Hyperliquid：初次連接時回補一年歷史（僅此一次，日常 batch 不重複觸發）。
     # 失敗不影響連接本身 —— 當前持倉已抓到，只是歷史折線少一段。
@@ -306,7 +322,8 @@ def update_connector(
     return _row_to_connector(updated)
 
 
-EXCHANGE_LIKE_PLATFORMS = {"binance", "okx", "mexc", "bybit", "pionex", "ibkr", "yuanta", "fubon"}
+# 1:1 by account_key —— manual 同樣是一個 connector 對一個 account
+EXCHANGE_LIKE_PLATFORMS = {"binance", "okx", "mexc", "bybit", "pionex", "ibkr", "yuanta", "fubon", "manual"}
 
 
 def _resolve_account_ids(conn, platform: str, account_key: str, creds: dict, user_id: str) -> list[int]:
@@ -490,6 +507,12 @@ def refresh_connector(connector_id: str, current_user: dict = Depends(get_curren
         )
 
     platform = row["platform_name"]
+    if platform in NO_FETCH_PLATFORMS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="手動來源沒有可同步的資料，請改用「匯入歷史紀錄」上傳 CSV。",
+        )
+
     fetch_status = "success"
     fetch_error: str | None = None
     batch_id: str | None = None

@@ -68,6 +68,8 @@ function formatRelative(iso: string | null): string {
 }
 
 const WALLET_PLATFORMS = new Set(['evm_wallet', 'sol_wallet', 'sui_wallet'])
+// 手動 CSV 來源沒有可同步的外部帳戶，後端也會擋 refresh
+const NO_REFRESH_PLATFORMS = new Set(['manual'])
 
 function ConnectorRow({
   c,
@@ -193,14 +195,16 @@ function ConnectorRow({
             >
               <Icon name="edit" />
             </button>
-            <button
-              className={`icon-btn${busy ? ' btn-spinning' : ''}`}
-              title="重新整理"
-              onClick={onRefresh}
-              disabled={busy || deleting}
-            >
-              <Icon name="refresh" />
-            </button>
+            {!NO_REFRESH_PLATFORMS.has(c.platform_name) && (
+              <button
+                className={`icon-btn${busy ? ' btn-spinning' : ''}`}
+                title="重新整理"
+                onClick={onRefresh}
+                disabled={busy || deleting}
+              >
+                <Icon name="refresh" />
+              </button>
+            )}
             <button
               className="icon-btn"
               title="移除"

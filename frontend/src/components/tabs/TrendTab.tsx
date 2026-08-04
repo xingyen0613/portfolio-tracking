@@ -11,10 +11,10 @@ import { DEMO_HISTORY, DEMO_BENCHMARKS, DEMO_SNAPSHOT } from '../../data/demoDat
 
 // ── Portfolio constants ──────────────────────────────────────────────────────
 
-const P_COLORS = { total: '#7c6ef5', crypto: '#f0a23c', us_stock: '#ec5b7e', tw_stock: '#4ec9a8' } as const
-const P_LABELS = { total: '總資產', crypto: '幣圈', us_stock: '美股', tw_stock: '台股' } as const
+const P_COLORS = { total: '#7c6ef5', crypto: '#f0a23c', us_stock: '#ec5b7e', tw_stock: '#4ec9a8', other: '#8b9bb4' } as const
+const P_LABELS = { total: '總資產', crypto: '幣圈', us_stock: '美股', tw_stock: '台股', other: '其他' } as const
 type PKey = keyof typeof P_COLORS
-const P_KEYS: PKey[] = ['total', 'crypto', 'us_stock', 'tw_stock']
+const P_KEYS: PKey[] = ['total', 'crypto', 'us_stock', 'tw_stock', 'other']
 
 // ── Benchmark constants ──────────────────────────────────────────────────────
 
@@ -40,11 +40,12 @@ const B_LABELS: Record<BTicker, string> = {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// other（手動來源）在使用者沒有這類資產時後端不會輸出 → 全部視為可缺
 interface HistoryData {
   dates: string[]
-  series: Record<PKey, number[]>
-  latest: Record<PKey, number>
-  metrics: Record<PKey, { total_return: number | null; sharpe: number | null; mdd: number | null }>
+  series: Partial<Record<PKey, number[]>>
+  latest: Partial<Record<PKey, number>>
+  metrics: Partial<Record<PKey, { total_return: number | null; sharpe: number | null; mdd: number | null }>>
 }
 
 interface BenchmarkSeries { ticker: string; label: string; color: string; dates: string[]; closes: number[] }
@@ -448,9 +449,10 @@ export default function TrendTab() {
         </div>
 
         <div className="trend-chip-group" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-          {P_KEYS.map(key => chip(P_LABELS[key], P_COLORS[key], pVis[key], false, () =>
-            setPVis(prev => ({ ...prev, [key]: !prev[key] }))
-          ))}
+          {P_KEYS.filter(key => key !== 'other' || (portData?.series?.other?.length ?? 0) > 0)
+            .map(key => chip(P_LABELS[key], P_COLORS[key], pVis[key], false, () =>
+              setPVis(prev => ({ ...prev, [key]: !prev[key] }))
+            ))}
         </div>
 
         <div className="trend-chip-group" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>

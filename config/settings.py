@@ -41,12 +41,15 @@ PLATFORM_CATEGORY = {
     "fubon": "tw_stock",
     "firsttrade": "us_stock",
     "ibkr": "us_stock",
+    # 手動 CSV 匯入來源（不動產、現金、保單等），不隸屬台美股/幣圈
+    "manual": "other",
 }
 
 CATEGORY_LABEL = {
     "crypto": "幣圈",
     "tw_stock": "台股",
     "us_stock": "美股",
+    "other": "其他",
 }
 
 # Exchange rate (TWD per USD) — hardcoded until live FX API is added

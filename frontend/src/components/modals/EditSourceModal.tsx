@@ -110,7 +110,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
     mut.mutate({ account_label: accountLabel.trim(), credentials })
   }
 
-  const needsCredsLoad = t.auth !== 'manual' && t.auth !== 'email'
+  const needsCredsLoad = t.auth !== 'manual' && t.auth !== 'email' && t.auth !== 'csv'
   const isLoading = needsCredsLoad && (credsLoading || !credentialsReady)
 
   return (
