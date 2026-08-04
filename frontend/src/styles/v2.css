@@ -1015,6 +1015,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   padding: 18px 32px 22px;
   margin-top: auto;
 }
+/* 內容只略高於視窗時，footer 仍留在視窗底部而非落在摺線外 */
+.site-footer-sticky {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+}
 .site-footer-inner {
   max-width: 1320px;
   margin: 0 auto;
@@ -1109,4 +1115,80 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   .legal-nav { gap: 12px; }
   .legal-doc { padding: 28px 18px 40px; }
   .site-footer { padding: 16px 18px 20px; }
+}
+
+/* ── Guide（Settings 頁的圖文說明 popup）────────────────────── */
+.guide-entry {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.guide-entry-title { font-size: 13px; font-weight: 600; }
+.guide-entry-sub { font-size: 11px; color: var(--fg-3); margin-top: 3px; line-height: 1.6; }
+
+.guide-doc.modal-body { padding: 24px 26px 30px; }
+.guide-step + .guide-step { margin-top: 30px; padding-top: 26px; border-top: 1px solid var(--bdr-2); }
+.guide-step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.guide-step-num {
+  width: 20px; height: 20px; flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+  font-size: 11px; font-weight: 600;
+  display: grid; place-items: center;
+}
+.guide-step-head h4 { font-size: 13px; font-weight: 600; }
+.guide-step-body { font-size: 12px; color: var(--fg-2); line-height: 1.85; }
+.guide-step-body p + p { margin-top: 8px; }
+.guide-step-body a { color: var(--accent); text-decoration: none; }
+.guide-step-body a:hover { text-decoration: underline; }
+
+.guide-feature { margin-top: 16px; }
+.guide-feature strong {
+  display: inline-block;
+  color: var(--fg);
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.guide-figs { margin-top: 12px; display: grid; gap: 14px; }
+.guide-fig img {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--bdr);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  cursor: zoom-in;
+}
+.guide-fig img:hover { border-color: var(--bdr-strong); }
+.guide-fig figcaption { font-size: 11px; color: var(--fg-3); margin-top: 6px; }
+
+.guide-note {
+  margin-top: 14px;
+  display: flex; gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surf);
+  border: 1px solid var(--bdr);
+  line-height: 1.7;
+}
+.guide-note-warn { border-color: rgba(236, 91, 126, 0.35); background: rgba(236, 91, 126, 0.07); }
+.guide-note strong { display: block; color: var(--fg); font-size: 12px; margin-bottom: 3px; }
+.guide-note span { color: var(--fg-2); }
+.guide-note-icon { width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px; color: var(--c-neg); }
+
+/* 圖片放大：疊在說明 modal 之上 */
+.guide-lightbox { z-index: 300; cursor: zoom-out; padding: 32px; }
+.guide-lightbox img {
+  max-width: min(1440px, 100%);
+  max-height: calc(100vh - 64px);
+  border: 1px solid var(--bdr);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+}
+.guide-lightbox-close { position: fixed; top: 16px; right: 16px; background: var(--surf-2); }
+
+@media (max-width: 720px) {
+  .guide-entry { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .guide-doc.modal-body { padding: 18px; }
+  .guide-lightbox { padding: 12px; }
 }

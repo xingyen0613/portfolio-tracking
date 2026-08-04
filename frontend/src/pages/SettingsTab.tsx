@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthContext'
 import { useDemo } from '../context/DemoContext'
 import { Icon } from '../components/Icon'
+import GuideSection from '../components/GuideSection'
 import LoginPromptModal from '../components/modals/LoginPromptModal'
 import { cancelSubscription, redirectToEcpayCheckout, useEntitlement } from '../api/billing'
 
@@ -72,7 +73,7 @@ function SubscriptionSection() {
     <>
       <h3 style={{ marginTop: 24 }}>Subscription</h3>
       <p className="muted">訂閱後可新增來源並啟用每日自動同步。</p>
-      <div className="card card-pad">
+      <div className="card card-pad" data-tour="subscription">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
@@ -185,6 +186,8 @@ export default function SettingsTab() {
       </div>
 
       <SubscriptionSection />
+
+      <GuideSection />
 
       <h3 style={{ marginTop: 24, color: 'var(--c-neg)' }}>Danger zone</h3>
       <p className="muted">登出此裝置。</p>

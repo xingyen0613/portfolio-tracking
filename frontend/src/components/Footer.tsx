@@ -6,14 +6,23 @@ type Props = {
   compact?: boolean
   /** Same-tab navigation — used on the legal pages themselves. */
   sameTab?: boolean
+  /** 釘在視窗底部（內容只略高於視窗的頁面，避免 footer 落在摺線外）。 */
+  sticky?: boolean
 }
 
-export default function Footer({ compact = false, sameTab = false }: Props) {
+export default function Footer({ compact = false, sameTab = false, sticky = false }: Props) {
   const target = sameTab ? undefined : '_blank'
   const rel = sameTab ? undefined : 'noopener noreferrer'
+  const cls = [
+    'site-footer',
+    compact ? 'site-footer-compact' : '',
+    sticky ? 'site-footer-sticky' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <footer className={compact ? 'site-footer site-footer-compact' : 'site-footer'}>
+    <footer className={cls}>
       <div className="site-footer-inner">
         <div className="site-footer-brand">© 2026 ALL IN · Portfolio tracker</div>
         <nav className="site-footer-links">
