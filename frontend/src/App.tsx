@@ -158,10 +158,10 @@ function AppInner({ initialRoute }: { initialRoute: Route | null }) {
           {route === 'alerts' && <AlertsTab />}
           {route === 'settings' && <SettingsTab />}
         </div>
-        <Footer />
+        <Footer sticky={route === 'settings'} />
       </main>
       <ModalHost modal={modal} setModal={setModal} />
-      {isDemo && <DemoTour />}
+      {isDemo && <DemoTour setRoute={setRoute} />}
       {oauthToast && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9999,

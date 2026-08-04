@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useDemo } from '../context/DemoContext'
+import type { Route } from '../App'
 
 interface TourStep {
   title: string
   body: string
   targets: string[]
+  /** 該步驟的目標元素所在分頁，切換步驟時一併切過去 */
+  route: Route
 }
 
 const STEPS: TourStep[] = [
@@ -12,21 +15,37 @@ const STEPS: TourStep[] = [
     title: '新增來源',
     body: '從左側 Sources 或右上角的按鈕，加入交易所、錢包或券商作為資料來源。',
     targets: ['[data-tour="sidebar-sources"]', '[data-tour="add-source-btn"]'],
+    route: 'dashboard',
   },
   {
     title: 'Performance Metrics',
     body: '一眼掌握各類資產的當前表現與漲跌幅。',
     targets: ['[data-tour="perf-metrics"]'],
+    route: 'dashboard',
   },
   {
     title: 'Asset Trend',
     body: '查看歷史資產淨值走勢，並可與其他 benchmark 比較。',
     targets: ['[data-tour="asset-trend"]'],
+    route: 'dashboard',
   },
   {
     title: 'Allocation & Holdings by Source',
     body: '深入每個來源的資產配置與詳細持倉細節。',
     targets: ['[data-tour="allocation"]', '[data-tour="holdings"]'],
+    route: 'dashboard',
+  },
+  {
+    title: '訂閱方案',
+    body: 'Settings 頁的 Subscription 區塊可開通訂閱，啟用每日自動同步、細部持倉明細與 benchmark 回測比較。',
+    targets: ['[data-tour="subscription"]'],
+    route: 'settings',
+  },
+  {
+    title: '使用說明',
+    body: '不確定怎麼開始？同一頁下方的「使用說明」有完整圖文教學，從連接第一個來源到看懂各項圖表。',
+    targets: ['[data-tour="guide"]'],
+    route: 'settings',
   },
 ]
 
@@ -42,7 +61,7 @@ interface Hole {
   h: number
 }
 
-export default function DemoTour() {
+export default function DemoTour({ setRoute }: { setRoute: (r: Route) => void }) {
   const { tourActive, endTour } = useDemo()
   const [step, setStep] = useState(0)
   const [holes, setHoles] = useState<Hole[]>([])
@@ -77,8 +96,13 @@ export default function DemoTour() {
     const first = document.querySelector(STEPS[step].targets[0])
     first?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     measure()
-    const t = setTimeout(measure, 400)
-    return () => clearTimeout(t)
+    // 切換分頁的步驟：等新頁面渲染與捲動歸零後再量一次
+    const t1 = setTimeout(measure, 120)
+    const t2 = setTimeout(measure, 400)
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
   }, [tourActive, step, measure])
 
   // Recompute holes on resize / scroll (capture inner scroll containers)
@@ -101,8 +125,12 @@ export default function DemoTour() {
   if (!tourActive) return null
 
   const isLast = step === STEPS.length - 1
-  const next = () => (isLast ? endTour() : setStep(s => s + 1))
-  const prev = () => setStep(s => Math.max(0, s - 1))
+  const goto = (i: number) => {
+    setRoute(STEPS[i].route)
+    setStep(i)
+  }
+  const next = () => (isLast ? endTour() : goto(step + 1))
+  const prev = () => goto(Math.max(0, step - 1))
 
   // Union of holes → anchor for tooltip placement
   const vw = window.innerWidth
