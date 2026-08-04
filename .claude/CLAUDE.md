@@ -92,6 +92,12 @@ uv run alembic upgrade head
 - 預覽模式的訂閱按鈕不受 `SettingsTab.tsx` 的 `CHECKOUT_PENDING` 影響：一律顯示可點的「登入後訂閱」→ 開 `LoginPromptModal`（與登入頁相同的 GoogleLogin），登入成功即 `exitDemo()`
 - 用途：可把 `https://allin-portfolio-tracking.pages.dev/preview/settings` 這種網址交給第三方（如金流服務商）審核，對方不需帳號即可看到訂閱方案頁
 - Cloudflare Pages 靠 `frontend/public/_redirects` 的 `/* /index.html 200` 支援子路徑直開
+- 導覽教學（`DemoTour.tsx`）共 6 步，每個 `TourStep` 帶 `route` 欄位；切到 Settings 的步驟由 `App.tsx` 傳入的 `setRoute` 換分頁，spotlight 目標靠 `data-tour` 屬性定位
+
+### Settings 頁圖文使用說明
+- `components/GuideSection.tsx`：Subscription 下方的 `Guide` 區塊，點按鈕開 modal（內容為六步驟圖文），點圖開 lightbox（z-index 300，疊在 modal 之上）
+- 截圖存 `frontend/public/guide/step-01..16.jpg`（1440px 寬、全部 lazy load），非 bundler 資產，改圖直接換檔即可
+- Settings 頁內容高於視窗，footer 以 `<Footer sticky>`（`route === 'settings'` 時）釘在視窗底部；其他頁維持隨內容捲動
 
 ### Hyperliquid Connector
 - info endpoint **公開唯讀，不需 API key**，只要地址（同 sui_wallet 模式，1:N by `addr[:10]`）；下單才需私鑰，本專案不碰
