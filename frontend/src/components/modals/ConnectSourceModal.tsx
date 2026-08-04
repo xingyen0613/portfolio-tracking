@@ -254,7 +254,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
     setWarning(null)
     if (!canSubmit) return
     if (!accountLabel.trim()) {
-      setError('請輸入連接名稱。')
+      setError('請輸入來源名稱。')
       return
     }
     mut.mutate({
@@ -291,7 +291,7 @@ export default function ConnectSourceModal({ templateId, close, setModal }: Prop
       <div className="modal-body">
         {t.auth !== 'yuanta' && (
           <div className="field">
-            <label className="field-label">連接名稱</label>
+            <label className="field-label">來源名稱</label>
             <input
               className="input"
               placeholder={`${t.name} — 主帳戶`}

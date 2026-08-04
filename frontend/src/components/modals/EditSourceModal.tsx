@@ -104,7 +104,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
   const handleSubmit = () => {
     setError(null)
     if (!accountLabel.trim()) {
-      setError('請輸入連接名稱。')
+      setError('請輸入來源名稱。')
       return
     }
     mut.mutate({ account_label: accountLabel.trim(), credentials })
@@ -134,7 +134,7 @@ export default function EditSourceModal({ connectorId, close }: Props) {
         ) : (
           <>
             <div className="field">
-              <label className="field-label">連接名稱</label>
+              <label className="field-label">來源名稱</label>
               <input
                 className="input"
                 value={accountLabel}
