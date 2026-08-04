@@ -407,6 +407,42 @@ def get_latest_category_totals(user_id: str) -> pd.DataFrame:
 
 
 
+def get_manual_account_latest(user_id: str) -> list[dict]:
+    """Return the latest account_snapshot per manual (CSV-imported) account.
+
+    Manual sources have no connector and therefore no normalized_holdings —
+    their only data is the account_snapshots written by the CSV import, so the
+    Holdings page reads them from here instead of get_holdings().
+    """
+    sql = """
+        SELECT DISTINCT ON (a.id)
+               a.account_key, a.label, acs.snapshot_date, acs.total_value, acs.currency
+        FROM account_snapshots acs
+        JOIN accounts a  ON acs.account_id = a.id
+        JOIN platforms p ON a.platform_id = p.id
+        WHERE p.name = 'manual'
+          AND acs.user_id = %s
+          AND acs.total_value IS NOT NULL
+        ORDER BY a.id, acs.snapshot_date DESC, acs.created_at DESC
+    """
+    with get_conn() as conn:
+        rows = conn.execute(sql, (user_id,)).fetchall()
+
+    fx = get_latest_fx_rate()
+    result: list[dict] = []
+    for row in rows:
+        value = float(row["total_value"])
+        if row["currency"] == "TWD":
+            value = value / fx
+        result.append({
+            "account_key":   row["account_key"],
+            "label":         row["label"] or row["account_key"],
+            "snapshot_date": str(row["snapshot_date"]),
+            "value_usd":     value,
+        })
+    return result
+
+
 def get_yuanta_latest(user_id: str) -> dict:
     """Return the latest daily net_asset snapshot for yuanta from account_snapshots."""
     sql = """

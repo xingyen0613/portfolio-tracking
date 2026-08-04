@@ -111,7 +111,10 @@ export async function importHistoricalData(
   form.append('file', file)
   form.append('currency', currency)
   form.append('conflict_strategy', conflictStrategy)
-  const r = await api.post(`/api/connectors/${connectorId}/historical-import`, form)
+  // 匯入會把 category_snapshots 一路重算到今天，跨度大的 CSV 可能要數十秒
+  const r = await api.post(`/api/connectors/${connectorId}/historical-import`, form, {
+    timeout: SYNC_TIMEOUT_MS,
+  })
   return r.data
 }
 

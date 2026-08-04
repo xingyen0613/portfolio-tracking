@@ -4,7 +4,7 @@
  * is just a visual placeholder.
  */
 
-export type AuthMethod = 'apikey' | 'address' | 'ibkr' | 'sinopac' | 'fubon' | 'yuanta' | 'email' | 'manual'
+export type AuthMethod = 'apikey' | 'address' | 'ibkr' | 'sinopac' | 'fubon' | 'yuanta' | 'email' | 'manual' | 'csv'
 export type Category = 'crypto' | 'us' | 'tw' | 'other'
 
 export interface GetApiConfig {
@@ -94,7 +94,7 @@ export const SOURCE_TEMPLATES: SourceTemplate[] = [
   { id: 'yuanta',   name: '元大證券',           desc: '台灣券商 · Gmail PDF',        category: 'tw',     auth: 'yuanta',  abbr: 'YT',   color: '#004b99', textColor: '#fff', implemented: true, singleInstance: true },
   { id: 'sinopac',  name: '永豐證券',           desc: '台灣券商 · Shioaji API',      category: 'tw',   auth: 'sinopac', abbr: '永',   color: '#003D82', textColor: '#fff', implemented: true, logoUrl: '/logos/sinopac.jpg' },
   { id: 'fubon',    name: '富邦證券',           desc: '台灣券商 · Neo API',          category: 'tw',     auth: 'fubon',   abbr: 'FB',   color: '#0a5e3e', textColor: '#fff', implemented: true, logoUrl: '/logos/fubon.png' },
-  { id: 'manual',   name: '手動輸入',           desc: '不動產、現金、自訂資產',       category: 'other',  auth: 'manual',  abbr: '+',    color: '#3a3a44', textColor: '#fff', implemented: false, comingSoon: 'v2 推出' },
+  { id: 'manual',   name: '手動輸入',           desc: '不動產、現金、自訂資產 · CSV 匯入', category: 'other',  auth: 'csv',     abbr: '＋',   color: '#3a3a44', textColor: '#fff', implemented: true },
 ]
 
 export const CATEGORY_LABEL: Record<Category | 'all', string> = {

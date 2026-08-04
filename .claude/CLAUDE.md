@@ -111,6 +111,17 @@ uv run alembic upgrade head
   - 取樣密度是 API 先天限制：近 30 天每日、更早每 7 天、三年帳戶可達 14 天一點
 - 現貨 481 token 多為 meme，`USD_THRESHOLD = 1.0` 過濾粉塵；無 USDC 計價對的 token 直接略過
 
+### 手動 CSV 來源（platform `manual` / category `other`）
+- 給用戶登錄**不屬於台股/美股/幣圈**的資產（不動產、保單、現金），第四個 category `other`（label「其他」）
+- **沒有 connector**：不進 `ENABLED_PLATFORMS`、不進 run_batch dispatch，因此新增平台的「六處清單」只需改 `PLATFORM_CATEGORY`；`connectors.py` 的 `NO_FETCH_PLATFORMS` 讓它跳過 try-fetch，`POST /refresh` 直接回 400
+- 資料唯一入口是既有的 `POST /api/connectors/{id}/historical-import`（CSV `date,total_value` + 幣別 USD/TWD），credentials 為空 dict
+- 新增來源時可**直接附 CSV**（選填）：`ConnectSourceModal` 的 mutationFn 串起 create → import 兩個呼叫，新來源必無舊資料所以固定用 `skip` 策略、不跑 dry-run；匯入失敗**不推翻**已建立的來源，只在成功畫面回報並請用戶到來源頁重試
+- **不寫 `normalized_holdings`**（`raw_payload_id` NOT NULL，偽造 raw payload 成本過高）→ Holdings 頁改由 `get_manual_account_latest()` 直接讀 `account_snapshots`，在 `holdings.py` 尾端組成一張 accounts 卡片
+- **carry forward**：`_aggregate_categories` 與 `rebuild_for_dates` 的聚合 SQL 本來就是「取 <= 該日最新一筆」，所以只要 category_snapshots 那天有被算過就會沿用；`historical_imports._fill_to_today()` 負責把最後一筆 CSV 之後補算到今天
+- `other` 全為 0 時 `/api/portfolio/history` **不輸出這條序列**，前端 TrendTab / PerformanceMetrics 也據此隱藏 chip 與卡片 —— 沒有手動資產的用戶（含 demo）畫面完全不變
+- `/api/portfolio/allocation/other` 下鑽顯示的是**各個手動來源**（公寓、保單…）而非標的
+- `_slugify()` 對純中文標籤會 fallback 成 `acct_<sha1[:8]>`：中文名稱本來全被壓成 `"account"`，同用戶第二個中文來源會誤判 409
+
 ### Holdings API dust 過濾
 - `backend/routers/holdings.py:_build_sections` 在顯示層過濾 `|value_usd| < 5`
 - DB 仍存全量；只有 API response 過濾

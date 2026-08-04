@@ -20,6 +20,7 @@
 | IBKR | 美股持倉 + 現金（含負值保證金） | Flex Web Service API | USD |
 | Firsttrade | 美股持倉 | 手動輸入（connector 待實作） | USD |
 | 元大證券 | 台股每日淨資產（持股市值 + 擔保品 + 複委託 + 期貨權益 - 融資餘額） | 月對帳單 PDF 解析 | TWD |
+| 手動輸入 | 不屬於台股/美股/幣圈的任意資產估值（不動產、保單、現金…），歸入「其他」類別 | 使用者自行上傳 CSV（`date, total_value`），匯入時選擇幣別 | USD / TWD |
 
 ## EVM 多鏈錢包 Pipeline
 

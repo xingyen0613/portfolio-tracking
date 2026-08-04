@@ -14,7 +14,7 @@ Query parameters (form fields):
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
 
@@ -30,6 +30,24 @@ WALLET_PLATFORMS = {"evm_wallet", "sol_wallet", "sui_wallet"}
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _fill_to_today(written_dates: list[str]) -> list[str]:
+    """Extend the written dates up to today so carry-forward is continuous.
+
+    A manual/CSV source only has values on the dates present in the file. The
+    aggregation query in rebuild_for_dates already carries the most recent
+    snapshot forward, but it only runs on the dates it is given — so without
+    this, the imported value would vanish from the chart the day after the last
+    CSV row. Mirrors the gap-filling in run_batch._aggregate_categories.
+    """
+    dates = set(written_dates)
+    today = date.today().isoformat()
+    fill = date.fromisoformat(max(dates)) + timedelta(days=1)
+    while fill.isoformat() <= today:
+        dates.add(fill.isoformat())
+        fill += timedelta(days=1)
+    return sorted(dates)
 
 
 def _get_account_id(conn, platform: str, account_key: str, user_id: str) -> int | None:
@@ -222,7 +240,7 @@ async def import_historical_data(
     if written_dates:
         try:
             with get_conn() as conn:
-                rebuild_for_dates(conn, user_id, written_dates)
+                rebuild_for_dates(conn, user_id, _fill_to_today(written_dates))
         except Exception:
             import logging
             logging.getLogger(__name__).exception(

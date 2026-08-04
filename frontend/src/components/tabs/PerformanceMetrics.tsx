@@ -10,6 +10,7 @@ const P_COLORS = {
   crypto:   '#f0a23c',
   us_stock: '#ec5b7e',
   tw_stock: '#4ec9a8',
+  other:    '#8b9bb4',
 } as const
 
 const P_LABELS = {
@@ -17,16 +18,18 @@ const P_LABELS = {
   crypto:   '加密貨幣',
   us_stock: '美股',
   tw_stock: '台股',
+  other:    '其他',
 } as const
 
 type PKey = keyof typeof P_COLORS
-const P_KEYS: PKey[] = ['total', 'crypto', 'us_stock', 'tw_stock']
+const P_KEYS: PKey[] = ['total', 'crypto', 'us_stock', 'tw_stock', 'other']
 const WINDOWS = ['1W', '1M', '3M', '6M', '1Y', '2Y', 'YTD', 'all']
 
 interface HistoryData {
   dates: string[]
   series: Record<string, number[]>
-  latest: Record<PKey, number>
+  // other（手動來源）在使用者沒有這類資產時後端不會輸出
+  latest: Partial<Record<PKey, number>>
 }
 
 interface MetricsData {
@@ -87,7 +90,7 @@ export default function PerformanceMetrics() {
 
       <div className="perf-cards-scroll">
       <div className="perf-cards">
-        {P_KEYS.map(key => {
+        {P_KEYS.filter(key => key !== 'other' || portData?.latest?.other != null).map(key => {
           const color   = P_COLORS[key]
           const balance = portData?.latest[key]
           const m       = metricsData?.[key]

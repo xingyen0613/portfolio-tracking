@@ -7,6 +7,7 @@ from app.auth.deps import get_current_user
 from app.dashboard.data import (
     get_holdings,
     get_latest_category_totals,
+    get_manual_account_latest,
 )
 from config.settings import CATEGORY_LABEL
 
@@ -84,9 +85,10 @@ PLATFORM_META: dict[str, dict] = {
     "yuanta":     {"display": "元大證券（台股）",   "abbr": "元",  "color": "#27ae60", "fg": "#fff"},
     "sinopac":    {"display": "永豐證券（台股）",   "abbr": "永",  "color": "#003D82", "fg": "#fff"},
     "fubon":      {"display": "富邦證券（台股）",   "abbr": "富",  "color": "#0a5e3e", "fg": "#fff"},
+    "manual":     {"display": "手動輸入（其他）",   "abbr": "＋",  "color": "#3a3a44", "fg": "#fff"},
 }
 
-CATEGORY_ORDER = {"crypto": 0, "us_stock": 1, "tw_stock": 2}
+CATEGORY_ORDER = {"crypto": 0, "us_stock": 1, "tw_stock": 2, "other": 3}
 
 # Platforms where holdings should be grouped by wallet address
 WALLET_PLATFORMS = {"sui_wallet", "sol_wallet", "evm_wallet", "hyperliquid"}
@@ -256,6 +258,41 @@ def get_all_holdings(current_user: dict = Depends(get_current_user)) -> dict[str
                 "total_usd": round(platform_total, 2),
                 "sections":  sections,
             })
+
+    # ── 手動來源（CSV 匯入，無 normalized_holdings）────────────────────────────
+    manual_accounts = get_manual_account_latest(user_id)
+    if manual_accounts:
+        meta = PLATFORM_META["manual"]
+        accounts = [
+            {
+                "account_key": m["account_key"],
+                "address":     None,
+                "chain":       None,
+                "label":       m["label"],
+                "total_usd":   round(m["value_usd"], 2),
+                "sections":    [{
+                    "label":     f"最後更新 {m['snapshot_date']}",
+                    "total_usd": round(m["value_usd"], 2),
+                    "rows":      [{
+                        "symbol":    m["label"],
+                        "name":      "",
+                        "quantity":  "—",
+                        "price":     "—",
+                        "value_usd": round(m["value_usd"], 2),
+                    }],
+                }],
+            }
+            for m in manual_accounts
+        ]
+        accounts.sort(key=lambda a: -a["total_usd"])
+        platforms.append({
+            **meta,
+            "name":      "manual",
+            "category":  "other",
+            "total_usd": round(sum(a["total_usd"] for a in accounts), 2),
+            "sections":  [],
+            "accounts":  accounts,
+        })
 
     # ── 過濾掉已歸零平台，排序 ────────────────────────────────────────────────
     platforms = [p for p in platforms if p["total_usd"] != 0]

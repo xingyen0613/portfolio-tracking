@@ -11,6 +11,7 @@ const P_COLORS: Record<string, string> = {
   crypto:   '#f0a23c',
   us_stock: '#ec5b7e',
   tw_stock: '#4ec9a8',
+  other:    '#8b9bb4',
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────

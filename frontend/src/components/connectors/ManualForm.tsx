@@ -1,7 +1,8 @@
 import { Icon } from '../Icon'
 
 /**
- * Manual entry / Schwab placeholder. UI only — no backend support in v1.
+ * Charles Schwab placeholder. UI only — no backend support yet.
+ * 手動 CSV 來源已獨立為 CsvSourceForm，不再共用這個表單。
  */
 export default function ManualForm() {
   return (
@@ -45,7 +46,8 @@ export default function ManualForm() {
         </button>
       </div>
       <div className="field-hint" style={{ color: 'var(--c-crypto)' }}>
-        手動輸入功能將在 v2 推出，目前僅供預覽介面。
+        Charles Schwab 連接功能尚未推出，目前僅供預覽介面。
+        若要自行輸入資產金額，請改用「其他」分類中的「手動輸入」來源。
       </div>
     </>
   )

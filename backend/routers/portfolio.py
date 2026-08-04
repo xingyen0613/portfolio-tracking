@@ -12,6 +12,7 @@ from app.dashboard.data import (
     get_crypto_symbol_breakdown,
     get_us_stock_symbol_breakdown,
     get_tw_stock_symbol_breakdown,
+    get_manual_account_latest,
 )
 from app.dashboard.metrics import compute_metrics
 from app.utils.fx import get_latest_fx_rate
@@ -19,7 +20,7 @@ from config.settings import CATEGORY_LABEL
 
 router = APIRouter()
 
-CATEGORIES = ["crypto", "us_stock", "tw_stock"]
+CATEGORIES = ["crypto", "us_stock", "tw_stock", "other"]
 
 WINDOW_DAYS: dict[str, int | None] = {
     "1W": 7, "1M": 30, "3M": 90, "6M": 180, "1Y": 365, "2Y": 730, "all": None,
@@ -59,7 +60,12 @@ def portfolio_history(
         start = pivot.index.max() - pd.Timedelta(days=days)
         pivot = pivot[pivot.index >= start]
 
-    keys = ["total"] + CATEGORIES
+    # 「其他」（手動 CSV 來源）多數用戶沒有 —— 全為 0 時整條序列不輸出，
+    # 前端才不會多出一條貼底的線與一張空卡片。total 仍照常把它加總進去。
+    keys = ["total"] + [
+        c for c in CATEGORIES
+        if c != "other" or (not pivot.empty and pivot["other"].abs().sum() > 0)
+    ]
     dates = pivot.index.strftime("%Y-%m-%d").tolist()
     series  = {k: pivot[k].round(2).tolist() for k in keys}
     latest  = {k: round(float(pivot[k].iloc[-1]), 2) if not pivot.empty else 0.0 for k in keys}
@@ -100,6 +106,20 @@ def portfolio_allocation_drilldown(
         "tw_stock": lambda: get_tw_stock_symbol_breakdown(user_id),
     }
     label = CATEGORY_LABEL.get(category, category)
+
+    # 「其他」沒有標的層級的持倉，改以各個手動來源（公寓、保單…）作為明細
+    if category == "other":
+        manual = get_manual_account_latest(user_id)
+        total = sum(m["value_usd"] for m in manual)
+        items = [
+            {
+                "symbol": m["label"],
+                "value_usd": round(m["value_usd"], 2),
+                "pct": round(m["value_usd"] / total * 100, 1) if total > 0 else 0.0,
+            }
+            for m in sorted(manual, key=lambda m: -m["value_usd"])
+        ]
+        return {"category": category, "label": label, "items": items}
 
     fetch = fetchers.get(category)
     if fetch is None:
