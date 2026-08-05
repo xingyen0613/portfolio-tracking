@@ -48,20 +48,22 @@ def get_entitlement(user_id: str) -> dict:
 
     Returns {'active': bool, 'status': str, 'provider': str|None, 'current_period_end': str|None}.
     Precedence:
-      1. is_system users are always active (owner exemption).
-      2. Otherwise read the user's subscriptions row.
-      3. No row → status 'none', inactive.
-
-    When billing is not enforced (default), short-circuit to entitled before any
-    DB read — also keeps things working before the subscriptions table exists.
+      1. is_system users are always active (owner exemption). Checked before the
+         enforcement switch so the owner reads as provider 'system' either way —
+         the frontend shows them as subscribed instead of 'unenforced'.
+      2. Billing not enforced (default) → everyone entitled, status 'unenforced'.
+         Short-circuits before touching `subscriptions`, which keeps things
+         working before that table exists.
+      3. Otherwise read the user's subscriptions row.
+      4. No row → status 'none', inactive.
     """
-    if not _billing_enforced():
-        return {"active": True, "status": "unenforced", "provider": None,
-                "current_period_end": None, "cancel_at_period_end": False}
-
     user = fetch_one("SELECT is_system FROM users WHERE id = %s", (user_id,))
     if user and user["is_system"]:
         return {"active": True, "status": "active", "provider": "system",
+                "current_period_end": None, "cancel_at_period_end": False}
+
+    if not _billing_enforced():
+        return {"active": True, "status": "unenforced", "provider": None,
                 "current_period_end": None, "cancel_at_period_end": False}
 
     row = fetch_one(
