@@ -60,15 +60,17 @@ function SubscriptionSection() {
     }
   }
 
-  const label = !entitlement
+  // 只有「付費中的 ecpay 訂閱」才算已訂閱。comp（早期用戶）與 system（站主）
+  // 照樣放行所有功能，但顯示為未訂閱並保留訂閱入口。
+  const paid = entitlement?.provider === 'ecpay' && entitlement.active ? entitlement : null
+  const label = !paid
     ? STATUS_LABELS.none
-    : entitlement.cancel_at_period_end && entitlement.active
+    : paid.cancel_at_period_end
       ? '已排程取消'
-      : (STATUS_LABELS[entitlement.status] ?? entitlement.status)
-  const periodEnd = entitlement?.current_period_end?.slice(0, 10)
-  const canCancel =
-    entitlement?.provider === 'ecpay' && entitlement.active && !entitlement.cancel_at_period_end
-  const showSubscribe = !entitlement || (!entitlement.active && entitlement.status !== 'unenforced')
+      : (STATUS_LABELS[paid.status] ?? paid.status)
+  const periodEnd = paid?.current_period_end?.slice(0, 10)
+  const canCancel = !!paid && !paid.cancel_at_period_end
+  const showSubscribe = !paid
 
   return (
     <>
