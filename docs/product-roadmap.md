@@ -62,7 +62,7 @@ SQLite 是單一檔案，多人同時讀寫會 lock，不適合生產環境。
 ```
 users             （帳號資料：id, email, google_id, name, created_at）
 user_connectors   （每個用戶設定哪些連接器 + 加密的 API Key）
-subscriptions     （付費狀態：user_id, plan, status, stripe_customer_id, expires_at）
+subscriptions     （付費狀態：user_id, provider, external_id, status, current_period_end, cancel_at_period_end）
 ```
 
 ### 0-B：API Key 管理方式改變
@@ -110,7 +110,7 @@ Phase 0 是純後端/資料庫工作，前端不需要動。這段時間拿來�
 | 設定頁 | 連接器管理、帳戶資料、訂閱狀態 |
 | 新增連接器 Wizard | 選平台 → 填資料 → 測試連線 → 完成 |
 | CSV 匯入頁 | 上傳、預覽、確認流程 |
-| 訂閱升級頁 | 方案比較、Stripe Checkout 入口 |
+| 訂閱升級頁 | 方案比較、綠界付款頁入口 |
 
 ### 完成條件
 設計稿涵蓋上述所有頁面，且主要互動流程（登入、新增連接器、CSV 匯入）有完整的 flow 可以參考。
@@ -214,30 +214,41 @@ date,platform,symbol,quantity,price_usd,category
 
 ---
 
-## Phase 5：訂閱金流（Stripe）
-**優先度：中 | 工期：1–2 週 | 建議等有真實測試用戶後再做**
+## Phase 5：訂閱金流（綠界 ECPay）
+**優先度：中 | 狀態：已上線，正式環境端到端驗證通過（2026-08-06）**
 
-### 方案規劃建議
+原訂 Stripe，因正式收款需台灣以外法律實體而改用綠界 ECPay（台灣本地）。PayPal 亦評估後放棄。
+
+### 實際方案
+
+單一方案，非 Free / Pro 分層：
 
 ```
-Free Plan：
-  - 1 個連接器
-  - 30 天歷史資料
-  - 無 Benchmark 比較
+訂閱（NT$50 / 月，AIO 定期定額信用卡）：
+  - 每日自動跨平台紀錄資產變化
+  - 細部持倉明細
+  - 各項 benchmark 回測比較
 
-Pro Plan（定價待定/月）：
-  - 無限連接器
-  - 完整歷史資料
-  - Benchmark 比較
-  - CSV 匯入功能
+未訂閱：
+  - 不能新增來源（backend/routers/connectors.py:128）
+  - 每日 batch 不跑（app/jobs/run_batch.py:60）
 ```
 
-### 需要做的事
-- [ ] Stripe 帳號設定、建立 Product + Price
-- [ ] 後端 `/api/checkout` endpoint → 建立 Stripe Checkout Session
-- [ ] Stripe Webhook 接收端點 → 更新用戶 subscription_status
-- [ ] 前端 Pricing 頁面
-- [ ] 功能 gate：Free 用戶碰到付費功能顯示升級提示
+Gating 一律走 `app/services/entitlements.py` 的 `get_entitlement` / `is_active`，該層不認識任何金流商 —— ECPay、comp 白名單、`is_system` 都只是往 `subscriptions` 寫一個 `status`。
+
+### 已完成
+- [x] 綠界正式特店申請 + 信用卡收款服務審核通過
+- [x] 後端 `/api/billing/checkout` → 組 AIO 定期定額參數 + CheckMacValue，前端隱藏 form POST 跳綠界付款頁（綠界禁 iframe，故非 redirect URL）
+- [x] 兩個 callback 取代 webhook：`ReturnURL`（首刷）、`PeriodReturnURL`（第 2 期起每月），CMV 驗簽後寫 `subscriptions`
+- [x] 每日對帳兜底：`reconcile_subscriptions()` 掛在 `/internal/trigger-batch` daily 最前，打 `QueryCreditCardPeriodInfo` 補漏掉的 callback
+- [x] 取消訂閱：綠界無 Customer Portal，自建按鈕 → `CreditCardPeriodAction`（僅終止後續扣款，本期照常可用到期）
+- [x] 前端訂閱區塊（`SettingsTab.tsx`）+ 免登入預覽頁 `/preview/settings`（送審用）
+- [x] 功能 gate：新增來源、每日 batch
+
+### 未決 / 已知問題
+- [ ] `BILLING_ENFORCED` 尚未開啟 —— 開了會立刻斷掉 5 位無 subscription 的既有用戶，建議先 `grant_comp` 給他們當老用戶優待
+- [ ] `BILLING_ENFORCED=false` 時 `get_entitlement` 在讀 `subscriptions` 前就短路，導致**已付費用戶前端仍顯示未訂閱、且無法取消**（`is_system` 那一半已於 PR #20 解掉）
+- [ ] 定價 NT$50 硬編碼在 `SettingsTab.tsx`，未從 API 取；調價要同時改前端與 `ECPAY_PERIOD_AMOUNT`
 
 ---
 
@@ -265,7 +276,7 @@ Pro Plan（定價待定/月）：
 | Week 7 | Phase 2 | 部署上線，可給測試用戶網址 ← **Alpha** |
 | Week 8–10 | Phase 3 | 用戶可自行新增連接器 |
 | Week 11–12 | Phase 4 | CSV 匯入可用 ← **Beta** |
-| Week 13–14 | Phase 5 | Stripe 訂閱上線 ← **正式收費** |
+| Week 13–14 | Phase 5 | 綠界 ECPay 訂閱上線 ← **正式收費** |
 | Week 15+ | Phase 6+ | 持續迭代 |
 
 ---
