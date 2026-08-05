@@ -7,9 +7,10 @@ import GuideSection from '../components/GuideSection'
 import LoginPromptModal from '../components/modals/LoginPromptModal'
 import { cancelSubscription, redirectToEcpayCheckout, useEntitlement } from '../api/billing'
 
-// 綠界信用卡收款服務審核中，正式金流未開通 → 訂閱入口停用、顯示「申請中」。
-// 審核通過並完成正式環境測試後改為 false（取消訂閱按鈕不受此旗標影響）。
-const CHECKOUT_PENDING = true
+// 綠界信用卡收款服務已於 2026-08-06 審核通過，訂閱入口開放。
+// 保留旗標作為緊急開關：金流出狀況時改回 true 即可停用訂閱入口
+//（取消訂閱按鈕不受此旗標影響）。
+const CHECKOUT_PENDING = false
 
 const STATUS_LABELS: Record<string, string> = {
   active: '訂閱中',
