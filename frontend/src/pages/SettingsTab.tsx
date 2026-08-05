@@ -60,16 +60,19 @@ function SubscriptionSection() {
     }
   }
 
-  // 只有「付費中的 ecpay 訂閱」才算已訂閱。comp（早期用戶）與 system（站主）
-  // 照樣放行所有功能，但顯示為未訂閱並保留訂閱入口。
-  const paid = entitlement?.provider === 'ecpay' && entitlement.active ? entitlement : null
+  // 付費中的 ecpay 訂閱與 system（站主）都顯示為訂閱中；comp（早期用戶）照樣
+  // 放行所有功能，但顯示為未訂閱並保留訂閱入口。只有 ecpay 有得取消
+  // （system 沒有綠界委託單，按下去只會 404）。
+  const paid = entitlement?.active && (entitlement.provider === 'ecpay' || entitlement.provider === 'system')
+    ? entitlement
+    : null
   const label = !paid
     ? STATUS_LABELS.none
     : paid.cancel_at_period_end
       ? '已排程取消'
       : (STATUS_LABELS[paid.status] ?? paid.status)
   const periodEnd = paid?.current_period_end?.slice(0, 10)
-  const canCancel = !!paid && !paid.cancel_at_period_end
+  const canCancel = !!paid && paid.provider === 'ecpay' && !paid.cancel_at_period_end
   const showSubscribe = !paid
 
   return (
