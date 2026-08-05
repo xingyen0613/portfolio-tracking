@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(//Users/yen/claude/Portfolio-Tracking/.env)",
+      "Read(//Users/yen/claude/Portfolio-Tracking/.env.*)",
+      "Read(//Users/yen/claude/Portfolio-Tracking/.secrets/**)"
+    ],
+    "ask": [
+      "Bash(gcloud run services describe *)",
+      "Bash(gcloud run services update *)",
+      "Bash(gcloud secrets *)",
+      "Bash(gcloud run revisions describe *)"
+    ]
+  }
+}
