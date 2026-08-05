@@ -9,6 +9,20 @@
 
 需要知道某個環境變數的 key 名稱時，讀 `.env.example` 即可。
 
+**「不讀取」涵蓋一切間接手段，不只 Read 工具：**
+- `cat` / `grep` / `sed` / `head` / `tail` 等 shell 指令
+- `python -c "open('.env')"`、`load_dotenv()` 後把值 print 出來
+- `gcloud run services describe`、`gcloud run revisions describe`、`gcloud secrets versions access` — 這些會把雲端上的環境變數明文倒出來，等同讀 `.env`
+- 任何「讓程式讀進去再顯示出來」的變形
+
+允許的用法是**讓程式自己去讀、值不經過我的眼睛也不進對話**：例如腳本裡 `load_dotenv()` 後直接把值交給 SDK 或 `gcloud`，全程不 print、不寫進輸出。需要顯示時只印長度或遮罩（`<16 chars>`）。
+
+**禁止用伺服器密鑰偽造身分。** 拿 `JWT_SECRET` 自簽 token 去打 API、冒充任何帳號（包含測試帳號）都不行。需要登入態時，請用戶自己在瀏覽器操作，或明確徵求同意後再談方法。
+
+**若 IDE 選取、貼上或任何管道把 `.env` 內容送進對話**：立即告知用戶該值已洩漏、建議輪替，並且不得複述、引用或使用該值。
+
+> 這一節是行為準則，不是強制機制。真正的攔截在 `.claude/settings.json` 的 `permissions`（deny/ask）。兩者並存：規則說明意圖與邊界，permissions 負責在我判斷失誤時擋下來。
+
 ## 資料保護規則
 
 以下資料屬於不可變的歷史紀錄，**禁止在未獲明確授權的情況下修改或刪除**：
