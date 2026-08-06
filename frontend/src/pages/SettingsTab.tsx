@@ -69,7 +69,7 @@ function SubscriptionSection() {
   const label = !paid
     ? STATUS_LABELS.none
     : paid.cancel_at_period_end
-      ? '已排程取消'
+      ? '訂閱中（已取消續訂）'
       : (STATUS_LABELS[paid.status] ?? paid.status)
   const periodEnd = paid?.current_period_end?.slice(0, 10)
   const canCancel = !!paid && paid.provider === 'ecpay' && !paid.cancel_at_period_end
