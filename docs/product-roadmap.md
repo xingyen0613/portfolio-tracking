@@ -244,11 +244,11 @@ Gating 一律走 `app/services/entitlements.py` 的 `get_entitlement` / `is_acti
 - [x] 取消訂閱：綠界無 Customer Portal，自建按鈕 → `CreditCardPeriodAction`（僅終止後續扣款，本期照常可用到期）
 - [x] 前端訂閱區塊（`SettingsTab.tsx`）+ 免登入預覽頁 `/preview/settings`（送審用）
 - [x] 功能 gate：新增來源、每日 batch
+- [x] `BILLING_ENFORCED` 已在 Cloud Run 開啟（2026-08-06 確認）；5 位既有用戶先以 `grant_comp` 發老用戶優待，不會被斷線
 
 ### 未決 / 已知問題
-- [ ] `BILLING_ENFORCED` 尚未開啟 —— 開了會立刻斷掉 5 位無 subscription 的既有用戶，建議先 `grant_comp` 給他們當老用戶優待
-- [ ] `BILLING_ENFORCED=false` 時 `get_entitlement` 在讀 `subscriptions` 前就短路，導致**已付費用戶前端仍顯示未訂閱、且無法取消**（`is_system` 那一半已於 PR #20 解掉）
 - [ ] 定價 NT$50 硬編碼在 `SettingsTab.tsx`，未從 API 取；調價要同時改前端與 `ECPAY_PERIOD_AMOUNT`
+- [ ] `BILLING_ENFORCED=false` 時 `get_entitlement` 在讀 `subscriptions` 前就短路（`app/services/entitlements.py:65`），付費用戶會顯示未訂閱且無法取消 —— 目前 flag 已開故不觸發，但若哪天關回 false 會復現
 
 ---
 
