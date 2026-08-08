@@ -1,6 +1,6 @@
 /* ============================================================
    Landing page（未登入首頁）
-   深色底 + 科技感背景渲染，產品截圖以 CSS 3D 透視呈現梯形。
+   黑底 + 白色流線背景；產品截圖以 CSS 3D 側轉定格，投影成梯形。
    ============================================================ */
 
 .lp {
@@ -11,28 +11,31 @@
   overflow-x: clip;
 }
 
-/* --- 背景渲染：網格 + 兩團光暈 --- */
+/* --- 背景：黑底白色流線，右上帶一點紫色氛圍 --- */
 .lp-bg {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(900px 600px at 50% -8%, rgba(124, 110, 245, 0.22), transparent 62%),
-    radial-gradient(700px 500px at 88% 22%, rgba(78, 201, 168, 0.10), transparent 60%),
-    linear-gradient(to bottom, transparent 0%, var(--bg) 72%);
+    radial-gradient(760px 520px at 82% 14%, rgba(124, 110, 245, 0.16), transparent 64%),
+    linear-gradient(to bottom, transparent 0%, var(--bg) 78%);
 }
 
-.lp-bg::before {
-  content: '';
+.lp-bg svg {
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(760px 520px at 50% 6%, #000 0%, transparent 78%);
-  -webkit-mask-image: radial-gradient(760px 520px at 50% 6%, #000 0%, transparent 78%);
+  width: 100%;
+  height: 78vh;
+  min-height: 620px;
+  opacity: 0.28;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
+}
+
+.lp-bg path {
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 .lp > *:not(.lp-bg) {
@@ -42,7 +45,7 @@
 
 /* --- 頂欄 --- */
 .lp-nav {
-  max-width: 1120px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 22px 24px;
   display: flex;
@@ -84,6 +87,7 @@
 
 .lp-nav-links {
   display: flex;
+  align-items: center;
   gap: 22px;
 }
 
@@ -98,17 +102,38 @@
   color: var(--fg);
 }
 
-/* --- Hero --- */
+.lp-nav-login {
+  padding: 7px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+
+.lp-nav-login:hover {
+  background: rgba(124, 110, 245, 0.24);
+  border-color: var(--accent);
+}
+
+/* --- Hero：文案靠左，截圖在右 --- */
 .lp-hero {
-  max-width: 1120px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 64px 24px 0;
-  text-align: center;
+  padding: 72px 24px 0;
+  display: grid;
+  grid-template-columns: 0.82fr 1.18fr;
+  align-items: center;
+  gap: 40px;
 }
 
 .lp-hero-title {
   margin: 0;
-  font-size: clamp(40px, 6.4vw, 76px);
+  font-size: clamp(40px, 5.2vw, 68px);
   font-weight: 700;
   line-height: 1.04;
   letter-spacing: -0.03em;
@@ -121,7 +146,7 @@
 .lp-hero-title span {
   display: block;
   margin-top: 10px;
-  font-size: clamp(18px, 2.4vw, 30px);
+  font-size: clamp(18px, 2.1vw, 27px);
   font-weight: 500;
   letter-spacing: 0.01em;
   background: linear-gradient(90deg, var(--accent) 0%, #63d3b4 100%);
@@ -131,42 +156,57 @@
 }
 
 .lp-hero-sub {
-  margin: 20px auto 0;
-  max-width: 520px;
+  margin: 22px 0 0;
+  max-width: 400px;
   font-size: 15px;
-  line-height: 1.7;
+  line-height: 1.75;
   color: var(--fg-2);
 }
 
-/* Hero 截圖：卡片繞垂直軸側轉定格，投影成梯形（左緣近、右緣遠） */
+/* 截圖：卡片繞垂直軸側轉定格，左緣遠（小）、右緣近（大）；
+   左側漸變透明並染上紫色，讓它像從背景裡浮出來 */
 .lp-hero-shot {
-  margin: 56px auto 0;
-  max-width: 1000px;
+  position: relative;
+  margin-right: -40px;
+}
+
+/* 紫色渲染：從卡片左緣往外擴散，讓它像從背景裡浮出來 */
+.lp-hero-shot::before {
+  content: '';
+  position: absolute;
+  inset: -14% -4% -18% -22%;
+  background:
+    radial-gradient(46% 56% at 24% 50%, rgba(124, 110, 245, 0.42), transparent 70%),
+    radial-gradient(38% 44% at 62% 76%, rgba(99, 211, 180, 0.14), transparent 72%);
+  filter: blur(26px);
+  pointer-events: none;
 }
 
 .lp-hero-shot img {
+  position: relative;
   display: block;
   width: 100%;
   height: auto;
   border-radius: 14px;
   border: 1px solid var(--bdr);
-  transform: perspective(1400px) rotateY(-21deg) scale(1.04);
-  transform-origin: 50% 50%;
+  transform: perspective(1100px) rotateY(-21deg);
+  transform-origin: 18% 50%;
   box-shadow:
     0 50px 120px rgba(0, 0, 0, 0.75),
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-    -40px 30px 90px rgba(124, 110, 245, 0.16);
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  mask-image: linear-gradient(to right, transparent 2%, rgba(0, 0, 0, 0.5) 22%, #000 52%);
+  -webkit-mask-image: linear-gradient(to right, transparent 2%, rgba(0, 0, 0, 0.5) 22%, #000 52%);
 }
 
 /* --- 通用 section --- */
 .lp-section {
-  max-width: 1120px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 104px 24px 0;
+  padding: 108px 24px 0;
 }
 
 .lp-section-head {
-  max-width: 620px;
+  max-width: 640px;
   margin: 0 auto;
   text-align: center;
 }
@@ -188,6 +228,7 @@
   letter-spacing: -0.02em;
   line-height: 1.25;
   color: var(--fg);
+  text-wrap: balance;
 }
 
 .lp-section-head p,
@@ -203,11 +244,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 44px;
+  padding-top: 48px;
 }
 
 .lp-section-cta-last {
-  padding-top: 104px;
+  padding-top: 108px;
   padding-bottom: 96px;
 }
 
@@ -244,6 +285,7 @@
   color: var(--fg-2);
   font-size: 13px;
   font-weight: 500;
+  font-family: inherit;
   letter-spacing: 0.01em;
   cursor: pointer;
   transition: all 150ms;
@@ -280,31 +322,54 @@
   text-underline-offset: 2px;
 }
 
-/* --- 來源 --- */
-.lp-source-grid {
-  margin-top: 44px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+/* --- 來源：四張分類卡片疊成一副牌，hover 拉出 --- */
+/* perspective 放在容器上，四張卡片共用同一個消失點，
+   離中心越遠變形越大，才像實體的一副牌而不是四張各自傾斜的圖 */
+.lp-deck {
+  margin: 56px auto 0;
+  display: flex;
+  justify-content: center;
+  padding: 26px 0 10px;
+  perspective: 1300px;
+  perspective-origin: 50% 50%;
 }
 
-.lp-source-card {
-  padding: 22px 20px;
+.lp-deck-card {
+  flex: 0 0 258px;
+  height: 316px;
+  padding: 22px 20px 0;
   border-radius: var(--radius-lg);
   border: 1px solid var(--bdr);
-  background: linear-gradient(180deg, var(--surf) 0%, var(--bg-elev) 100%);
+  background: linear-gradient(170deg, var(--surf) 0%, var(--bg-elev) 100%);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.55);
+  transform: rotateY(30deg);
+  transform-origin: 100% 50%;
+  transition: transform 380ms cubic-bezier(0.22, 0.8, 0.3, 1),
+    box-shadow 380ms, border-color 380ms;
+  overflow: hidden;
 }
 
-.lp-source-label {
+.lp-deck-card + .lp-deck-card {
+  margin-left: -58px;
+}
+
+.lp-deck-card:hover {
+  transform: rotateY(0deg) translateY(-14px) translateZ(60px);
+  border-color: var(--bdr-strong);
+  box-shadow: 0 36px 80px rgba(0, 0, 0, 0.72), 0 0 0 1px var(--accent-line);
+  z-index: 3;
+}
+
+.lp-deck-label {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--fg);
 }
 
-.lp-source-label::before {
+.lp-deck-label::before {
   content: '';
   width: 7px;
   height: 7px;
@@ -312,97 +377,73 @@
   background: var(--dot);
 }
 
-.lp-source-card p {
-  margin: 10px 0 14px;
+.lp-deck-note {
+  margin: 10px 0 0;
   font-size: 12.5px;
-  line-height: 1.65;
+  line-height: 1.6;
   color: var(--fg-3);
 }
 
-.lp-source-card ul {
-  margin: 0;
-  padding: 0;
+/* 平台清單往下漸變透明，暗示還有更多 */
+.lp-deck-list {
+  margin: 18px 0 0;
+  padding: 0 0 40px;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
+  mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
 }
 
-.lp-source-card li {
-  font-size: 12.5px;
-  color: var(--fg-2);
-  padding-left: 14px;
-  position: relative;
-}
-
-.lp-source-card li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 7px;
-  width: 5px;
-  height: 5px;
-  border-radius: 1px;
-  background: var(--bdr-strong);
-}
-
-.lp-logo-wall {
-  margin-top: 28px;
-  padding: 20px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--bdr-2);
-  background: rgba(22, 22, 27, 0.5);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px 28px;
-}
-
-.lp-logo {
+.lp-deck-list li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  opacity: 0.72;
-  transition: opacity 150ms;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--fg-2);
+  white-space: nowrap;
 }
 
-.lp-logo:hover {
-  opacity: 1;
-}
-
-.lp-logo img {
-  width: 22px;
-  height: 22px;
+.lp-deck-list img {
+  width: 20px;
+  height: 20px;
   border-radius: 6px;
   object-fit: cover;
+  flex-shrink: 0;
 }
 
-.lp-logo-abbr {
-  width: 22px;
-  height: 22px;
+.lp-plat-abbr {
+  width: 20px;
+  height: 20px;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 9px;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
-.lp-logo-name {
-  font-size: 12.5px;
-  color: var(--fg-2);
-  white-space: nowrap;
+/* --- 功能區塊：hover 時文字向外淡出、截圖轉正展開 --- */
+.lp-feature-eyebrow {
+  margin-bottom: 16px;
 }
 
-/* --- 功能區塊：文字 + 傾斜截圖 --- */
-.lp-feature {
+.lp-feature-rev .lp-feature-eyebrow {
+  text-align: right;
+}
+
+.lp-feature-body {
   display: grid;
   grid-template-columns: 0.82fr 1.18fr;
   align-items: center;
   gap: 48px;
+  transition: grid-template-columns 520ms cubic-bezier(0.22, 0.8, 0.3, 1),
+    gap 520ms cubic-bezier(0.22, 0.8, 0.3, 1);
 }
 
-.lp-feature-rev {
+.lp-feature-rev .lp-feature-body {
   grid-template-columns: 1.18fr 0.82fr;
 }
 
@@ -410,8 +451,34 @@
   order: 2;
 }
 
-/* perspective 只作用於直接子元素，而 .lp-shot 會因 translate 另建 containing block，
-   所以透視寫在 img 自己的 transform 裡，梯形才會成立。 */
+/* max-height 一起收掉，否則欄寬歸零時文字會 wrap 成一字一行，把區塊撐高 */
+.lp-feature-text {
+  min-width: 0;
+  max-height: 340px;
+  overflow: hidden;
+  transition: opacity 260ms ease, transform 420ms cubic-bezier(0.22, 0.8, 0.3, 1),
+    max-height 520ms cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+.lp-feature:hover .lp-feature-body {
+  grid-template-columns: 0fr 1fr;
+  gap: 0;
+}
+
+.lp-feature-rev:hover .lp-feature-body {
+  grid-template-columns: 1fr 0fr;
+}
+
+.lp-feature:hover .lp-feature-text {
+  opacity: 0;
+  max-height: 0;
+  transform: translateX(-40px);
+  pointer-events: none;
+}
+
+.lp-feature-rev:hover .lp-feature-text {
+  transform: translateX(40px);
+}
 
 .lp-shot img {
   display: block;
@@ -424,6 +491,7 @@
   box-shadow:
     0 40px 90px rgba(0, 0, 0, 0.7),
     -30px 24px 70px rgba(124, 110, 245, 0.12);
+  transition: transform 520ms cubic-bezier(0.22, 0.8, 0.3, 1), box-shadow 520ms;
 }
 
 .lp-feature-rev .lp-shot img {
@@ -431,6 +499,13 @@
   box-shadow:
     0 40px 90px rgba(0, 0, 0, 0.7),
     30px 24px 70px rgba(124, 110, 245, 0.12);
+}
+
+/* 展開：轉正、拿掉透視，讓截圖以完整尺寸呈現 */
+.lp-feature:hover .lp-shot img,
+.lp-feature-rev:hover .lp-shot img {
+  transform: perspective(1200px) rotateY(0deg);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--accent-line);
 }
 
 /* 兩張圖時錯層堆疊：上層 allocation 往左上偏，下層 holdings 往右下偏 */
@@ -441,6 +516,7 @@
 
 .lp-shots-stack .lp-shot {
   grid-area: 1 / 1;
+  transition: transform 520ms cubic-bezier(0.22, 0.8, 0.3, 1);
 }
 
 .lp-shots-stack .lp-shot:first-child {
@@ -452,17 +528,67 @@
   transform: translate(7%, 16%);
 }
 
+.lp-feature:hover .lp-shots-stack .lp-shot:first-child {
+  transform: translate(-2%, -42%);
+}
+
+.lp-feature:hover .lp-shots-stack .lp-shot:last-child {
+  transform: translate(2%, 14%);
+}
+
 /* --- 操作說明 --- */
-.lp-howto {
-  margin-top: 44px;
+.lp-steps {
+  margin: 46px 0 52px;
+  padding: 0;
+  list-style: none;
   display: grid;
-  grid-template-columns: 1.35fr 1fr;
-  gap: 32px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  counter-reset: step;
+}
+
+.lp-steps li {
+  display: flex;
+  gap: 12px;
+  padding: 20px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--bdr-2);
+  background: rgba(22, 22, 27, 0.55);
+}
+
+.lp-step-num {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+}
+
+.lp-step-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 6px;
+}
+
+.lp-steps p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--fg-3);
 }
 
 .lp-video-frame {
   position: relative;
+  max-width: 860px;
+  margin: 0 auto;
   border-radius: var(--radius-lg);
   border: 1px solid var(--bdr);
   overflow: hidden;
@@ -515,34 +641,12 @@
   color: var(--fg-3);
 }
 
-.lp-howto-steps {
+.lp-howto-foot {
+  margin-top: 28px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-bottom: 26px;
-}
-
-.lp-howto-steps > div {
-  display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 13.5px;
-  color: var(--fg-2);
-}
-
-.lp-howto-steps span {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-line);
+  gap: 10px;
 }
 
 .lp-btn-primary {
@@ -563,32 +667,82 @@
 }
 
 .lp-howto-note {
-  margin: 12px 0 0;
+  margin: 0;
   font-size: 12px;
   color: var(--fg-3);
 }
 
-/* --- 響應式：窄螢幕取消 3D，改回正面平躺 --- */
-@media (max-width: 1000px) {
-  .lp-source-grid {
-    grid-template-columns: repeat(2, 1fr);
+/* --- 響應式 --- */
+@media (max-width: 1080px) {
+  .lp-hero {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    text-align: left;
   }
 
-  .lp-feature,
-  .lp-feature-rev,
-  .lp-howto {
+  .lp-hero-shot {
+    margin-right: -24px;
+  }
+
+  .lp-steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1000px) {
+  .lp-feature-body,
+  .lp-feature-rev .lp-feature-body {
     grid-template-columns: 1fr;
     gap: 28px;
+  }
+
+  .lp-feature-rev .lp-feature-eyebrow {
+    text-align: left;
   }
 
   .lp-feature-rev .lp-feature-text {
     order: 0;
   }
+
+  /* 觸控裝置沒有 hover，維持展開前的排版 */
+  .lp-feature:hover .lp-feature-body,
+  .lp-feature-rev:hover .lp-feature-body {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .lp-feature:hover .lp-feature-text {
+    opacity: 1;
+    max-height: 340px;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  /* 分類卡片改成可橫向捲動的一排，不再重疊 */
+  .lp-deck {
+    justify-content: flex-start;
+    gap: 16px;
+    overflow-x: auto;
+    padding: 8px 24px 16px;
+    margin-left: -24px;
+    margin-right: -24px;
+  }
+
+  .lp-deck-card,
+  .lp-deck-card:hover {
+    transform: none;
+    height: auto;
+    min-height: 280px;
+  }
+
+  .lp-deck-card + .lp-deck-card {
+    margin-left: 0;
+  }
 }
 
 @media (max-width: 720px) {
   .lp-section {
-    padding-top: 72px;
+    padding-top: 76px;
   }
 
   .lp-hero {
@@ -596,17 +750,21 @@
   }
 
   .lp-hero-shot {
-    margin-top: 36px;
-    perspective: none;
+    margin-right: 0;
   }
 
-  /* Hero 讓使用者看到 dashboard 全貌，整張縮進畫面寬 */
   .lp-hero-shot img {
     transform: none;
+    mask-image: none;
+    -webkit-mask-image: none;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
   }
 
   /* 功能截圖是寬扁的局部畫面，縮到手機寬會看不清，改成橫向捲動 */
+  .lp-shots {
+    overflow-x: auto;
+  }
+
   .lp-shot img,
   .lp-feature-rev .lp-shot img {
     transform: none;
@@ -614,14 +772,11 @@
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
   }
 
-  .lp-shots {
-    overflow-x: auto;
-  }
-
   .lp-shots-stack {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    padding: 0;
   }
 
   .lp-shots-stack .lp-shot:first-child,
@@ -629,11 +784,21 @@
     transform: none;
   }
 
-  .lp-source-grid {
+  .lp-steps {
     grid-template-columns: 1fr;
   }
 
   .lp-nav-links {
-    gap: 16px;
+    gap: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-deck-card,
+  .lp-feature,
+  .lp-feature-text,
+  .lp-shot img,
+  .lp-shots-stack .lp-shot {
+    transition: none;
   }
 }
