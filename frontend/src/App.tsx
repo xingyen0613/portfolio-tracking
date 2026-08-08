@@ -3,7 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from './auth/AuthContext'
 import { CurrencyProvider } from './context/CurrencyContext'
 import { DemoProvider, useDemo } from './context/DemoContext'
-import LoginPage from './pages/LoginPage'
+import LandingPage from './pages/LandingPage'
+import GuidePage from './pages/GuidePage'
 import LegalPage from './pages/LegalPage'
 import { legalSlugForPath } from './legal/content'
 import Sidebar from './components/Sidebar'
@@ -38,6 +39,10 @@ export default function App() {
   // Legal pages live at their own URLs and need no auth.
   const legalSlug = legalSlugForPath(window.location.pathname)
   if (legalSlug) return <LegalPage slug={legalSlug} />
+
+  // 圖文使用說明也是公開頁，landing page 直接連過來
+  if (window.location.pathname.replace(/\/+$/, '') === '/guide') return <GuidePage />
+
 
   // /preview/<route> 免登入直接進入預覽模式並落在指定分頁
   const previewRoute = previewRouteForPath(window.location.pathname)
@@ -143,7 +148,7 @@ function AppInner({ initialRoute }: { initialRoute: Route | null }) {
     }
   }, [isDemo, route])
 
-  if (!token && !isDemo) return <LoginPage />
+  if (!token && !isDemo) return <LandingPage />
 
   return (
     <CurrencyProvider>
