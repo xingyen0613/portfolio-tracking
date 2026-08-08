@@ -177,6 +177,14 @@
   color: var(--fg-2);
 }
 
+/* 第二句自成一行並提亮，當成主張而不是補充說明 */
+.lp-hero-sub span {
+  display: block;
+  margin-top: 8px;
+  color: var(--fg);
+  font-weight: 500;
+}
+
 /* 截圖：卡片繞垂直軸側轉定格，左緣遠（小）、右緣近（大）；
    左側漸變透明並染上紫色，讓它像從背景裡浮出來 */
 .lp-hero-shot {

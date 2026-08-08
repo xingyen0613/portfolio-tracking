@@ -291,7 +291,10 @@ export default function LandingPage() {
             ALL IN
             <span>one portfolio tracker</span>
           </h1>
-          <p className="lp-hero-sub">連接交易所、錢包與券商，在專屬儀表板一次掌握完整資產。</p>
+          <p className="lp-hero-sub">
+            連接交易所、錢包與券商，在專屬儀表板一次掌握完整資產。
+            <span>每日自動更新，無需手動記錄。</span>
+          </p>
         </div>
 
         <div className="lp-hero-shot">
