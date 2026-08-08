@@ -113,6 +113,20 @@ uv run alembic upgrade head
 - 截圖存 `frontend/public/guide/step-01..16.jpg`（1440px 寬、全部 lazy load），非 bundler 資產，改圖直接換檔即可
 - Settings 頁內容高於視窗，footer 以 `<Footer sticky>`（`route === 'settings'` 時）釘在視窗底部；其他頁維持隨內容捲動
 
+### Landing page 說明影片
+- 影片放 **YouTube**（可見性設「不公開列出」：可嵌入、不出現在搜尋與頻道），ID 寫在 `LandingPage.tsx` 的 `DEMO_VIDEO_ID`
+- **點擊才載入**：`videoStarted` state 控制，未點播放鍵前畫面上只有 poster img，不對 Google 發任何請求；點下去才注入 `youtube-nocookie.com` 的 iframe
+- poster 是 `frontend/public/landing/video-poster.jpg`，取影片 **60 秒處的 Dashboard 畫面**——**不要用第一帧**，居中的播放鍵會壓在標題「ALL IN One」的 IN 上，讀成「ALL ▶ One」
+- 容器 `aspect-ratio: 1666 / 1080` 對齊影片畫布。影片內容實際約 2.07:1，上下有黑邊（CapCut 畫布設定造成，程式端裁不掉——裁了 poster 播放後仍有黑邊會跳動），要填滿只能改畫布重匯
+- 原始影片與字卡素材放 `video-asset/`（**已 gitignore**，單支近 30MB，別 commit）。CapCut「帶透明背景」匯出會產出 `X_video.mp4` + `X_video.mp4.alpha.mp4` 配對，主檔的 mdat 被 XOR `0xbf` 分段混淆、不是可播放的 mp4——要正常檔案就別勾透明背景
+- 匯出後**先確認音軌沒被 mute**：曾匯出過音軌全靜音的版本（有 AAC track 但 PCM 全 0）。驗法見下方「影片檔驗證」
+
+### 影片檔驗證（不需 ffmpeg）
+這台機器沒有 ffmpeg，但 macOS 內建的 AVFoundation 就能做全帧解碼、音量量測與 H.264 轉碼，用 `swiftc` 編個十幾行的工具即可：
+- **畫面**：`AVAssetReader` + `AVAssetReaderTrackOutput` 逐帧 `copyNextSampleBuffer()`，數出的帧數要等於 `stsz` 的 sample 數，且 `reader.status == .completed`
+- **音量**：音訊軌以 PCM 讀出後統計非零 sample 比例與 RMS。**只確認「有 audio track」或「buffer 有寫入」不算驗證過**——靜音檔這兩項都會通過
+- **轉碼**：`AVAssetWriter` 指定 `AVVideoCodecKey: .h264` + `AVVideoAverageBitRateKey`。Cloudflare Pages 單檔上限 25MiB，若要改回本地 `<video>` 需壓在這之內，且必須轉 H.264（Firefox 不支援 HEVC）
+
 ### Hyperliquid Connector
 - info endpoint **公開唯讀，不需 API key**，只要地址（同 sui_wallet 模式，1:N by `addr[:10]`）；下單才需私鑰，本專案不碰
 - 淨值公式：`accountValue = totalRawUsd + Σ sign(szi) × positionValue`（實測差 0.00000000）

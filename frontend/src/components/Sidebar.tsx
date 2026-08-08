@@ -54,7 +54,6 @@ export default function Sidebar({ route, setRoute }: Props) {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark"></div>
         <div>
           <div className="brand-name">ALL IN</div>
           <div className="brand-sub">Portfolio tracker</div>
