@@ -11,6 +11,11 @@ from app.connectors.base import BaseConnector
 _BASE_URL = "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService"
 _HEADERS = {"User-Agent": "Python/3"}
 
+# IBKR 週末報表產製窗口偶爾回 503 或 "Statement could not be generated"，
+# 重試幾次即可，不必整天放棄。
+_SEND_RETRIES = 3
+_SEND_DELAY = 10
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -76,29 +81,48 @@ class IBKRConnector(BaseConnector):
 
         return holdings
 
+    def _request(self, endpoint: str, params: dict) -> str:
+        """打 Flex endpoint 回 XML text。
+
+        錯誤訊息刻意不帶 URL — query string 含 flex_token，而錯誤字串會進
+        source_runs.error_message、connector last_error 與 batch log。
+        """
+        try:
+            resp = requests.get(f"{_BASE_URL}/{endpoint}", params=params,
+                                headers=_HEADERS, timeout=30)
+            resp.raise_for_status()
+        except requests.HTTPError as e:
+            raise RuntimeError(f"{endpoint}: HTTP {e.response.status_code}") from None
+        except requests.RequestException as e:
+            raise RuntimeError(f"{endpoint}: {type(e).__name__}") from None
+        return resp.text
+
     def _send_request(self) -> tuple[str, str]:
-        url = f"{_BASE_URL}/SendRequest"
         params = {"t": self.token, "q": self.query_id, "v": "3"}
-        resp = requests.get(url, params=params, headers=_HEADERS, timeout=30)
-        resp.raise_for_status()
+        last_err = None
 
-        root = ET.fromstring(resp.text)
-        if root.findtext("Status") != "Success":
-            raise RuntimeError(f"SendRequest failed: {root.findtext('ErrorMessage')}")
+        for attempt in range(1, _SEND_RETRIES + 1):
+            try:
+                root = ET.fromstring(self._request("SendRequest", params))
+                if root.findtext("Status") == "Success":
+                    return root.findtext("ReferenceCode"), root.findtext("Url")
+                last_err = f"SendRequest failed: {root.findtext('ErrorMessage')}"
+            except RuntimeError as e:
+                last_err = str(e)
 
-        return root.findtext("ReferenceCode"), root.findtext("Url")
+            if attempt < _SEND_RETRIES:
+                time.sleep(_SEND_DELAY)
+
+        raise RuntimeError(f"{last_err} (after {_SEND_RETRIES} attempts)")
 
     def _get_statement(self, ref_code: str,
                        retries: int = 5, delay: int = 5) -> str:
-        url = f"{_BASE_URL}/GetStatement"
         params = {"t": self.token, "q": ref_code, "v": "3"}
         time.sleep(5)
 
         for attempt in range(1, retries + 1):
-            resp = requests.get(url, params=params, headers=_HEADERS, timeout=30)
-            resp.raise_for_status()
-
-            root = ET.fromstring(resp.text)
+            text = self._request("GetStatement", params)
+            root = ET.fromstring(text)
             status = root.findtext("Status")
 
             if status == "Warn":
@@ -106,9 +130,9 @@ class IBKRConnector(BaseConnector):
                 continue
             if status == "Fail":
                 code = root.findtext("ErrorCode") or "?"
-                msg = root.findtext("ErrorMessage") or resp.text
+                msg = root.findtext("ErrorMessage") or text
                 raise RuntimeError(f"GetStatement failed (code {code}): {msg}")
 
-            return resp.text
+            return text
 
         raise RuntimeError("GetStatement: report not ready after max retries")
