@@ -17,7 +17,7 @@ interface Feature {
   eyebrow: string
   title: string
   desc: string
-  shots: Shot[]
+  shot: Shot
 }
 
 /** 影片區塊與 hero 共用的 dashboard 全景截圖。 */
@@ -28,22 +28,19 @@ const FEATURES: Feature[] = [
     eyebrow: 'Performance Metrics',
     title: '過去表現，一眼看完',
     desc: '各類別的餘額、1W 到 ALL 各區間的報酬率、Sharpe 值與最大回落，全部算好放在同一排卡片上。',
-    shots: [{ src: '/landing/metrics.png', w: 1256, h: 244 }],
+    shot: { src: '/landing/metrics.png', w: 1256, h: 244 },
   },
   {
     eyebrow: 'Asset Trend',
     title: '你的資產和大盤，同一張圖',
     desc: '每天記錄下來的部位變成一條連續的資產曲線，可依類別拆開檢視，也能疊上 S&P 500、NASDAQ 100、費半、0050、BTC 等比較基準——看看自己有沒有打贏大盤。',
-    shots: [{ src: '/landing/trend.png', w: 1256, h: 425 }],
+    shot: { src: '/landing/trend.png', w: 1256, h: 425 },
   },
   {
     eyebrow: 'Allocation & Holdings by Source',
     title: '從配置比例看到持倉明細',
     desc: '圓餅圖看各類別佔比，點下去展開該類別的持倉明細；再往下依來源列出每個平台的完整部位，現金與期貨／合約也一併呈現。',
-    shots: [
-      { src: '/landing/allocation.png', w: 1256, h: 235 },
-      { src: '/landing/holdings.png', w: 1256, h: 464 },
-    ],
+    shot: { src: '/landing/allocation-holdings.png', w: 1256, h: 726 },
   },
 ]
 
@@ -119,14 +116,11 @@ function PlatformMark({ p }: { p: Platform }) {
   )
 }
 
-function Shots({ shots }: { shots: Shot[] }) {
+/** hover 只綁在這個容器上，滑到旁邊的說明文字不會觸發展開。 */
+function Shots({ shot }: { shot: Shot }) {
   return (
-    <div className={`lp-shots${shots.length > 1 ? ' lp-shots-stack' : ''}`}>
-      {shots.map(s => (
-        <div className="lp-shot" key={s.src}>
-          <img src={s.src} alt="" width={s.w} height={s.h} loading="lazy" />
-        </div>
-      ))}
+    <div className="lp-shots">
+      <img src={shot.src} alt="" width={shot.w} height={shot.h} loading="lazy" />
     </div>
   )
 }
@@ -311,7 +305,7 @@ export default function LandingPage() {
               <h2>{f.title}</h2>
               <p>{f.desc}</p>
             </div>
-            <Shots shots={f.shots} />
+            <Shots shot={f.shot} />
           </div>
         </section>
       ))}

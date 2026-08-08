@@ -460,27 +460,28 @@
     max-height 520ms cubic-bezier(0.22, 0.8, 0.3, 1);
 }
 
-.lp-feature:hover .lp-feature-body {
+/* :has() 讓觸發範圍只有截圖本身——滑到旁邊的說明文字不會展開 */
+.lp-feature:has(.lp-shots:hover) .lp-feature-body {
   grid-template-columns: 0fr 1fr;
   gap: 0;
 }
 
-.lp-feature-rev:hover .lp-feature-body {
+.lp-feature-rev:has(.lp-shots:hover) .lp-feature-body {
   grid-template-columns: 1fr 0fr;
 }
 
-.lp-feature:hover .lp-feature-text {
+.lp-feature:has(.lp-shots:hover) .lp-feature-text {
   opacity: 0;
   max-height: 0;
   transform: translateX(-40px);
   pointer-events: none;
 }
 
-.lp-feature-rev:hover .lp-feature-text {
+.lp-feature-rev:has(.lp-shots:hover) .lp-feature-text {
   transform: translateX(40px);
 }
 
-.lp-shot img {
+.lp-shots img {
   display: block;
   width: 100%;
   height: auto;
@@ -494,46 +495,18 @@
   transition: transform 520ms cubic-bezier(0.22, 0.8, 0.3, 1), box-shadow 520ms;
 }
 
-.lp-feature-rev .lp-shot img {
+.lp-feature-rev .lp-shots img {
   transform: perspective(1200px) rotateY(24deg);
   box-shadow:
     0 40px 90px rgba(0, 0, 0, 0.7),
     30px 24px 70px rgba(124, 110, 245, 0.12);
 }
 
-/* 展開：轉正、拿掉透視，讓截圖以完整尺寸呈現 */
-.lp-feature:hover .lp-shot img,
-.lp-feature-rev:hover .lp-shot img {
+/* 展開：轉正，讓截圖以完整尺寸呈現 */
+.lp-shots:hover img,
+.lp-feature-rev .lp-shots:hover img {
   transform: perspective(1200px) rotateY(0deg);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--accent-line);
-}
-
-/* 兩張圖時錯層堆疊：上層 allocation 往左上偏，下層 holdings 往右下偏 */
-.lp-shots-stack {
-  display: grid;
-  padding: 46px 0;
-}
-
-.lp-shots-stack .lp-shot {
-  grid-area: 1 / 1;
-  transition: transform 520ms cubic-bezier(0.22, 0.8, 0.3, 1);
-}
-
-.lp-shots-stack .lp-shot:first-child {
-  transform: translate(-7%, -46%);
-  z-index: 2;
-}
-
-.lp-shots-stack .lp-shot:last-child {
-  transform: translate(7%, 16%);
-}
-
-.lp-feature:hover .lp-shots-stack .lp-shot:first-child {
-  transform: translate(-2%, -42%);
-}
-
-.lp-feature:hover .lp-shots-stack .lp-shot:last-child {
-  transform: translate(2%, 14%);
 }
 
 /* --- 操作說明 --- */
@@ -705,13 +678,13 @@
   }
 
   /* 觸控裝置沒有 hover，維持展開前的排版 */
-  .lp-feature:hover .lp-feature-body,
-  .lp-feature-rev:hover .lp-feature-body {
+  .lp-feature:has(.lp-shots:hover) .lp-feature-body,
+  .lp-feature-rev:has(.lp-shots:hover) .lp-feature-body {
     grid-template-columns: 1fr;
     gap: 28px;
   }
 
-  .lp-feature:hover .lp-feature-text {
+  .lp-feature:has(.lp-shots:hover) .lp-feature-text {
     opacity: 1;
     max-height: 340px;
     transform: none;
@@ -765,23 +738,11 @@
     overflow-x: auto;
   }
 
-  .lp-shot img,
-  .lp-feature-rev .lp-shot img {
+  .lp-shots img,
+  .lp-feature-rev .lp-shots img {
     transform: none;
     min-width: 620px;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-  }
-
-  .lp-shots-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    padding: 0;
-  }
-
-  .lp-shots-stack .lp-shot:first-child,
-  .lp-shots-stack .lp-shot:last-child {
-    transform: none;
   }
 
   .lp-steps {
@@ -795,10 +756,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .lp-deck-card,
-  .lp-feature,
+  .lp-feature-body,
   .lp-feature-text,
-  .lp-shot img,
-  .lp-shots-stack .lp-shot {
+  .lp-shots img {
     transition: none;
   }
 }
