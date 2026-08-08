@@ -52,3 +52,7 @@ test_import.csv
 
 # 本地產生的 landing page 靜態預覽（由 scratchpad 腳本組出，不進版控）
 /landing-preview.html
+
+# 說明影片的原始檔與字卡素材（單支影片近 30MB，二進位進 git 拿不掉）
+# 影片本身放 YouTube，landing page 只嵌入
+/video-asset/

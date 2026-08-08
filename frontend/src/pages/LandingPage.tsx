@@ -20,8 +20,11 @@ interface Feature {
   shot: Shot
 }
 
-/** 影片區塊與 hero 共用的 dashboard 全景截圖。 */
+/** hero 的 dashboard 全景截圖。 */
 const HERO_SHOT: Shot = { src: '/landing/hero-dashboard.png', w: 1600, h: 980 }
+
+/** 說明影片（YouTube，不公開列出）。poster 是這支影片的第一帧。 */
+const DEMO_VIDEO_ID = 'yFAg6Rh_3XQ'
 
 const FEATURES: Feature[] = [
   {
@@ -185,6 +188,8 @@ export default function LandingPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
+  /** 點下播放鍵才載入 YouTube iframe，在那之前不對 Google 發任何請求。 */
+  const [videoStarted, setVideoStarted] = useState(false)
 
   async function handleLogin(credential: string) {
     if (!credential) {
@@ -330,11 +335,25 @@ export default function LandingPage() {
         </ol>
 
         <div className="lp-video-frame">
-          <img src={HERO_SHOT.src} alt="" width={HERO_SHOT.w} height={HERO_SHOT.h} loading="lazy" />
-          <div className="lp-video-overlay">
-            <span className="lp-video-play" aria-hidden="true" />
-            <span className="lp-video-label">說明影片準備中</span>
-          </div>
+          {videoStarted ? (
+            <iframe
+              className="lp-video-embed"
+              src={`https://www.youtube-nocookie.com/embed/${DEMO_VIDEO_ID}?autoplay=1&rel=0`}
+              title="ALL IN 說明影片"
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <button
+              type="button"
+              className="lp-video-cta"
+              onClick={() => setVideoStarted(true)}
+              aria-label="播放說明影片"
+            >
+              <img src="/landing/video-poster.jpg" alt="" width={1666} height={1080} loading="lazy" />
+              <span className="lp-video-play" aria-hidden="true" />
+            </button>
+          )}
         </div>
 
         <div className="lp-howto-foot">
