@@ -138,12 +138,10 @@
   color: var(--fg-2);
 }
 
-/* Hero 截圖：側邊角度 + 微傾斜，投影成梯形 */
+/* Hero 截圖：卡片繞垂直軸側轉定格，投影成梯形（左緣近、右緣遠） */
 .lp-hero-shot {
   margin: 56px auto 0;
   max-width: 1000px;
-  perspective: 2000px;
-  perspective-origin: 50% 0%;
 }
 
 .lp-hero-shot img {
@@ -152,12 +150,12 @@
   height: auto;
   border-radius: 14px;
   border: 1px solid var(--bdr);
-  transform: rotateX(9deg) rotateY(-15deg) rotate(1.2deg) scale(0.97);
-  transform-origin: 50% 0%;
+  transform: perspective(1400px) rotateY(-21deg) scale(1.04);
+  transform-origin: 50% 50%;
   box-shadow:
     0 50px 120px rgba(0, 0, 0, 0.75),
     0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-    -40px 40px 90px rgba(124, 110, 245, 0.16);
+    -40px 30px 90px rgba(124, 110, 245, 0.16);
 }
 
 /* --- 通用 section --- */
@@ -422,17 +420,17 @@
   border-radius: 12px;
   border: 1px solid var(--bdr);
   background: var(--bg-elev);
-  transform: perspective(1700px) rotateY(-17deg) rotateX(7deg) rotate(0.6deg);
+  transform: perspective(1200px) rotateY(-24deg);
   box-shadow:
     0 40px 90px rgba(0, 0, 0, 0.7),
-    -30px 30px 70px rgba(124, 110, 245, 0.12);
+    -30px 24px 70px rgba(124, 110, 245, 0.12);
 }
 
 .lp-feature-rev .lp-shot img {
-  transform: perspective(1700px) rotateY(17deg) rotateX(7deg) rotate(-0.6deg);
+  transform: perspective(1200px) rotateY(24deg);
   box-shadow:
     0 40px 90px rgba(0, 0, 0, 0.7),
-    30px 30px 70px rgba(124, 110, 245, 0.12);
+    30px 24px 70px rgba(124, 110, 245, 0.12);
 }
 
 /* 兩張圖時錯層堆疊：上層 allocation 往左上偏，下層 holdings 往右下偏 */
