@@ -49,3 +49,6 @@ log/
 how-to-get-api.md
 sinopac-form.md
 test_import.csv
+
+# 本地產生的 landing page 靜態預覽（由 scratchpad 腳本組出，不進版控）
+/landing-preview.html
