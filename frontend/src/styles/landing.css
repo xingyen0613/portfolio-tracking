@@ -38,17 +38,19 @@
   vector-effect: non-scaling-stroke;
 }
 
-/* 排除 .modal-backdrop：它需要保持自己的 position: fixed / z-index: 200，
-   被這條蓋成 relative 的話彈窗會變成排在 footer 之後的普通區塊，看起來像點了沒反應。 */
-.lp > *:not(.lp-bg):not(.modal-backdrop) {
+/* 這條只給一般內容區塊。有自己定位需求的要排除，否則會被蓋成 relative：
+   - .modal-backdrop 需要 fixed / z-index 200，否則彈窗變成排在 footer 之後的區塊
+   - .lp-nav 需要 sticky，否則頂欄不會黏在頂端
+   排除比提高對方特異性可靠：每加一個 :not() 這條就更難被蓋過。 */
+.lp > *:not(.lp-bg):not(.modal-backdrop):not(.lp-nav) {
   position: relative;
   z-index: 1;
 }
 
 /* --- 頂欄：黏在頂端，往下捲收起、往上捲放回來 ---
-   選擇器帶 .lp > 是為了勝過下面 .lp > *:not(.lp-bg) 的 position: relative。
+   上面那條 .lp > * 已經用 :not(.lp-nav) 排除它，所以這裡不必再靠特異性搶。
    背景要滿版，所以不用 max-width + margin auto，改用 padding 把內容推到中間。 */
-.lp > .lp-nav {
+.lp-nav {
   position: sticky;
   top: 0;
   z-index: 20;
@@ -64,11 +66,11 @@
 }
 
 /* 捲離頂端後補一條分隔線，浮在內容上時邊界才清楚 */
-.lp > .lp-nav:not(.lp-nav-at-top) {
+.lp-nav:not(.lp-nav-at-top) {
   border-bottom-color: var(--bdr-2);
 }
 
-.lp > .lp-nav-hidden {
+.lp-nav-hidden {
   transform: translateY(-100%);
 }
 
