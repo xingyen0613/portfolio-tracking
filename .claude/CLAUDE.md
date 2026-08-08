@@ -113,6 +113,28 @@ uv run alembic upgrade head
 - 截圖存 `frontend/public/guide/step-01..16.jpg`（1440px 寬、全部 lazy load），非 bundler 資產，改圖直接換檔即可
 - Settings 頁內容高於視窗，footer 以 `<Footer sticky>`（`route === 'settings'` 時）釘在視窗底部；其他頁維持隨內容捲動
 
+### Landing page 定位與 overflow 陷阱
+`landing.css` 有兩處「不知道就會再踩一次」的結構，改 landing 前先讀：
+
+**1. `.lp > *` 的排除清單**
+```css
+.lp > *:not(.lp-bg):not(.modal-backdrop):not(.lp-nav) { position: relative; z-index: 1; }
+```
+這條是給一般內容區塊的。**任何有自己定位需求的 `.lp` 直接子元素都必須加進排除清單**，否則 position 會被蓋掉：
+- 少了 `:not(.modal-backdrop)` → 登入彈窗從 `fixed` 變 `relative`，變成排在 footer 之後的普通區塊，點右上角登入看起來毫無反應
+- 少了 `:not(.lp-nav)` → 頂欄的 `sticky` 失效，隨頁面捲出視窗
+- **不要靠提高特異性去搶**：每多一個 `:not()` 這條就升一級特異性，用 `.lp > .lp-nav` 對打會在下次新增排除時再次失效（已實際發生過一次，修彈窗把頂欄弄壞）
+
+**2. mobile 功能截圖是兩層結構，缺一不可**
+- 外層 `.lp-shots`：`overflow: hidden` + 負 margin + 漸層 `::after`。**外層不能用 `visible`** —— 它是 grid item，`visible` 會讓 `img` 的 `min-width: 620px` 變成整欄的最小寬度，把說明文字一起撐出畫面
+- 內層 `.lp-shots-scroll`：`overflow-x: auto`，真正的捲動區。**漸層必須留在外層**，放內層會跟著捲動內容一起跑
+
+**其他座標細節**
+- 頂欄 sticky + `translateY(-100%)` 收起，捲動方向由 `LandingPage.tsx` 的 `navHidden` 判斷（門檻 6px 防手機抖動、包在 `requestAnimationFrame`）；背景要滿版所以不用 `max-width + margin auto`，改用 `padding: … max(24px, calc((100% - 1132px) / 2))`
+- hero 截圖的 `transform-origin` 必須是 `100% 50%`（右緣）。用 `18% 50%` 會讓右緣往前放大並溢出，被 `.lp` 的 `overflow-x: clip` 切掉
+- mobile hero 截圖是 absolute 背景層，`right: 0` 就貼齊螢幕邊 —— absolute 的參考框是 `.lp-hero` 的 **padding box**，不要再補 padding 的 24px（補了會超出被裁）。文字可讀性靠中間夾的 `.lp-hero::before` 漸層，不是靠壓低截圖 opacity
+- 來源卡片 mobile 展開用 `:hover, :focus-within`（卡片帶 `tabIndex={0}`）。觸控靠「tap 觸發 hover」，**未在實機 iOS Safari 驗證過**；若實機無效改成 React state 的 onClick
+
 ### Landing page 說明影片
 - 影片放 **YouTube**（可見性設「不公開列出」：可嵌入、不出現在搜尋與頻道），ID 寫在 `LandingPage.tsx` 的 `DEMO_VIDEO_ID`
 - **點擊才載入**：`videoStarted` state 控制，未點播放鍵前畫面上只有 poster img，不對 Google 發任何請求；點下去才注入 `youtube-nocookie.com` 的 iframe
