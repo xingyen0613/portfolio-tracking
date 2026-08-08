@@ -92,17 +92,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex; align-items: center; gap: 10px;
   padding: 4px 8px 18px;
 }
-.brand-mark {
-  width: 28px; height: 28px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent) 0%, #a48cf0 100%);
-  display: grid; place-items: center;
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.06) inset, 0 4px 14px rgba(124,110,245,0.35);
-  position: relative;
-}
-.brand-mark::after {
-  content: ""; width: 10px; height: 10px; border-radius: 3px;
-  background: rgba(255,255,255,0.92); transform: rotate(45deg);
-}
 .brand-name { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
 .brand-sub { font-size: 10px; color: var(--fg-3); margin-top: -2px; letter-spacing: 0.04em; text-transform: uppercase; }
 
@@ -592,11 +581,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex; flex-direction: column;
 }
 .m-brand { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 28px; }
-.m-brand-mark {
-  width: 36px; height: 36px; border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), #f0a23c);
-  margin-bottom: 6px;
-}
 .m-brand-name { font-size: 18px; font-weight: 700; letter-spacing: 0.04em; color: var(--fg); }
 .m-brand-sub { font-size: 11px; color: var(--fg-3); letter-spacing: 0.02em; }
 
@@ -1039,6 +1023,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   transition: color 80ms;
 }
 .site-footer-links a:hover { color: var(--fg); text-decoration: underline; }
+.site-footer-contact a { color: var(--fg-2); }
+.site-footer-label { color: var(--fg-4); }
 
 .site-footer-compact { padding: 14px 0 0; }
 .site-footer-compact .site-footer-inner {
@@ -1072,10 +1058,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   z-index: 5;
 }
 .legal-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-.legal-brand-mark {
-  width: 22px; height: 22px; border-radius: 6px;
-  background: linear-gradient(135deg, var(--accent), #f0a23c);
-}
 .legal-brand-name { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; color: var(--fg); }
 .legal-nav { display: flex; gap: 18px; margin-left: auto; font-size: 12px; }
 .legal-nav a { color: var(--fg-3); text-decoration: none; }
@@ -1114,7 +1096,33 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   .legal-header { padding: 14px 18px; gap: 14px; }
   .legal-nav { gap: 12px; }
   .legal-doc { padding: 28px 18px 40px; }
-  .site-footer { padding: 16px 18px 20px; }
+  .site-footer { padding: 14px 18px 18px; }
+  /* 手機上分左右兩欄：聯絡方式在左（佔滿兩列），版權與法律連結靠右疊起來。
+     三組各自一列會讓 footer 太高。 */
+  .site-footer-inner {
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: space-between;
+    align-items: start;
+    gap: 6px 14px;
+  }
+  .site-footer-contact {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .site-footer-brand {
+    grid-column: 2;
+    grid-row: 1;
+    margin-right: 0;
+    text-align: right;
+  }
+  .site-footer-links:not(.site-footer-contact) {
+    grid-column: 2;
+    grid-row: 2;
+    justify-content: flex-end;
+  }
 }
 
 /* ── Guide（Settings 頁的圖文說明 popup）────────────────────── */

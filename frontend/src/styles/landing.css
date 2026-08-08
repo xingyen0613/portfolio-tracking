@@ -38,19 +38,38 @@
   vector-effect: non-scaling-stroke;
 }
 
-.lp > *:not(.lp-bg) {
+/* 排除 .modal-backdrop：它需要保持自己的 position: fixed / z-index: 200，
+   被這條蓋成 relative 的話彈窗會變成排在 footer 之後的普通區塊，看起來像點了沒反應。 */
+.lp > *:not(.lp-bg):not(.modal-backdrop) {
   position: relative;
   z-index: 1;
 }
 
-/* --- 頂欄 --- */
-.lp-nav {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 22px 24px;
+/* --- 頂欄：黏在頂端，往下捲收起、往上捲放回來 ---
+   選擇器帶 .lp > 是為了勝過下面 .lp > *:not(.lp-bg) 的 position: relative。
+   背景要滿版，所以不用 max-width + margin auto，改用 padding 把內容推到中間。 */
+.lp > .lp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 18px max(24px, calc((100% - 1132px) / 2));
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background: rgba(10, 10, 12, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid transparent;
+  transition: transform 260ms cubic-bezier(0.22, 0.8, 0.3, 1), border-color 260ms;
+}
+
+/* 捲離頂端後補一條分隔線，浮在內容上時邊界才清楚 */
+.lp > .lp-nav:not(.lp-nav-at-top) {
+  border-bottom-color: var(--bdr-2);
+}
+
+.lp > .lp-nav-hidden {
+  transform: translateY(-100%);
 }
 
 .lp-brand {
@@ -59,14 +78,6 @@
   gap: 10px;
   text-decoration: none;
   color: var(--fg);
-}
-
-.lp-brand-mark {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent) 0%, #a48cf0 100%);
-  box-shadow: 0 0 24px rgba(124, 110, 245, 0.45);
 }
 
 .lp-brand-name {
@@ -126,9 +137,10 @@
   margin: 0 auto;
   padding: 72px 24px 0;
   display: grid;
-  grid-template-columns: 0.82fr 1.18fr;
+  /* 右欄給多一點：截圖側轉後左緣會往內縮，欄位太窄整張圖會顯小 */
+  grid-template-columns: 0.72fr 1.28fr;
   align-items: center;
-  gap: 40px;
+  gap: 32px;
 }
 
 .lp-hero-title {
@@ -167,7 +179,6 @@
    左側漸變透明並染上紫色，讓它像從背景裡浮出來 */
 .lp-hero-shot {
   position: relative;
-  margin-right: -40px;
 }
 
 /* 紫色渲染：從卡片左緣往外擴散，讓它像從背景裡浮出來 */
@@ -189,8 +200,10 @@
   height: auto;
   border-radius: 14px;
   border: 1px solid var(--bdr);
-  transform: perspective(1100px) rotateY(-21deg);
-  transform-origin: 18% 50%;
+  /* 軸心放右緣：旋轉時右邊固定不動，只有左緣往後退。
+     用 18% 當軸心的話右緣會往前放大並溢出容器，被 .lp 的 overflow-x: clip 切掉。 */
+  transform: perspective(1100px) rotateY(-17deg);
+  transform-origin: 100% 50%;
   box-shadow:
     0 50px 120px rgba(0, 0, 0, 0.75),
     0 0 0 1px rgba(255, 255, 255, 0.04) inset;
@@ -212,9 +225,9 @@
 }
 
 .lp-eyebrow {
-  font-size: 11px;
+  font-size: 13.5px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--accent);
   margin-bottom: 12px;
@@ -335,6 +348,7 @@
 }
 
 .lp-deck-card {
+  position: relative;
   flex: 0 0 258px;
   height: 316px;
   padding: 22px 20px 0;
@@ -347,6 +361,19 @@
   transition: transform 380ms cubic-bezier(0.22, 0.8, 0.3, 1),
     box-shadow 380ms, border-color 380ms;
   overflow: hidden;
+}
+
+/* 卡片底部的暗色漸層：和清單自身的 mask 疊在一起，做出
+   「清單還沒完、下面壓著更多來源」的深度感 */
+.lp-deck-card::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 104px;
+  background: linear-gradient(to bottom, transparent 0%, rgba(8, 8, 10, 0.62) 46%, rgba(8, 8, 10, 0.95) 100%);
+  pointer-events: none;
 }
 
 .lp-deck-card + .lp-deck-card {
@@ -392,8 +419,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 40%, rgba(0, 0, 0, 0.28) 76%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, rgba(0, 0, 0, 0.28) 76%, transparent 100%);
 }
 
 .lp-deck-list li {
@@ -479,6 +506,45 @@
 
 .lp-feature-rev:has(.lp-shots:hover) .lp-feature-text {
   transform: translateX(40px);
+}
+
+/* 截圖往版面外側延伸，外緣用漸層陰影收掉，看起來像畫面還往外continue。
+   hover 展開時陰影淡出、延伸收回，才看得到完整截圖。 */
+.lp-shots {
+  position: relative;
+  margin-right: -120px;
+  transition: margin 520ms cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+.lp-feature-rev .lp-shots {
+  margin-right: 0;
+  margin-left: -120px;
+}
+
+.lp-shots::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, transparent 70%, rgba(8, 8, 10, 0.4) 87%, rgba(8, 8, 10, 0.92) 100%);
+  opacity: 1;
+  transition: opacity 420ms ease;
+  pointer-events: none;
+}
+
+.lp-feature-rev .lp-shots::after {
+  background: linear-gradient(to left, transparent 70%, rgba(8, 8, 10, 0.4) 87%, rgba(8, 8, 10, 0.92) 100%);
+}
+
+.lp-shots:hover::after {
+  opacity: 0;
+}
+
+.lp-feature:has(.lp-shots:hover) .lp-shots {
+  margin-right: 0;
+}
+
+.lp-feature-rev:has(.lp-shots:hover) .lp-shots {
+  margin-left: 0;
 }
 
 .lp-shots img {
@@ -735,24 +801,182 @@
     padding-top: 76px;
   }
 
-  .lp-hero {
-    padding-top: 44px;
+  /* --- 頂欄：logo 方塊拿掉後把騰出的空間讓給導覽 --- */
+  .lp-nav {
+    padding: 16px 16px;
   }
 
+  .lp-brand-name {
+    font-size: 13px;
+  }
+
+  .lp-brand-sub {
+    font-size: 9px;
+    letter-spacing: 0.04em;
+  }
+
+  .lp-nav-links {
+    gap: 13px;
+  }
+
+  .lp-nav-links a {
+    font-size: 12px;
+  }
+
+  .lp-nav-login {
+    padding: 6px 14px;
+    font-size: 12px;
+  }
+
+  /* --- Hero：dashboard 旋轉定格沉到字樣後面當背景（同 web 的側轉手法）--- */
+  .lp-hero {
+    position: relative;
+    padding-top: 40px;
+    padding-bottom: 8px;
+    min-height: 384px;
+    gap: 0;
+  }
+
+  /* 文字側的暗色保護層：夾在截圖(z0)與文字(z2)之間，
+     讓截圖可以放亮到看得出是 dashboard，同時左側字樣仍讀得清楚 */
+  .lp-hero::before {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      rgba(10, 10, 12, 0.94) 0%,
+      rgba(10, 10, 12, 0.78) 38%,
+      rgba(10, 10, 12, 0.3) 72%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+
+  .lp-hero-text {
+    position: relative;
+    z-index: 2;
+  }
+
+  .lp-hero-sub {
+    max-width: 302px;
+  }
+
+  /* absolute 的參考框是 .lp-hero 的 padding box，右緣已經等於螢幕邊，
+     所以 right:0 就剛好貼齊、不會被裁。旋轉軸在右緣（100% 50%），右邊不再外擴。 */
   .lp-hero-shot {
-    margin-right: 0;
+    position: absolute;
+    z-index: 0;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    margin: 0;
+    pointer-events: none;
+  }
+
+  .lp-hero-shot::before {
+    inset: -22% -10% -26% -32%;
   }
 
   .lp-hero-shot img {
-    transform: none;
-    mask-image: none;
-    -webkit-mask-image: none;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    opacity: 0.72;
+    border-radius: 10px;
+    transform: perspective(760px) rotateY(-20deg);
+    transform-origin: 100% 50%;
+    mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.5) 26%, #000 62%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.5) 26%, #000 62%);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
   }
 
-  /* 功能截圖是寬扁的局部畫面，縮到手機寬會看不清，改成橫向捲動 */
-  .lp-shots {
+  /* --- 來源：四張卡片垂直堆疊，只露類別，展開才看清單 --- */
+  .lp-deck {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0;
+    overflow: visible;
+    perspective: none;
+    margin: 40px 0 0;
+    padding: 0;
+  }
+
+  /* min-height 要一起歸零，否則 1000px 那段設的 280px 會蓋掉 max-height */
+  .lp-deck-card,
+  .lp-deck-card:hover,
+  .lp-deck-card:focus-within {
+    flex: none;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    transform: none;
+    transition: max-height 400ms cubic-bezier(0.22, 0.8, 0.3, 1),
+      box-shadow 400ms, border-color 400ms;
+  }
+
+  /* 收起：只露出類別名稱。88px 會剛好把補充說明切一半，看起來像壞掉 */
+  .lp-deck-card {
+    max-height: 58px;
+  }
+
+  /* 疊在前一張上，看起來是一疊卡片而不是四個獨立區塊 */
+  .lp-deck-card + .lp-deck-card {
+    margin-left: 0;
+    margin-top: -14px;
+  }
+
+  /* 觸控裝置 tap 會觸發 hover；focus-within 讓鍵盤也能展開（卡片有 tabindex）*/
+  .lp-deck-card:hover,
+  .lp-deck-card:focus-within {
+    max-height: 360px;
+    z-index: 3;
+    border-color: var(--bdr-strong);
+  }
+
+  .lp-deck-card:focus-visible {
+    outline: none;
+    border-color: var(--accent-line);
+  }
+
+  /* 收起狀態卡片只有 58px 高，陰影要跟著收，否則整張卡片都被壓黑 */
+  .lp-deck-card::after {
+    height: 34px;
+  }
+
+  .lp-deck-card:hover::after,
+  .lp-deck-card:focus-within::after {
+    height: 76px;
+  }
+
+  /* 功能截圖不縮小，往右延伸出螢幕、右緣用漸層收掉，仍可左右拖曳看完整內容。
+     外層 overflow 必須是 hidden：這是 grid item，visible 會讓 img 的
+     min-width:620px 變成欄位最小寬度，把整欄（連說明文字）撐出畫面。
+     捲動發生在內層，所以外層 hidden 不影響拖曳；漸層留在外層才不會跟著內容跑。 */
+  .lp-shots,
+  .lp-feature-rev .lp-shots {
+    overflow: hidden;
+    margin-left: 0;
+    margin-right: -24px;
+  }
+
+  .lp-shots-scroll {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    /* 捲動條藏起來：右緣的漸層陰影已經在提示「還有更多」 */
+    scrollbar-width: none;
+  }
+
+  .lp-shots-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 手機是單欄排版，沒有左右之分，rev 的漸層也一律朝右 */
+  .lp-shots::after,
+  .lp-feature-rev .lp-shots::after {
+    display: block;
+    background: linear-gradient(to right, transparent 54%, rgba(8, 8, 10, 0.45) 79%, rgba(8, 8, 10, 0.95) 100%);
   }
 
   .lp-shots img,
@@ -764,10 +988,6 @@
 
   .lp-steps {
     grid-template-columns: 1fr;
-  }
-
-  .lp-nav-links {
-    gap: 14px;
   }
 }
 

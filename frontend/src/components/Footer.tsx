@@ -32,10 +32,11 @@ export default function Footer({ compact = false, sameTab = false, sticky = fals
             </a>
           ))}
         </nav>
-        <div className="site-footer-links">
+        <div className="site-footer-links site-footer-contact">
+          <span className="site-footer-label">聯絡我們</span>
           <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
           <a href={SUPPORT_TELEGRAM_URL} target="_blank" rel="noopener noreferrer">
-            @{SUPPORT_TELEGRAM}
+            Telegram @{SUPPORT_TELEGRAM}
           </a>
         </div>
       </div>

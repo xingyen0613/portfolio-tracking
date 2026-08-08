@@ -12,7 +12,6 @@ export default function GuidePage() {
     <div className="legal-stage">
       <header className="legal-header">
         <a className="legal-brand" href="/">
-          <span className="legal-brand-mark" />
           <span className="legal-brand-name">ALL IN</span>
         </a>
         <nav className="legal-nav">

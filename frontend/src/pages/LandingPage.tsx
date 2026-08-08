@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../auth/AuthContext'
@@ -119,11 +119,14 @@ function PlatformMark({ p }: { p: Platform }) {
   )
 }
 
-/** hover 只綁在這個容器上，滑到旁邊的說明文字不會觸發展開。 */
+/** hover 只綁在外層容器上，滑到旁邊的說明文字不會觸發展開。
+ *  內層是手機上的橫向捲動區——漸層陰影必須留在外層，否則會跟著捲動內容一起跑。 */
 function Shots({ shot }: { shot: Shot }) {
   return (
     <div className="lp-shots">
-      <img src={shot.src} alt="" width={shot.w} height={shot.h} loading="lazy" />
+      <div className="lp-shots-scroll">
+        <img src={shot.src} alt="" width={shot.w} height={shot.h} loading="lazy" />
+      </div>
     </div>
   )
 }
@@ -190,6 +193,34 @@ export default function LandingPage() {
   const [loginOpen, setLoginOpen] = useState(false)
   /** 點下播放鍵才載入 YouTube iframe，在那之前不對 Google 發任何請求。 */
   const [videoStarted, setVideoStarted] = useState(false)
+  /** 往下捲收起頂欄，往上捲（不論在哪個位置）立刻放回來。 */
+  const [navHidden, setNavHidden] = useState(false)
+  /** 在頁面最頂端時不畫分隔線。 */
+  const [navAtTop, setNavAtTop] = useState(true)
+
+  useEffect(() => {
+    let last = window.scrollY
+    let queued = false
+
+    const update = () => {
+      queued = false
+      const y = window.scrollY
+      // 門檻 6px：避免手機捲動的細微抖動讓頂欄一直閃
+      if (y > last + 6 && y > 90) setNavHidden(true)
+      else if (y < last - 6) setNavHidden(false)
+      setNavAtTop(y <= 4)
+      last = y
+    }
+
+    const onScroll = () => {
+      if (queued) return
+      queued = true
+      requestAnimationFrame(update)
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   async function handleLogin(credential: string) {
     if (!credential) {
@@ -235,9 +266,10 @@ export default function LandingPage() {
         </svg>
       </div>
 
-      <header className="lp-nav">
+      <header
+        className={`lp-nav${navHidden ? ' lp-nav-hidden' : ''}${navAtTop ? ' lp-nav-at-top' : ''}`}
+      >
         <a className="lp-brand" href="/">
-          <span className="lp-brand-mark" />
           <span>
             <span className="lp-brand-name">ALL IN</span>
             <span className="lp-brand-sub">Portfolio tracker</span>
@@ -282,9 +314,15 @@ export default function LandingPage() {
           </p>
         </div>
 
+        {/* 卡片帶 tabIndex：手機上點一下就展開（觸控的 tap 會觸發 hover），鍵盤也能用 Tab 逐張展開 */}
         <div className="lp-deck">
           {CATEGORIES.map(c => (
-            <article className="lp-deck-card" key={c.label} style={{ ['--dot' as string]: c.accent }}>
+            <article
+              className="lp-deck-card"
+              key={c.label}
+              tabIndex={0}
+              style={{ ['--dot' as string]: c.accent }}
+            >
               <div className="lp-deck-label">{c.label}</div>
               {c.note && <p className="lp-deck-note">{c.note}</p>}
               <ul className="lp-deck-list">
