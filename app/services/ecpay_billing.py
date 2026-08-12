@@ -145,13 +145,29 @@ def _add_months(dt: datetime, months: int) -> datetime:
                       day=min(dt.day, calendar.monthrange(year, month)[1]))
 
 
+def _parse_ecpay_dt(value: str) -> datetime:
+    """Parse an ECPay 'YYYY/MM/DD HH:MM:SS' timestamp (always UTC+8)."""
+    try:
+        return datetime.strptime(value, "%Y/%m/%d %H:%M:%S").replace(tzinfo=_TAIPEI)
+    except ValueError:
+        return datetime.now(_TAIPEI)
+
+
 def _period_end_iso(auth_date: str) -> str:
     """Next charge date (UTC ISO) computed from an ECPay UTC+8 timestamp."""
+    return _add_months(_parse_ecpay_dt(auth_date), _FREQUENCY).astimezone(timezone.utc).isoformat()
+
+
+def _paid_at_iso(value: str | None) -> str | None:
+    """Charge timestamp as UTC ISO; None when the callback omits the field."""
+    return _parse_ecpay_dt(value).astimezone(timezone.utc).isoformat() if value else None
+
+
+def _int_or_none(value) -> int | None:
     try:
-        authorized = datetime.strptime(auth_date, "%Y/%m/%d %H:%M:%S").replace(tzinfo=_TAIPEI)
-    except ValueError:
-        authorized = datetime.now(_TAIPEI)
-    return _add_months(authorized, _FREQUENCY).astimezone(timezone.utc).isoformat()
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
 
 
 def handle_first_auth(form: dict) -> None:
@@ -177,7 +193,9 @@ def handle_first_auth(form: dict) -> None:
                        form.get("MerchantTradeNo"), form.get("RtnCode"), form.get("RtnMsg"))
         return
     _upsert(user_id, form["MerchantTradeNo"], "active",
-            _period_end_iso(form.get("PaymentDate", "")))
+            _period_end_iso(form.get("PaymentDate", "")),
+            amount=_int_or_none(form.get("TotalAmount")),
+            paid_at=_paid_at_iso(form.get("PaymentDate")))
 
 
 def handle_period(form: dict) -> None:
@@ -193,8 +211,12 @@ def handle_period(form: dict) -> None:
         logger.info("ecpay simulated period payment ignored: %s", form.get("MerchantTradeNo"))
         return
     if str(form.get("RtnCode")) == "1":
+        # Period callbacks name the charged amount `Amount`; the first-auth
+        # callback calls the same value `TotalAmount`.
         _upsert(user_id, form["MerchantTradeNo"], "active",
-                _period_end_iso(form.get("ProcessDate", "")))
+                _period_end_iso(form.get("ProcessDate", "")),
+                amount=_int_or_none(form.get("Amount") or form.get("TotalAmount")),
+                paid_at=_paid_at_iso(form.get("ProcessDate")))
     else:
         # Charge failed. ECPay retries by itself and auto-terminates after 6
         # consecutive failures; past_due (inactive) until a retry succeeds.
@@ -207,23 +229,39 @@ def handle_period(form: dict) -> None:
         )
 
 
-def _upsert(user_id: str, trade_no: str, status: str, period_end: str) -> None:
+def _upsert(user_id: str, trade_no: str, status: str, period_end: str,
+            amount: int | None = None, paid_at: str | None = None) -> None:
     now = datetime.now(timezone.utc).isoformat()
     execute(
         """
         INSERT INTO subscriptions
             (id, user_id, provider, external_id, status, current_period_end,
-             cancel_at_period_end, created_at, updated_at)
-        VALUES (%s, %s, 'ecpay', %s, %s, %s, FALSE, %s, %s)
+             cancel_at_period_end, amount, last_payment_at, started_at,
+             created_at, updated_at)
+        VALUES (%s, %s, 'ecpay', %s, %s, %s, FALSE, %s, %s, %s, %s, %s)
         ON CONFLICT (user_id) DO UPDATE SET
             provider             = 'ecpay',
             external_id          = EXCLUDED.external_id,
             status               = EXCLUDED.status,
             current_period_end   = EXCLUDED.current_period_end,
             cancel_at_period_end = FALSE,
+            -- Never overwrite a stored value with NULL: a callback that omits
+            -- the field says nothing about the amount already on record.
+            amount               = COALESCE(EXCLUDED.amount, subscriptions.amount),
+            last_payment_at      = COALESCE(EXCLUDED.last_payment_at,
+                                            subscriptions.last_payment_at),
+            -- A different ECPay order means a new subscription run (the user
+            -- canceled and signed up again); monthly renewals of the same
+            -- order keep the original start date.
+            started_at           = CASE
+                WHEN subscriptions.external_id IS DISTINCT FROM EXCLUDED.external_id
+                    THEN EXCLUDED.started_at
+                ELSE subscriptions.started_at
+            END,
             updated_at           = EXCLUDED.updated_at
         """,
-        (str(uuid.uuid4()), user_id, trade_no, status, period_end, now, now),
+        (str(uuid.uuid4()), user_id, trade_no, status, period_end,
+         amount, paid_at, paid_at or now, now, now),
     )
 
 
@@ -297,6 +335,9 @@ def reconcile_subscriptions() -> dict:
         if expected_end and (db_end is None or expected_end > db_end):
             updates["current_period_end"] = expected_end.isoformat()
             updates["status"] = "active"
+            # Same charge the period end was derived from — the callback we
+            # missed would have recorded it.
+            updates["last_payment_at"] = _paid_at_iso(last_charge)
         if ended and not row["cancel_at_period_end"]:
             updates["cancel_at_period_end"] = True
         if not updates:

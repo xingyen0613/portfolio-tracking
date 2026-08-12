@@ -224,7 +224,7 @@ date,platform,symbol,quantity,price_usd,category
 單一方案，非 Free / Pro 分層：
 
 ```
-訂閱（NT$50 / 月，AIO 定期定額信用卡）：
+訂閱（NT$99 / 月，AIO 定期定額信用卡）：
   - 每日自動跨平台紀錄資產變化
   - 細部持倉明細
   - 各項 benchmark 回測比較
@@ -247,7 +247,7 @@ Gating 一律走 `app/services/entitlements.py` 的 `get_entitlement` / `is_acti
 - [x] `BILLING_ENFORCED` 已在 Cloud Run 開啟（2026-08-06 確認）；5 位既有用戶先以 `grant_comp` 發老用戶優待，不會被斷線
 
 ### 未決 / 已知問題
-- [ ] 定價 NT$50 硬編碼在 `SettingsTab.tsx`，未從 API 取；調價要同時改前端與 `ECPAY_PERIOD_AMOUNT`
+- [ ] 定價 NT$99 硬編碼在 `SettingsTab.tsx`，未從 API 取；調價要同時改前端與 `ECPAY_PERIOD_AMOUNT`（DB 已記錄每位訂閱者實付的 `amount`，見 migration 018）
 - [ ] `BILLING_ENFORCED=false` 時 `get_entitlement` 在讀 `subscriptions` 前就短路（`app/services/entitlements.py:65`），付費用戶會顯示未訂閱且無法取消 —— 目前 flag 已開故不觸發，但若哪天關回 false 會復現
 
 ---
