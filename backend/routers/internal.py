@@ -3,6 +3,7 @@ Internal endpoints for Cloud Scheduler to trigger batch jobs.
 Auth: X-Scheduler-Secret header must match SCHEDULER_SECRET env var.
 """
 
+import hmac
 import logging
 from typing import Literal
 
@@ -24,7 +25,7 @@ class TriggerRequest(BaseModel):
 def _verify_secret(x_scheduler_secret: str | None) -> None:
     if not SCHEDULER_SECRET:
         raise HTTPException(status_code=503, detail="SCHEDULER_SECRET not configured")
-    if x_scheduler_secret != SCHEDULER_SECRET:
+    if not hmac.compare_digest(x_scheduler_secret or "", SCHEDULER_SECRET):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
 

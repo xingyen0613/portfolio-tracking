@@ -1,11 +1,12 @@
 """Phase 1 verification for the entitlement layer.
 
 Exercises all four scenarios end-to-end against the DB and prints the real dicts.
-Mutates ONLY the test account xingyen02@gmail.com (grant then revoke). Leaves it
-revoked at the end (re-run `grant` via scripts/grant_comp.py if it should stay comp).
+Mutates ONLY the test account (grant then revoke). Leaves it revoked at the end
+(re-run `grant` via scripts/grant_comp.py if it should stay comp).
 
-    uv run python scripts/verify_entitlements.py
+    VERIFY_OWNER_EMAIL=... VERIFY_TEST_EMAIL=... uv run python scripts/verify_entitlements.py
 """
+import os
 import sys
 from pathlib import Path
 
@@ -13,8 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.services.entitlements import get_entitlement, grant_comp, revoke_comp, _user_id_by_email
 
-OWNER_EMAIL = "xingyen0613@gmail.com"   # is_system=TRUE
-TEST_EMAIL = "xingyen02@gmail.com"      # non-system test account
+OWNER_EMAIL = os.environ.get("VERIFY_OWNER_EMAIL")
+TEST_EMAIL = os.environ.get("VERIFY_TEST_EMAIL")
 
 
 def check(label: str, got: dict, want_active: bool, want_statuses: set[str]) -> bool:
@@ -24,6 +25,11 @@ def check(label: str, got: dict, want_active: bool, want_statuses: set[str]) -> 
 
 
 def main() -> int:
+    if not OWNER_EMAIL or not TEST_EMAIL:
+        print("ERROR: set VERIFY_OWNER_EMAIL (is_system account) and VERIFY_TEST_EMAIL",
+              file=sys.stderr)
+        return 1
+
     owner_id = _user_id_by_email(OWNER_EMAIL)
     test_id = _user_id_by_email(TEST_EMAIL)
 

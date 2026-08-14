@@ -1,0 +1,46 @@
+# Dockerfile 最後一行是 COPY . .，而 docker 不讀 .gitignore。
+# 沒有這個檔案的話，本機 build 會把憑證與 .env 烤進 image layer（刪不掉）。
+
+# 機密：絕不進 image
+.env
+.env.*
+.secrets/
+config/.env.*
+
+# 虛擬環境與快取（466MB，且是 macOS arm64 版，進 image 也不能用）
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# 版控歷史（25MB，含所有分支）
+.git/
+.github/
+
+# 歷史快照 JSON（432MB，runtime 從 DB 讀，不需要）
+data/
+
+# 前端獨立部署到 Cloudflare Pages，後端 image 用不到
+frontend/
+
+# vendor/ 只有 fubon whl 需要進 image（Dockerfile 會裝它）
+vendor/yuanta_spark/
+
+# 開發環境產物
+.claude/
+.playwright-mcp/
+.wrangler/
+video-asset/
+.DS_Store
+log/
+shioaji.log
+
+# 文件與截圖素材：runtime 不讀（已確認無程式碼引用 .md）
+# 注意 dockerignore 不支援 gitignore 的 /xxx 錨定寫法，pattern 一律不加開頭斜線
+*.md
+docs/
+*.png
+*.jpg
+*.plist
