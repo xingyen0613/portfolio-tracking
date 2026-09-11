@@ -464,7 +464,10 @@ def run_batch(platforms: list[str], user_id: str,
     # Determine batch final status
     statuses = [r.status for r in results]
     if not statuses:
-        batch_status = "failed"
+        # No source ran at all: this user has no account on any of the requested
+        # platforms (e.g. a yuanta-only user swept up by the daily batch, which
+        # doesn't include yuanta). Nothing was attempted, so this isn't a failure.
+        batch_status = "skipped"
     elif all(s == "success" for s in statuses):
         batch_status = "success"
     elif any(s == "success" for s in statuses):
