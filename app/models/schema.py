@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS batches (
     id          TEXT PRIMARY KEY,       -- UUID
     started_at  TEXT NOT NULL,          -- ISO8601
     finished_at TEXT,
-    status      TEXT NOT NULL DEFAULT 'running'  -- running | success | partial | failed
+    status      TEXT NOT NULL DEFAULT 'running'  -- running | success | partial | failed | skipped
 );
 
 CREATE TABLE IF NOT EXISTS source_runs (
