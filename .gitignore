@@ -20,6 +20,7 @@ scripts/*
 !scripts/grant_comp.py
 !scripts/verify_entitlements.py
 !scripts/hyperliquid_poc.py
+!scripts/cloud_health_check.py
 .venv/
 /data/
 __pycache__/
