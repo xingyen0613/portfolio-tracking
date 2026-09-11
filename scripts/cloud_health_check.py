@@ -12,12 +12,19 @@ The local cron batch (`python -m app.jobs.run_batch`) only ever runs for
 SYSTEM_OWNER_ID, so "a non-system user has a category_snapshot dated today" is a
 clean signal that the cloud track specifically did its job.
 
-Usage (crontab, after the 23:30 Taipei Cloud Scheduler run):
-    55 23 * * * cd <repo> && uv run python scripts/cloud_health_check.py
+It checks *yesterday*, not today: the cloud batch runs 23:30-23:42 Taipei, which
+leaves only ~13 minutes before the date rolls over. Checking the previous day
+from a morning cron removes that coupling entirely — an outage that started last
+night is still an outage this morning, and a 9-hour-late alert is irrelevant next
+to the 12-day blind spot this exists to close.
+
+Usage (crontab):
+    0 9 * * * cd <repo> && uv run python scripts/cloud_health_check.py
 """
 
+import argparse
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -28,7 +35,11 @@ from config.settings import SYSTEM_OWNER_ID
 
 
 def main() -> int:
-    today = date.today().isoformat()
+    parser = argparse.ArgumentParser(description="Alert if the GCP batch did not run.")
+    parser.add_argument("--days-ago", type=int, default=1,
+                        help="which day to check (default: 1 = yesterday)")
+    args = parser.parse_args()
+    target = (date.today() - timedelta(days=args.days_ago)).isoformat()
 
     with get_conn() as conn:
         row = conn.execute(
@@ -38,7 +49,7 @@ def main() -> int:
              WHERE snapshot_date = %s
                AND user_id <> %s
             """,
-            (today, SYSTEM_OWNER_ID),
+            (target, SYSTEM_OWNER_ID),
         ).fetchone()
         expected = conn.execute(
             """
@@ -55,15 +66,15 @@ def main() -> int:
 
     if cloud_users == 0 and expected_users > 0:
         send_telegram(
-            "🔴 雲端 batch 今天沒有跑\n"
-            f"{today} 的 category_snapshots 沒有任何非 system 用戶資料"
+            "🔴 雲端 batch 沒有跑\n"
+            f"{target} 的 category_snapshots 沒有任何非 system 用戶資料"
             f"（預期 {expected_users} 位）。\n"
             "Cloud Run 或 Cloud Scheduler 可能已停擺 — 請檢查 GCP billing 與服務狀態。"
         )
-        print(f"[health] ALERT sent — 0/{expected_users} cloud users on {today}")
+        print(f"[health] ALERT sent — 0/{expected_users} cloud users on {target}")
         return 1
 
-    print(f"[health] OK — {cloud_users}/{expected_users} cloud users on {today}")
+    print(f"[health] OK — {cloud_users}/{expected_users} cloud users on {target}")
     return 0
 
 
