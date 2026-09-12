@@ -21,6 +21,7 @@ scripts/*
 !scripts/verify_entitlements.py
 !scripts/hyperliquid_poc.py
 !scripts/cloud_health_check.py
+!scripts/test_ibkr_retry.py
 .venv/
 /data/
 __pycache__/
