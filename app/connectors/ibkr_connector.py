@@ -120,8 +120,21 @@ class IBKRConnector(BaseConnector):
         params = {"t": self.token, "q": ref_code, "v": "3"}
         time.sleep(5)
 
+        last_err = None
         for attempt in range(1, retries + 1):
-            text = self._request("GetStatement", params)
+            try:
+                text = self._request("GetStatement", params)
+            except RuntimeError as e:
+                # 傳輸層抖動（ConnectionError、5xx）。這個迴圈原本只在
+                # status == "Warn" 時重試，連線錯誤會直接穿出去 —— 2026-09-11
+                # 的 "GetStatement: ConnectionError" 就是這樣變成一次 batch 失敗，
+                # 而同一批次裡其他用戶的同一支 API 是通的。
+                last_err = str(e)
+                if attempt == retries:
+                    raise RuntimeError(f"{last_err} (after {retries} attempts)") from None
+                time.sleep(delay)
+                continue
+
             root = ET.fromstring(text)
             status = root.findtext("Status")
 
