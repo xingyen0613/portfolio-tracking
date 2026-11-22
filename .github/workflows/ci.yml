@@ -1,0 +1,63 @@
+name: CI
+
+# CI only. Deployment stays in deploy.yml (manual workflow_dispatch).
+#
+# What is NOT run here, and why:
+# - scripts/test_e2e_price_cache.py, scripts/test_price_cache.py,
+#   scripts/test_subscription_payment_fields.py: they connect to the real
+#   Supabase database (config.db) and/or call price APIs. CI has no DB
+#   credentials and must never touch production data.
+# - Anything that logs in to a broker or exchange (Shioaji / Sinopac, Fubon,
+#   IBKR, ccxt exchanges, Alchemy, Gmail OAuth): needs user credentials.
+#   shioaji is installed (it is in requirements.txt) but never logged in.
+# - frontend `npm run lint`: currently fails with 19 pre-existing errors
+#   (mostly the new eslint-plugin-react-hooks v7 rules). Add it here once
+#   the existing code is cleaned up.
+# - vendor/fubon_neo-*.whl: imported lazily inside FubonConnector only, so
+#   the backend import check below does not need it.
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Syntax check
+        run: python -m compileall -q app backend config scripts alembic main.py
+      - name: Import check (FastAPI app loads without env / DB)
+        run: python -c "import backend.main as m; print(len(m.app.routes), 'routes')"
+      - name: IBKR GetStatement retry test (offline, fake responses)
+        run: python scripts/test_ibkr_retry.py
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Type check + build (tsc -b && vite build)
+        run: npm run build
